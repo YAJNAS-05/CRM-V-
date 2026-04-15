@@ -1,0 +1,444 @@
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, Save, Package } from 'lucide-react'
+import { inventoryApi } from '../../../api/erpApi'
+import { InventoryItem, CreateInventoryItemRequest } from '../../../types/erp'
+import { ApiResponse } from '../../../types'
+import { useAuthStore } from '../../../store/authStore'
+import { toast } from 'react-hot-toast'
+
+const InventoryForm: React.FC = () => {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const isEditing = !!id
+  const { user } = useAuthStore()
+
+  const [formData, setFormData] = useState<CreateInventoryItemRequest>({
+    itemCode: '',
+    name: '',
+    description: '',
+    category: 'EQUIPMENT',
+    unitOfMeasure: 'PIECE',
+    quantity: 0,
+    minStockLevel: 0,
+    maxStockLevel: 100,
+    reorderPoint: 10,
+    unitPrice: 0,
+    supplierName: '',
+    location: '',
+    barcode: '',
+    sku: '',
+    status: 'ACTIVE',
+  })
+
+  const [loading, setLoading] = useState(false)
+  const [fetchLoading, setFetchLoading] = useState(isEditing)
+
+  useEffect(() => {
+    if (isEditing && id) {
+      fetchInventoryItem(id)
+    }
+  }, [id, isEditing])
+
+  const fetchInventoryItem = async (itemId: string) => {
+    try {
+      setFetchLoading(true)
+      const response = await inventoryApi.getById(itemId)
+      if (response.success) {
+        const item = response.data!
+        setFormData({
+          itemCode: item.itemCode,
+          name: item.name,
+          description: item.description || '',
+          category: item.category,
+          unitOfMeasure: item.unitOfMeasure,
+          quantity: item.quantity,
+          minStockLevel: item.minStockLevel,
+          maxStockLevel: item.maxStockLevel,
+          reorderPoint: item.reorderPoint,
+          unitPrice: item.unitPrice,
+          supplierName: item.supplierName || '',
+          location: item.location || '',
+          barcode: item.barcode || '',
+          sku: item.sku || '',
+          status: item.status,
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching inventory item:', error)
+      toast.error('Failed to load inventory item')
+      navigate('/erp/inventory')
+    } finally {
+      setFetchLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Validation
+    if (!formData.itemCode.trim()) {
+      toast.error('Item code is required')
+      return
+    }
+    if (!formData.name.trim()) {
+      toast.error('Item name is required')
+      return
+    }
+    if (formData.unitPrice < 0) {
+      toast.error('Unit price cannot be negative')
+      return
+    }
+    if (formData.quantity < 0) {
+      toast.error('Quantity cannot be negative')
+      return
+    }
+    if (formData.minStockLevel < 0) {
+      toast.error('Minimum stock level cannot be negative')
+      return
+    }
+    if (formData.maxStockLevel < formData.minStockLevel) {
+      toast.error('Maximum stock level must be greater than minimum stock level')
+      return
+    }
+
+    try {
+      setLoading(true)
+      let response: ApiResponse<InventoryItem>
+
+      if (isEditing && id) {
+        response = await inventoryApi.update(id, { id, ...formData })
+      } else {
+        response = await inventoryApi.create(formData)
+      }
+
+      if (response.success) {
+        toast.success(`Inventory item ${isEditing ? 'updated' : 'created'} successfully`)
+        navigate('/erp/inventory')
+      }
+    } catch (error) {
+      console.error('Error saving inventory item:', error)
+      toast.error(`Failed to ${isEditing ? 'update' : 'create'} inventory item`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? parseFloat(value) || 0 : value,
+    }))
+  }
+
+  if (fetchLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <Link
+            to="/erp/inventory"
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+              <Package className="mr-2 h-6 w-6" />
+              {isEditing ? 'Edit Inventory Item' : 'Add Inventory Item'}
+            </h1>
+            <p className="text-gray-600">
+              {isEditing ? 'Update inventory item details' : 'Create a new inventory item'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-6">
+        {/* Basic Information */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="itemCode" className="block text-sm font-medium text-gray-700">
+                Item Code *
+              </label>
+              <input
+                type="text"
+                id="itemCode"
+                name="itemCode"
+                value={formData.itemCode}
+                onChange={handleInputChange}
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter item code"
+              />
+            </div>
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                Name *
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter item name"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                Description
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows={3}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter item description"
+              />
+            </div>
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                Category *
+              </label>
+              <select
+                id="category"
+                name="category"
+                value={formData.category}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="EQUIPMENT">Equipment</option>
+                <option value="SPARE_PARTS">Spare Parts</option>
+                <option value="CONSUMABLES">Consumables</option>
+                <option value="RAW_MATERIALS">Raw Materials</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="unitOfMeasure" className="block text-sm font-medium text-gray-700">
+                Unit of Measure *
+              </label>
+              <select
+                id="unitOfMeasure"
+                name="unitOfMeasure"
+                value={formData.unitOfMeasure}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="PIECE">Piece</option>
+                <option value="KG">Kilogram</option>
+                <option value="LITER">Liter</option>
+                <option value="METER">Meter</option>
+                <option value="BOX">Box</option>
+                <option value="PACK">Pack</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700">
+                Status *
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="DISCONTINUED">Discontinued</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing & Stock */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Pricing & Stock Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="unitPrice" className="block text-sm font-medium text-gray-700">
+                Unit Price *
+              </label>
+              <input
+                type="number"
+                id="unitPrice"
+                name="unitPrice"
+                value={formData.unitPrice}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
+                Current Quantity *
+              </label>
+              <input
+                type="number"
+                id="quantity"
+                name="quantity"
+                value={formData.quantity}
+                onChange={handleInputChange}
+                min="0"
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label htmlFor="minStockLevel" className="block text-sm font-medium text-gray-700">
+                Minimum Stock Level *
+              </label>
+              <input
+                type="number"
+                id="minStockLevel"
+                name="minStockLevel"
+                value={formData.minStockLevel}
+                onChange={handleInputChange}
+                min="0"
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label htmlFor="maxStockLevel" className="block text-sm font-medium text-gray-700">
+                Maximum Stock Level *
+              </label>
+              <input
+                type="number"
+                id="maxStockLevel"
+                name="maxStockLevel"
+                value={formData.maxStockLevel}
+                onChange={handleInputChange}
+                min="0"
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="100"
+              />
+            </div>
+            <div>
+              <label htmlFor="reorderPoint" className="block text-sm font-medium text-gray-700">
+                Reorder Point *
+              </label>
+              <input
+                type="number"
+                id="reorderPoint"
+                name="reorderPoint"
+                value={formData.reorderPoint}
+                onChange={handleInputChange}
+                min="0"
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="10"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Information */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="supplierName" className="block text-sm font-medium text-gray-700">
+                Supplier Name
+              </label>
+              <input
+                type="text"
+                id="supplierName"
+                name="supplierName"
+                value={formData.supplierName}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter supplier name"
+              />
+            </div>
+            <div>
+              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+                Location
+              </label>
+              <input
+                type="text"
+                id="location"
+                name="location"
+                value={formData.location}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter storage location"
+              />
+            </div>
+            <div>
+              <label htmlFor="barcode" className="block text-sm font-medium text-gray-700">
+                Barcode
+              </label>
+              <input
+                type="text"
+                id="barcode"
+                name="barcode"
+                value={formData.barcode}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter barcode"
+              />
+            </div>
+            <div>
+              <label htmlFor="sku" className="block text-sm font-medium text-gray-700">
+                SKU
+              </label>
+              <input
+                type="text"
+                id="sku"
+                name="sku"
+                value={formData.sku}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter SKU"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex justify-end space-x-4">
+          <Link
+            to="/erp/inventory"
+            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+          >
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {loading ? 'Saving...' : 'Save Item'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export default InventoryForm
