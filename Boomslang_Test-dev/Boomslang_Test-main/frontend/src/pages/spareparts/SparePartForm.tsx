@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { sparePartApi } from '../../api/erpApi'
+import { sparePartApi, supplierApi } from '../../api/erpApi'
+import { Supplier } from '../../types/erp'
 import { toast } from 'react-hot-toast'
+import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
 
 const SPARE_PART_CATEGORIES = ['Probes', 'Injectors', 'Coils', 'CR/DR']
 
@@ -22,6 +24,7 @@ interface FormData {
   reorderPoint: string
   unitCost: string
   currency: string
+  supplierId: string
   warehouseLocation: string
 }
 
@@ -38,6 +41,7 @@ const defaultForm: FormData = {
   reorderPoint: '',
   unitCost: '',
   currency: 'USD',
+  supplierId: '',
   warehouseLocation: '',
 }
 
@@ -48,10 +52,28 @@ export default function SparePartForm() {
   const [form, setForm] = useState<FormData>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+
+  useEffect(() => {
+    loadSuppliers()
+  }, [])
 
   useEffect(() => {
     if (isEdit && id) loadItem()
-  }, [id])
+  }, [id, isEdit])
+
+  const loadSuppliers = async () => {
+    try {
+      setLookupLoading(true)
+      const response = await supplierApi.getAll(0, 200)
+      setSuppliers(response.data?.data?.content || [])
+    } catch {
+      toast.error('Failed to load suppliers')
+    } finally {
+      setLookupLoading(false)
+    }
+  }
 
   const loadItem = async () => {
     try {
@@ -73,6 +95,7 @@ export default function SparePartForm() {
           reorderPoint: e.reorderPoint?.toString() || '',
           unitCost: e.unitCost?.toString() || '',
           currency: e.currency || 'USD',
+          supplierId: e.supplierId || '',
           warehouseLocation: e.warehouseLocation || '',
         })
       }
@@ -83,6 +106,20 @@ export default function SparePartForm() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
+
+  const handleLookupChange = (name: string, value: string) => {
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const supplierOptions = useMemo(
+    () =>
+      suppliers.map((supplier) => ({
+        value: supplier.id,
+        label: supplier.companyName,
+        meta: [supplier.country, supplier.paymentTerms].filter(Boolean).join(' | ') || undefined,
+      })),
+    [suppliers]
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,6 +133,7 @@ export default function SparePartForm() {
         reorderPoint: form.reorderPoint ? parseInt(form.reorderPoint) : null,
         unitCost: form.unitCost ? parseFloat(form.unitCost) : null,
         yearOfManufacture: form.yearOfManufacture ? parseInt(form.yearOfManufacture) : null,
+        supplierId: form.supplierId || null,
       }
       if (isEdit) {
         const response = await sparePartApi.update(id!, payload)
@@ -272,7 +310,12 @@ export default function SparePartForm() {
                   </div>
                   <div>
                     <label className={labelClass}>Warehouse Location</label>
-                    <input type="text" name="warehouseLocation" value={form.warehouseLocation} onChange={handleChange} className={inputClass} />
+                    <select name="warehouseLocation" value={form.warehouseLocation} onChange={handleChange} className={inputClass}>
+                      <option value="">-- Select Warehouse Location --</option>
+                      {LOCATIONS.map((location) => (
+                        <option key={location} value={location}>{location}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>Unit Cost</label>
@@ -287,6 +330,17 @@ export default function SparePartForm() {
                       <option value="JPY">JPY</option>
                       <option value="GBP">GBP</option>
                     </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <SearchableLookupSelect
+                      label="Supplier"
+                      name="supplierId"
+                      value={form.supplierId}
+                      options={supplierOptions}
+                      onChange={handleLookupChange}
+                      disabled={lookupLoading}
+                      placeholder="Search supplier by company name"
+                    />
                   </div>
                 </div>
               </div>

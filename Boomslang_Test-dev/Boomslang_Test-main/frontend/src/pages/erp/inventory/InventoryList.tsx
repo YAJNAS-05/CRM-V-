@@ -6,6 +6,7 @@ import { InventoryItem } from '../../../types/erp'
 import { ApiResponse } from '../../../types'
 import { useAuthStore } from '../../../store/authStore'
 import { toast } from 'react-hot-toast'
+import { exportToExcel, getExportDateStamp } from '../../../utils/exportToExcel'
 
 const InventoryList: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -69,6 +70,26 @@ const InventoryList: React.FC = () => {
     item.description?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const handleExport = () => {
+    const rows = filteredInventory.map((item) => ({
+      ItemCode: item.itemCode,
+      Name: item.name,
+      Description: item.description || '',
+      Category: item.category,
+      Quantity: item.quantity,
+      UnitOfMeasure: item.unitOfMeasure,
+      MinStockLevel: item.minStockLevel,
+      UnitPrice: item.unitPrice,
+      Location: item.location || '',
+      Status: item.status,
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Inventory_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Inventory',
+    })
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'bg-green-100 text-green-800'
@@ -103,13 +124,22 @@ const InventoryList: React.FC = () => {
           </h1>
           <p className="text-gray-600">Manage your inventory items and stock levels</p>
         </div>
-        <Link
-          to="/erp/inventory/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={filteredInventory.length === 0}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <Link
+            to="/erp/inventory/new"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}

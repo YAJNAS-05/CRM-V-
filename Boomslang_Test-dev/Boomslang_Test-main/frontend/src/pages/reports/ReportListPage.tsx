@@ -1,247 +1,253 @@
-// src/pages/reports/ReportListPage.tsx
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { reportApi } from '@/api/reportApi'
 import { useNotification } from '@/hooks/useNotification'
-import { useAuthStore } from '@/store/authStore'
 
-interface Report {
-  reportId: number | string
-  reportName: string
-  module: string
+interface CustomReportItem {
+  id: string
+  name: string
   description?: string
-  columnCount?: number
-  isSystem?: boolean
-  ownedBy?: string | number
+  widgets?: any[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const ReportListPage = () => {
   const navigate = useNavigate()
   const { success, error } = useNotification()
-  const user = useAuthStore((state: any) => state.user)
   const [search, setSearch] = useState('')
-  const [moduleFilter, setModuleFilter] = useState<string | null>(null)
-  const [isCloning, setIsCloning] = useState<string | number | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [isDeletingCustom, setIsDeletingCustom] = useState<string | null>(null)
 
-  // Fetch reports list
-  const { data: reports = [], isLoading, refetch } = useQuery({
-    queryKey: ['reports', moduleFilter],
+  const {
+    data: customReports = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ['custom-reports'],
     queryFn: async () => {
       try {
-        const response = await reportApi.listReports(moduleFilter || undefined)
-        // Backend returns Page<ReportDefinitionEntity>, extract content array
-        const pageData = response.data?.data as any
-        return pageData?.content || []
+        const page = await reportApi.listCustomReports(0, 500)
+        return Array.isArray(page?.content) ? page.content : []
       } catch {
         return []
       }
-    }
+    },
   })
 
-  // Fetch modules for filter
-  const { data: modules = [] } = useQuery({
-    queryKey: ['report-modules'],
-    queryFn: async () => {
-      try {
-        const response = await reportApi.getModules()
-        const data = response.data?.data as any[] || []
-        // Extract module names if they're objects with 'name' property
-        return Array.isArray(data) && data.length > 0 && typeof data[0] === 'object'
-          ? data.map((m: any) => ({ name: m.name, displayName: m.displayName }))
-          : ['CRM', 'ERP', 'FINANCE'].map(n => ({ name: n, displayName: n }))
-      } catch {
-        return ['CRM', 'ERP', 'FINANCE'].map(n => ({ name: n, displayName: n }))
-      }
-    }
-  })
+  const filteredCustomReports: CustomReportItem[] = useMemo(() => {
+    if (!Array.isArray(customReports)) return []
 
-  // Filter reports based on search
-  const filteredReports: Report[] = useMemo(() => {
-    if (!Array.isArray(reports)) return []
-    return reports
-      .filter((r: any) => r && r.reportId) // Filter out invalid entries
-      .map((r: any) => ({
-        reportId: r.reportId,
-        reportName: r.reportName || 'Untitled Report',
-        module: r.module || 'UNKNOWN',
-        description: r.description,
-        columnCount: r.columns?.length || 0,
-        isSystem: r.isSystem,
-        ownedBy: r.ownedBy
-      }))
-      .filter((r: Report) =>
-        r.reportName.toLowerCase().includes(search.toLowerCase()) ||
-        (r.description && r.description.toLowerCase().includes(search.toLowerCase()))
-      )
-  }, [reports, search])
+    const filtered = customReports.filter((report: CustomReportItem) => {
+      const titleMatch = report.name?.toLowerCase().includes(search.toLowerCase())
+      const descriptionMatch = report.description?.toLowerCase().includes(search.toLowerCase())
+      return Boolean(titleMatch || descriptionMatch)
+    })
 
-  const handleCloneReport = async (reportId: number | string, moduleName: string) => {
+    return [...filtered].sort((a, b) => {
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime()
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime()
+      return bTime - aTime
+    })
+  }, [customReports, search])
+
+  const handleDeleteCustomReport = async (reportId: string, reportName: string) => {
+    if (!confirm(`Delete saved report "${reportName}"? This cannot be undone.`)) return
+
     try {
-      setIsCloning(reportId)
-      const cloned = await reportApi.cloneReport(reportId as number, moduleName)
-      const clonedReport = cloned.data?.data as Report
-      success('Report Cloned', `Report cloned as "${clonedReport.reportName}"`)
+      setIsDeletingCustom(reportId)
+      await reportApi.deleteCustomReport(reportId)
+      success('Report Deleted', 'Saved report deleted successfully')
       await refetch()
     } catch (err) {
-      error('Clone Failed', `Failed to clone: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      error('Delete Failed', `Failed to delete saved report: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
-      setIsCloning(null)
-    }
-  }
-
-  const handleDeleteReport = async (reportId: number | string, reportName: string) => {
-    if (!confirm(`Delete report "${reportName}"? This cannot be undone.`)) return
-
-    try {
-      await reportApi.deleteReport(reportId as number)
-      success('Report Deleted', 'Report deleted successfully')
-      await refetch()
-    } catch (err) {
-      error('Delete Failed', `Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setIsDeletingCustom(null)
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Reports</h1>
-        <p className="text-muted-foreground mt-1">Browse, run, and manage reports</p>
+        <h1 className="text-3xl font-bold">Saved Reports</h1>
+        <p className="text-muted-foreground mt-1">All saved custom reports are available here.</p>
       </div>
 
-      {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Search reports..."
-            value={search}
-            onChange={(e: any) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-2 border rounded-lg bg-background"
-          />
-          <select
-            value={moduleFilter || ''}
-            onChange={(e: any) => setModuleFilter(e.target.value || null)}
-            className="px-3 py-2 border rounded-lg bg-background"
-          >
-            <option value="">All Modules</option>
-            {Array.isArray(modules) && modules.map((m: any) => {
-              const name = typeof m === 'string' ? m : m.name
-              const displayName = typeof m === 'string' ? m : (m.displayName || m.name)
-              return (
-                <option key={name} value={name}>{displayName}</option>
-              )
-            })}
-          </select>
-        </div>
-        <button
-          onClick={() => navigate('/reports/builder')}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-        >
-          + New Report
-        </button>
-      </div>
+        <input
+          type="text"
+          placeholder="Search saved reports..."
+          value={search}
+          onChange={(e: any) => setSearch(e.target.value)}
+          className="flex-1 px-3 py-2 border rounded-lg bg-background"
+        />
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-3 py-2 text-sm ${
+                viewMode === 'grid'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-2 text-sm border-l ${
+                viewMode === 'list'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              List
+            </button>
+          </div>
 
-      {/* Reports Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-48 bg-muted/20 rounded-lg border border-border/50 animate-pulse"
-            />
-          ))}
-        </div>
-      ) : filteredReports.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            {search || moduleFilter ? 'No reports found' : 'No reports yet'}
-          </p>
           <button
-            onClick={() => navigate('/reports/builder')}
-            className="mt-4 text-sm text-primary hover:underline"
+            onClick={() => navigate('/reports/custom')}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
           >
-            Create your first report
+            + New Custom Report
           </button>
         </div>
+      </div>
+
+      {isLoading ? (
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={`saved-skeleton-${i}`}
+                className="h-44 bg-muted/20 rounded-lg border border-border/50 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={`saved-list-skeleton-${i}`}
+                className="h-20 bg-muted/20 rounded-lg border border-border/50 animate-pulse"
+              />
+            ))}
+          </div>
+        )
+      ) : filteredCustomReports.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
+          {search ? 'No saved reports match your search' : 'No saved custom reports yet'}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredReports.map((report: Report) => (
-            <div
-              key={report.reportId}
-              className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors"
-            >
-              {/* Header */}
-              <div className="mb-3">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <h3
-                    className="font-semibold text-foreground cursor-pointer hover:text-primary truncate flex-1"
-                    onClick={() => navigate(`/reports/${report.reportId}`)}
-                  >
-                    {report.reportName}
-                  </h3>
-                  <span className="text-xs px-2 py-1 bg-muted rounded whitespace-nowrap">
-                    {report.module}
-                  </span>
-                </div>
-                {!report.isSystem && (
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCustomReports.map((report) => (
+              <div key={report.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                <div className="mb-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-semibold text-foreground truncate flex-1">{report.name || 'Untitled Saved Report'}</h3>
+                    <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded whitespace-nowrap">
+                      SAVED
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    by {report.ownedBy || 'System'}
+                    {Array.isArray(report.widgets) ? report.widgets.length : 0} widgets
                   </p>
+                </div>
+
+                {report.description ? (
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[60px]">{report.description}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-3 min-h-[60px]">No description</p>
                 )}
-              </div>
 
-              {/* Description */}
-              {report.description && (
-                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                  {report.description}
-                </p>
-              )}
-
-              {/* Footer */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  {report.columnCount || 0} columns
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/reports/${report.reportId}`)}
-                    className="text-xs px-3 py-1 border rounded hover:bg-muted"
-                  >
-                    View
-                  </button>
-                  {user && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Updated {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'just now'}
+                  </span>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => handleCloneReport(report.reportId, report.module)}
-                      disabled={isCloning === report.reportId}
-                      className="text-xs px-3 py-1 border rounded hover:bg-muted disabled:opacity-40"
-                      title="Clone to create an editable copy"
+                      onClick={() => navigate(`/reports/custom/${report.id}?mode=preview`)}
+                      className="text-xs px-3 py-1 border rounded hover:bg-muted"
                     >
-                      {isCloning === report.reportId ? '...' : 'Clone'}
+                      View
                     </button>
-                  )}
-                  {!report.isSystem && user?.userId === report.ownedBy && (
                     <button
-                      onClick={() => navigate(`/reports/${report.reportId}/edit`)}
+                      onClick={() => navigate(`/reports/custom/${report.id}`)}
                       className="text-xs px-3 py-1 border rounded hover:bg-muted"
                     >
                       Edit
                     </button>
-                  )}
-                  {!report.isSystem && user?.userId === report.ownedBy && (
                     <button
-                      onClick={() => handleDeleteReport(report.reportId, report.reportName)}
-                      className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteCustomReport(report.id, report.name)}
+                      disabled={isDeletingCustom === report.id}
+                      className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10 disabled:opacity-40"
                     >
-                      Delete
+                      {isDeletingCustom === report.id ? '...' : 'Delete'}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border overflow-hidden bg-card">
+            <div className="hidden md:grid md:grid-cols-12 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-50 border-b border-border">
+              <div className="md:col-span-5">Report</div>
+              <div className="md:col-span-2">Widgets</div>
+              <div className="md:col-span-2">Updated</div>
+              <div className="md:col-span-3 text-right">Actions</div>
             </div>
-          ))}
-        </div>
+
+            {filteredCustomReports.map((report) => (
+              <div
+                key={`list-${report.id}`}
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 px-4 py-4 border-b border-border last:border-b-0"
+              >
+                <div className="md:col-span-5 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-foreground truncate">{report.name || 'Untitled Saved Report'}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded whitespace-nowrap">SAVED</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    {report.description || 'No description'}
+                  </p>
+                </div>
+
+                <div className="md:col-span-2 text-sm text-slate-700 flex items-center">
+                  {Array.isArray(report.widgets) ? report.widgets.length : 0} widgets
+                </div>
+
+                <div className="md:col-span-2 text-sm text-slate-600 flex items-center">
+                  {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'just now'}
+                </div>
+
+                <div className="md:col-span-3 flex items-center md:justify-end gap-2">
+                  <button
+                    onClick={() => navigate(`/reports/custom/${report.id}?mode=preview`)}
+                    className="text-xs px-3 py-1 border rounded hover:bg-muted"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => navigate(`/reports/custom/${report.id}`)}
+                    className="text-xs px-3 py-1 border rounded hover:bg-muted"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCustomReport(report.id, report.name)}
+                    disabled={isDeletingCustom === report.id}
+                    className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                  >
+                    {isDeletingCustom === report.id ? '...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   )

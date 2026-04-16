@@ -1,5 +1,4 @@
 // src/api/reportApi.ts
-import axios from 'axios'
 import axiosInstance from './axiosInstance'
 
 export interface ReportDefinition {
@@ -72,6 +71,58 @@ export interface ReportExecutionRequest {
   companyCode?: string
 }
 
+interface LocalCustomReport {
+  id: string
+  name: string
+  description: string
+  widgets: any[]
+  refreshRate?: number
+  filters?: any
+  createdAt: string
+  updatedAt: string
+}
+
+const CUSTOM_REPORTS_STORAGE_KEY = 'everx_custom_reports_local'
+
+const readLocalCustomReports = (): LocalCustomReport[] => {
+  if (typeof window === 'undefined') return []
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_REPORTS_STORAGE_KEY)
+    if (!raw) return []
+
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const writeLocalCustomReports = (reports: LocalCustomReport[]) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(CUSTOM_REPORTS_STORAGE_KEY, JSON.stringify(reports))
+}
+
+const createLocalReportId = () =>
+  `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+const shouldUseCustomReportFallback = (error: any) => {
+  const status = error?.response?.status
+  return !status || [400, 401, 403, 404, 500, 501, 503, 504].includes(status)
+}
+
+const ENABLE_CUSTOM_REPORTS_API = import.meta.env.VITE_ENABLE_CUSTOM_REPORTS_API === 'true'
+let customReportsApiStatus: 'unknown' | 'available' | 'unavailable' =
+  ENABLE_CUSTOM_REPORTS_API ? 'unknown' : 'unavailable'
+
+const shouldSkipCustomReportsApi = () => customReportsApiStatus === 'unavailable'
+const markCustomReportsApiAvailable = () => {
+  customReportsApiStatus = 'available'
+}
+const markCustomReportsApiUnavailable = () => {
+  customReportsApiStatus = 'unavailable'
+}
+
 export const reportApi = {
   // Get all reports
   listReports: (module?: string, page = 0, size = 20) =>
@@ -133,5 +184,335 @@ export const reportApi = {
   jasperExportExcel: (reportId: number, request: ReportExecutionRequest) =>
     axiosInstance.post(`/v1/reports/${reportId}/jasper/export-excel`, request, {
       responseType: 'blob'
-    })
+    }),
+
+  // ============ CUSTOM REPORT ENDPOINTS (Widget-based) ============
+
+  // Get custom report
+  getCustomReport: async (reportId: string) => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports().find((report) => report.id === reportId)
+      if (!local) throw new Error('Custom report not found')
+      return local
+    }
+
+    try {
+      const response = await axiosInstance.get(`/v1/custom-reports/${reportId}`)
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports().find((report) => report.id === reportId)
+      if (!local) {
+        throw error
+      }
+
+      return local
+    }
+  },
+
+  // List custom reports
+  listCustomReports: async (page = 0, size = 20) => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports()
+      const start = page * size
+      return {
+        content: local.slice(start, start + size),
+        totalElements: local.length,
+        totalPages: Math.max(1, Math.ceil(local.length / size)),
+        number: page,
+        size,
+      }
+    }
+
+    try {
+      const response = await axiosInstance.get('/v1/custom-reports', {
+        params: { page, size }
+      })
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports()
+      const start = page * size
+      return {
+        content: local.slice(start, start + size),
+        totalElements: local.length,
+        totalPages: Math.max(1, Math.ceil(local.length / size)),
+        number: page,
+        size,
+      }
+    }
+  },
+
+  // Create custom report
+  createCustomReport: async (data: any) => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports()
+      const now = new Date().toISOString()
+      const saved: LocalCustomReport = {
+        id: createLocalReportId(),
+        name: data?.name || 'Untitled Custom Report',
+        description: data?.description || '',
+        widgets: Array.isArray(data?.widgets) ? data.widgets : [],
+        refreshRate: data?.refreshRate,
+        filters: data?.filters,
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      local.unshift(saved)
+      writeLocalCustomReports(local)
+      return saved
+    }
+
+    try {
+      const response = await axiosInstance.post('/v1/custom-reports', data)
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports()
+      const now = new Date().toISOString()
+      const saved: LocalCustomReport = {
+        id: createLocalReportId(),
+        name: data?.name || 'Untitled Custom Report',
+        description: data?.description || '',
+        widgets: Array.isArray(data?.widgets) ? data.widgets : [],
+        refreshRate: data?.refreshRate,
+        filters: data?.filters,
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      local.unshift(saved)
+      writeLocalCustomReports(local)
+      return saved
+    }
+  },
+
+  // Update custom report
+  updateCustomReport: async (reportId: string, data: any) => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports()
+      const index = local.findIndex((report) => report.id === reportId)
+      const now = new Date().toISOString()
+
+      if (index >= 0) {
+        local[index] = {
+          ...local[index],
+          ...data,
+          id: reportId,
+          updatedAt: now,
+        }
+      } else {
+        local.unshift({
+          id: reportId,
+          name: data?.name || 'Untitled Custom Report',
+          description: data?.description || '',
+          widgets: Array.isArray(data?.widgets) ? data.widgets : [],
+          refreshRate: data?.refreshRate,
+          filters: data?.filters,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+
+      writeLocalCustomReports(local)
+      return local.find((report) => report.id === reportId)
+    }
+
+    try {
+      const response = await axiosInstance.put(`/v1/custom-reports/${reportId}`, data)
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports()
+      const index = local.findIndex((report) => report.id === reportId)
+      const now = new Date().toISOString()
+
+      if (index >= 0) {
+        local[index] = {
+          ...local[index],
+          ...data,
+          id: reportId,
+          updatedAt: now,
+        }
+      } else {
+        local.unshift({
+          id: reportId,
+          name: data?.name || 'Untitled Custom Report',
+          description: data?.description || '',
+          widgets: Array.isArray(data?.widgets) ? data.widgets : [],
+          refreshRate: data?.refreshRate,
+          filters: data?.filters,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+
+      writeLocalCustomReports(local)
+      return local.find((report) => report.id === reportId)
+    }
+  },
+
+  // Delete custom report
+  deleteCustomReport: async (reportId: string) => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports().filter((report) => report.id !== reportId)
+      writeLocalCustomReports(local)
+      return
+    }
+
+    try {
+      await axiosInstance.delete(`/v1/custom-reports/${reportId}`)
+      markCustomReportsApiAvailable()
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports().filter((report) => report.id !== reportId)
+      writeLocalCustomReports(local)
+    }
+  },
+
+  // Execute custom report with filters
+  executeCustomReport: async (reportId: string, filters: any) => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports().find((report) => report.id === reportId)
+      return {
+        reportId,
+        widgets: local?.widgets || [],
+        filters,
+        rows: [],
+      }
+    }
+
+    try {
+      const response = await axiosInstance.post(`/v1/custom-reports/${reportId}/execute`, { filters })
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports().find((report) => report.id === reportId)
+      return {
+        reportId,
+        widgets: local?.widgets || [],
+        filters,
+        rows: [],
+      }
+    }
+  },
+
+  // Export custom report
+  exportCustomReport: async (reportId: string, format: 'CSV' | 'EXCEL' | 'PDF' = 'EXCEL') => {
+    if (shouldSkipCustomReportsApi()) {
+      const local = readLocalCustomReports().find((report) => report.id === reportId)
+      const body = JSON.stringify(local || {}, null, 2)
+      return new Blob([body], { type: 'application/json' })
+    }
+
+    try {
+      const response = await axiosInstance.post(
+        `/v1/custom-reports/${reportId}/export?format=${format}`,
+        {},
+        { responseType: 'blob' }
+      )
+      markCustomReportsApiAvailable()
+      return response.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      const local = readLocalCustomReports().find((report) => report.id === reportId)
+      const body = JSON.stringify(local || {}, null, 2)
+      return new Blob([body], { type: 'application/json' })
+    }
+  },
+
+  // Get widget configuration options
+  getWidgetOptions: async (widgetType: 'chart' | 'metric' | 'table' | 'text') => {
+    if (shouldSkipCustomReportsApi()) {
+      return {
+        widgetType,
+        fallback: true,
+      }
+    }
+
+    try {
+      const response = await axiosInstance.get(`/v1/custom-reports/widgets/${widgetType}/options`)
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      return {
+        widgetType,
+        fallback: true,
+      }
+    }
+  },
+
+  // Validate widget configuration
+  validateWidget: async (widget: any) => {
+    if (shouldSkipCustomReportsApi()) {
+      return {
+        valid: true,
+        errors: [],
+      }
+    }
+
+    try {
+      const response = await axiosInstance.post('/v1/custom-reports/widgets/validate', widget)
+      markCustomReportsApiAvailable()
+      return response.data.data
+    } catch (error) {
+      if (!shouldUseCustomReportFallback(error)) {
+        throw error
+      }
+
+      markCustomReportsApiUnavailable()
+
+      return {
+        valid: true,
+        errors: [],
+      }
+    }
+  }
 }

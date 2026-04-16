@@ -47,9 +47,9 @@ public class PostingPeriodService {
     }
 
     /**
-     * Close a posting period. Only ADMIN or FINANCE role can close.
+        * Close a posting period. Requires FINANCE_EDIT permission.
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'FINANCE')")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public PostingPeriod closePeriod(String companyCode, int year, int period, String closedBy) {
         PostingPeriod pp = postingPeriodRepository
             .findByCompanyCodeAndFiscalYearAndPeriod(companyCode, year, period)
@@ -67,9 +67,9 @@ public class PostingPeriodService {
     }
 
     /**
-     * Open a posting period. Only ADMIN role can open.
+        * Open a posting period. Requires FINANCE_EDIT permission.
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public PostingPeriod openPeriod(String companyCode, int year, int period) {
         PostingPeriod pp = postingPeriodRepository
             .findByCompanyCodeAndFiscalYearAndPeriod(companyCode, year, period)

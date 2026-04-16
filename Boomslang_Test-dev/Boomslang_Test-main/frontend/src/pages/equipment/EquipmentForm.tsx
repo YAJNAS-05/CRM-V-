@@ -15,6 +15,7 @@ const EQUIPMENT_STATUSES = [
 const MANUFACTURERS = ['Siemens', 'GE', 'Philips', 'Toshiba', 'Hitachi', 'Konica', 'Hologic', 'Canon', 'Fujifilm', 'Other']
 
 const LOCATIONS = ['Australia', 'USA', 'Japan', 'Germany', 'UK', 'India', 'Other']
+const SLICE_CONFIG_OPTIONS = ['4 Slice', '16 Slice', '32 Slice', '64 Slice', '128 Slice', '256 Slice', '320 Slice']
 
 interface FormData {
   internalCode: string
@@ -229,7 +230,12 @@ export default function EquipmentForm() {
             </div>
             <div>
               <label className={labelClass}>Slice Config</label>
-              <input type="text" name="sliceConfig" value={form.sliceConfig} onChange={handleChange} className={inputClass} placeholder="e.g. 128 Slice" />
+              <select name="sliceConfig" value={form.sliceConfig} onChange={handleChange} className={inputClass}>
+                <option value="">Select Slice Config</option>
+                {SLICE_CONFIG_OPTIONS.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
             </div>
           </div>
         )
@@ -529,7 +535,12 @@ export default function EquipmentForm() {
                   </div>
                   <div>
                     <label className={labelClass}>Warehouse Location</label>
-                    <input type="text" name="warehouseLocation" value={form.warehouseLocation} onChange={handleChange} className={inputClass} />
+                    <select name="warehouseLocation" value={form.warehouseLocation} onChange={handleChange} className={inputClass}>
+                      <option value="">-- Select Warehouse Location --</option>
+                      {LOCATIONS.map((location) => (
+                        <option key={location} value={location}>{location}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>Asking Price</label>

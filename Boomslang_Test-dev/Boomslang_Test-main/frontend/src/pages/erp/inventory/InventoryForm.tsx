@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Save, Package } from 'lucide-react'
-import { inventoryApi } from '../../../api/erpApi'
-import { InventoryItem, CreateInventoryItemRequest } from '../../../types/erp'
+import { inventoryApi, supplierApi } from '../../../api/erpApi'
+import { InventoryItem, CreateInventoryItemRequest, Supplier } from '../../../types/erp'
 import { ApiResponse } from '../../../types'
 import { useAuthStore } from '../../../store/authStore'
 import { toast } from 'react-hot-toast'
+import SearchableLookupSelect from '../../../components/form/SearchableLookupSelect'
+
+const INVENTORY_CATEGORIES = [
+  'EQUIPMENT_ACCESSORY',
+  'CONSUMABLE',
+  'PACKING_MATERIAL',
+  'SAFETY',
+  'TOOL',
+  'OTHER',
+]
+
+const UNIT_OF_MEASURE_OPTIONS = ['PIECE', 'BOX', 'SET', 'ROLL', 'KG', 'LTR']
+
+const INVENTORY_LOCATIONS = ['Sydney AU', 'Vista CA USA', 'Kawasaki JP', 'Australia', 'USA', 'Japan', 'Germany', 'UK', 'India', 'Other']
 
 const InventoryForm: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -33,12 +47,46 @@ const InventoryForm: React.FC = () => {
 
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(isEditing)
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [selectedSupplierId, setSelectedSupplierId] = useState('')
 
   useEffect(() => {
     if (isEditing && id) {
       fetchInventoryItem(id)
     }
   }, [id, isEditing])
+
+  useEffect(() => {
+    loadSuppliers()
+  }, [])
+
+  useEffect(() => {
+    if (!formData.supplierName || suppliers.length === 0) {
+      return
+    }
+
+    const normalizedSupplierName = formData.supplierName.toLowerCase()
+
+    const matchedSupplier = suppliers.find(
+      (supplier) => supplier.companyName.toLowerCase() === normalizedSupplierName
+    )
+    if (matchedSupplier) {
+      setSelectedSupplierId(matchedSupplier.id)
+    }
+  }, [formData.supplierName, suppliers])
+
+  const loadSuppliers = async () => {
+    try {
+      setLookupLoading(true)
+      const response = await supplierApi.getAll(0, 200)
+      setSuppliers(response.data?.data?.content || [])
+    } catch {
+      toast.error('Failed to load suppliers')
+    } finally {
+      setLookupLoading(false)
+    }
+  }
 
   const fetchInventoryItem = async (itemId: string) => {
     try {
@@ -132,6 +180,21 @@ const InventoryForm: React.FC = () => {
     }))
   }
 
+  const handleSupplierChange = (_name: string, value: string) => {
+    setSelectedSupplierId(value)
+    const selectedSupplier = suppliers.find((supplier) => supplier.id === value)
+    setFormData((prev) => ({
+      ...prev,
+      supplierName: selectedSupplier?.companyName || '',
+    }))
+  }
+
+  const supplierOptions = suppliers.map((supplier) => ({
+    value: supplier.id,
+    label: supplier.companyName,
+    meta: [supplier.country, supplier.paymentTerms].filter(Boolean).join(' | ') || undefined,
+  }))
+
   if (fetchLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -224,10 +287,9 @@ const InventoryForm: React.FC = () => {
                 onChange={handleInputChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="EQUIPMENT">Equipment</option>
-                <option value="SPARE_PARTS">Spare Parts</option>
-                <option value="CONSUMABLES">Consumables</option>
-                <option value="RAW_MATERIALS">Raw Materials</option>
+                {INVENTORY_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>{category.replace(/_/g, ' ')}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -241,12 +303,9 @@ const InventoryForm: React.FC = () => {
                 onChange={handleInputChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="PIECE">Piece</option>
-                <option value="KG">Kilogram</option>
-                <option value="LITER">Liter</option>
-                <option value="METER">Meter</option>
-                <option value="BOX">Box</option>
-                <option value="PACK">Pack</option>
+                {UNIT_OF_MEASURE_OPTIONS.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -361,32 +420,32 @@ const InventoryForm: React.FC = () => {
           <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="supplierName" className="block text-sm font-medium text-gray-700">
-                Supplier Name
-              </label>
-              <input
-                type="text"
-                id="supplierName"
-                name="supplierName"
-                value={formData.supplierName}
-                onChange={handleInputChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter supplier name"
+              <SearchableLookupSelect
+                label="Supplier"
+                name="supplierId"
+                value={selectedSupplierId}
+                options={supplierOptions}
+                onChange={handleSupplierChange}
+                disabled={lookupLoading}
+                placeholder="Search supplier by company name"
               />
             </div>
             <div>
               <label htmlFor="location" className="block text-sm font-medium text-gray-700">
                 Location
               </label>
-              <input
-                type="text"
+              <select
                 id="location"
                 name="location"
                 value={formData.location}
                 onChange={handleInputChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter storage location"
-              />
+              >
+                <option value="">Select location</option>
+                {INVENTORY_LOCATIONS.map((location) => (
+                  <option key={location} value={location}>{location}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="barcode" className="block text-sm font-medium text-gray-700">

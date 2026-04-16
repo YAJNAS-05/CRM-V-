@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { invoiceApi } from '../../api/financeApi'
 import { Invoice, InvoiceStatus, InvoiceEntity } from '../../types/finance'
 import { toast } from 'sonner'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+
+const extractPageContent = <T,>(payload: unknown): T[] => {
+  if (!payload || typeof payload !== 'object') return []
+  const wrapped = payload as { data?: unknown; content?: unknown }
+  const data = wrapped.data ?? payload
+  if (!data || typeof data !== 'object') return []
+  const content = (data as { content?: unknown }).content
+  return Array.isArray(content) ? (content as T[]) : []
+}
 
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -28,7 +38,7 @@ const InvoiceListPage: React.FC = () => {
       } else {
         response = await invoiceApi.getAll(page, pageSize)
       }
-      setInvoices(response.data.data?.content || [])
+      setInvoices(extractPageContent<Invoice>(response.data))
     } catch (error) {
       toast.error('Failed to load invoices')
     } finally {
@@ -47,6 +57,30 @@ const InvoiceListPage: React.FC = () => {
     }
   }
 
+  const handleExport = () => {
+    const rows = invoices.map((invoice) => ({
+      InvoiceNumber: invoice.invoiceNumber,
+      Entity: invoice.entity,
+      Type: invoice.type,
+      Status: invoice.status,
+      IssueDate: invoice.issueDate || '',
+      DueDate: invoice.dueDate || '',
+      AccountId: invoice.accountId,
+      SalesOrderId: invoice.soId || '',
+      Currency: invoice.currency || '',
+      Subtotal: invoice.subtotal || 0,
+      TaxAmount: invoice.taxAmount || 0,
+      TotalAmount: invoice.totalAmount || 0,
+      PaidAmount: invoice.paidAmount || 0,
+      Notes: invoice.notes || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Invoices_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Invoices',
+    })
+  }
+
   if (isLoading && invoices.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -59,12 +93,21 @@ const InvoiceListPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Invoices</h1>
-        <button
-          onClick={() => navigate('/finance/invoices/new')}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-        >
-          New Invoice
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={invoices.length === 0}
+            className="border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => navigate('/finance/invoices/new')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+          >
+            New Invoice
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4 mb-6">

@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.*;
  * REST Controller for posting period management.
  * 
  * Handles operations to close/open fiscal periods, preventing transactions in closed periods.
- * Only ADMIN role can manage periods.
+ * Requires FINANCE_EDIT permission to manage periods.
  */
 @RestController
 @RequestMapping("/api/v1/finance/posting-periods")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('FINANCE_EDIT')")
 public class PostingPeriodController {
 
     private final PostingPeriodService postingPeriodService;

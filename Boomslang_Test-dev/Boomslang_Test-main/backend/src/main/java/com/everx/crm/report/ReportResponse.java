@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -35,6 +36,30 @@ public class ReportResponse {
         private BigDecimal totalPipelineValue;
         private BigDecimal wonValue;
         private double winRate;
+        private String visibilityScope;
+        private UUID viewerUserId;
+        private int teamMemberCount;
+        private List<UserPerformance> userPerformance;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class UserPerformance {
+        private UUID userId;
+        private String userName;
+        private long leads;
+        private long convertedLeads;
+        private long deals;
+        private long openDeals;
+        private long wonDeals;
+        private long lostDeals;
+        private BigDecimal pipelineValue;
+        private long activities;
+        private long completedActivities;
+        private long overdueActivities;
+        private double leadConversionRate;
     }
 
     @Data

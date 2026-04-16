@@ -29,7 +29,7 @@ public class AccountController {
     private AccountService accountService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<AccountDto>>> getAllAccounts(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/accounts");
@@ -38,7 +38,7 @@ public class AccountController {
     }
 
     @GetMapping("/{accountId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<AccountDto>> getAccountById(@PathVariable UUID accountId) {
         log.info("GET /api/v1/crm/accounts/{}", accountId);
         AccountDto account = accountService.getAccountById(accountId);
@@ -46,7 +46,7 @@ public class AccountController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<AccountDto>>> searchAccounts(
             @RequestParam("q") String q,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -56,7 +56,7 @@ public class AccountController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<AccountDto>> createAccount(@Valid @RequestBody CreateAccountRequest request) {
         log.info("POST /api/v1/crm/accounts");
         AccountDto account = accountService.createAccount(request);
@@ -64,7 +64,7 @@ public class AccountController {
     }
 
     @PutMapping("/{accountId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<AccountDto>> updateAccount(
             @PathVariable UUID accountId,
             @Valid @RequestBody UpdateAccountRequest request) {
@@ -74,7 +74,7 @@ public class AccountController {
     }
 
     @DeleteMapping("/{accountId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable UUID accountId) {
         log.info("DELETE /api/v1/crm/accounts/{}", accountId);
         accountService.deleteAccount(accountId);

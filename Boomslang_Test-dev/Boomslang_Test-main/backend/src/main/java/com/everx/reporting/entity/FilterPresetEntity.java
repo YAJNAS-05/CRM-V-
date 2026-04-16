@@ -30,7 +30,7 @@ public class FilterPresetEntity {
     @Column(name = "preset_name", nullable = false, length = 100)
     private String presetName;
 
-    @Column(name = "filters", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "filters", nullable = false, columnDefinition = "JSON")
     @JdbcTypeCode(SqlTypes.JSON)
     private Object filters;
 

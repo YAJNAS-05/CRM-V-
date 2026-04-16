@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { adminApi } from '../../api/adminApi'
-import { User, CreateUserRequest, UpdateUserRequest } from '../../types/auth'
+import { CreateUserRequest, RoleDefinition, UpdateUserRequest, User } from '../../types/auth'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
-import { X, Plus, Edit2, Trash2, AlertCircle } from 'lucide-react'
+import { X, Plus, Edit2, Trash2 } from 'lucide-react'
 
-const ROLES = ['ADMIN', 'USER', 'MANAGER', 'EDITOR']
-const OFFICE_LOCATIONS = ['USA', 'AUSTRALIA', 'JAPAN']
+type LocationOption = {
+  name: string
+  code?: string
+}
 
 const UserManagementPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<RoleDefinition[]>([])
+  const [locations, setLocations] = useState<LocationOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -20,16 +24,32 @@ const UserManagementPage: React.FC = () => {
     password: '',
     fullName: '',
     phone: '',
-    role: 'USER',
+    roles: ['READ_ONLY'],
     officeLocation: 'USA',
     isActive: true,
   })
   const [editFormData, setEditFormData] = useState<Partial<UpdateUserRequest>>({})
   const pageSize = 20
 
+  const roleOptions = useMemo(
+    () =>
+      roles.length > 0
+        ? roles.map((role) => role.name)
+        : ['READ_ONLY', 'VIEWER', 'MANAGER', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'SERVICE_TECH', 'ADMIN'],
+    [roles]
+  )
+  const locationOptions = useMemo(
+    () => locations.map((location) => location.name),
+    [locations]
+  )
+
   useEffect(() => {
-    fetchUsers()
+    void fetchUsers()
   }, [page])
+
+  useEffect(() => {
+    void fetchRoleAndLocationCatalogs()
+  }, [])
 
   const fetchUsers = async () => {
     try {
@@ -43,6 +63,41 @@ const UserManagementPage: React.FC = () => {
     }
   }
 
+  const fetchRoleAndLocationCatalogs = async () => {
+    try {
+      const [rolesResponse, locationsResponse] = await Promise.all([
+        adminApi.getRoles(),
+        adminApi.getLocations(),
+      ])
+
+      const fetchedRoles = rolesResponse.data.data || []
+      const fetchedLocations = locationsResponse.data.data || []
+      setRoles(fetchedRoles)
+      setLocations(fetchedLocations)
+
+      if (fetchedLocations.length > 0 && !formData.officeLocation) {
+        setFormData((prev) => ({ ...prev, officeLocation: fetchedLocations[0].name }))
+      }
+    } catch (error) {
+      toast.error('Failed to load role catalog')
+    }
+  }
+
+  const handleRoleToggle = (
+    roleName: string,
+    selectedRoles: string[] | undefined,
+    onChange: (roles: string[]) => void
+  ) => {
+    const current = selectedRoles || []
+    if (current.includes(roleName)) {
+      const next = current.filter((role) => role !== roleName)
+      onChange(next)
+      return
+    }
+
+    onChange([...current, roleName])
+  }
+
   const handleAddUser = async () => {
     try {
       if (!formData.email || !formData.password || !formData.fullName) {
@@ -50,7 +105,23 @@ const UserManagementPage: React.FC = () => {
         return
       }
 
-      await adminApi.createUser(formData as CreateUserRequest)
+      if (!formData.roles || formData.roles.length === 0) {
+        toast.error('Please select at least one role')
+        return
+      }
+
+      const payload: CreateUserRequest = {
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        phone: formData.phone || '',
+        role: formData.roles[0],
+        roles: formData.roles,
+        officeLocation: formData.officeLocation || 'USA',
+        isActive: formData.isActive ?? true,
+      }
+
+      await adminApi.createUser(payload)
       toast.success('User created successfully')
       setShowAddModal(false)
       setFormData({
@@ -58,8 +129,8 @@ const UserManagementPage: React.FC = () => {
         password: '',
         fullName: '',
         phone: '',
-        role: 'USER',
-        officeLocation: 'USA',
+        roles: ['READ_ONLY'],
+        officeLocation: locationOptions[0] || 'USA',
         isActive: true,
       })
       setPage(0)
@@ -74,7 +145,17 @@ const UserManagementPage: React.FC = () => {
     try {
       if (!selectedUser) return
 
-      await adminApi.updateUser(selectedUser.id, editFormData as UpdateUserRequest)
+      if (editFormData.roles && editFormData.roles.length === 0) {
+        toast.error('Please select at least one role')
+        return
+      }
+
+      const payload: UpdateUserRequest = {
+        ...editFormData,
+        role: editFormData.roles && editFormData.roles.length > 0 ? editFormData.roles[0] : editFormData.role,
+      }
+
+      await adminApi.updateUser(selectedUser.id, payload)
       toast.success('User updated successfully')
       setShowEditModal(false)
       setSelectedUser(null)
@@ -115,19 +196,22 @@ const UserManagementPage: React.FC = () => {
       password: '',
       fullName: '',
       phone: '',
-      role: 'USER',
-      officeLocation: 'USA',
+      roles: ['READ_ONLY'],
+      officeLocation: locationOptions[0] || 'USA',
       isActive: true,
     })
     setShowAddModal(true)
   }
 
   const openEditModal = (user: User) => {
+    const selectedRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role]
+
     setSelectedUser(user)
     setEditFormData({
       fullName: user.fullName,
       phone: user.phone,
-      role: user.role,
+      role: selectedRoles[0],
+      roles: selectedRoles,
       officeLocation: user.officeLocation,
       isActive: user.isActive,
     })
@@ -141,7 +225,7 @@ const UserManagementPage: React.FC = () => {
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Identity & Access</h1>
-          <p className="text-slate-500 font-medium">Manage platform users and their roles.</p>
+          <p className="text-slate-500 font-medium">Manage users, assign multiple roles, and control access.</p>
         </div>
         <button
           onClick={openAddModal}
@@ -157,7 +241,7 @@ const UserManagementPage: React.FC = () => {
           <thead className="bg-slate-50/50 border-b border-slate-100">
             <tr>
               <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Name & Email</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Role</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Roles</th>
               <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Office</th>
               <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Login</th>
               <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
@@ -165,56 +249,71 @@ const UserManagementPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-700 text-xs">
-                      {user.fullName.split(' ').map(n => n[0]).join('')}
+            {users.map((user) => {
+              const userRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role]
+              return (
+                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-700 text-xs">
+                        {user.fullName
+                          .split(' ')
+                          .map((name) => name[0])
+                          .join('')}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{user.fullName}</p>
+                        <p className="text-xs text-slate-400 font-medium">{user.email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{user.fullName}</p>
-                      <p className="text-xs text-slate-400 font-medium">{user.email}</p>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {userRoles.map((roleName) => (
+                        <span
+                          key={`${user.id}-${roleName}`}
+                          className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter"
+                        >
+                          {roleName}
+                        </span>
+                      ))}
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter">
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-5 text-xs font-bold text-slate-500">{user.officeLocation}</td>
-                <td className="px-6 py-5 text-xs text-slate-400">
-                  {user.lastLogin ? format(new Date(user.lastLogin), 'MMM d, HH:mm') : 'Never'}
-                </td>
-                <td className="px-6 py-5">
-                  <button
-                    onClick={() => handleToggleStatus(user.id)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${user.isActive ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${user.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </td>
-                <td className="px-6 py-5 text-right">
-                  <div className="flex justify-end gap-2">
+                  </td>
+                  <td className="px-6 py-5 text-xs font-bold text-slate-500">{user.officeLocation}</td>
+                  <td className="px-6 py-5 text-xs text-slate-400">
+                    {user.lastLogin ? format(new Date(user.lastLogin), 'MMM d, HH:mm') : 'Never'}
+                  </td>
+                  <td className="px-6 py-5">
                     <button
-                      onClick={() => openEditModal(user)}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition"
-                      title="Edit user"
+                      onClick={() => handleToggleStatus(user.id)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${user.isActive ? 'bg-indigo-600' : 'bg-slate-200'}`}
                     >
-                      <Edit2 size={16} />
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${user.isActive ? 'translate-x-6' : 'translate-x-1'}`}
+                      />
                     </button>
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      className="text-xs font-bold text-red-600 hover:text-red-700 transition"
-                      title="Delete user"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openEditModal(user)}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition"
+                        title="Edit user"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="text-xs font-bold text-red-600 hover:text-red-700 transition"
+                        title="Delete user"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -237,16 +336,12 @@ const UserManagementPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Add User Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-slate-900">Add New User</h2>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
@@ -281,7 +376,7 @@ const UserManagementPage: React.FC = () => {
                   value={formData.password || ''}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Minimum 6 characters"
+                  placeholder="Minimum 8 characters"
                 />
               </div>
 
@@ -297,27 +392,40 @@ const UserManagementPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-widest">Role</label>
-                <select
-                  value={formData.role || 'USER'}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {ROLES.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-widest">Roles *</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3">
+                  {roleOptions.map((roleName) => {
+                    const checked = (formData.roles || []).includes(roleName)
+                    return (
+                      <label key={`create-${roleName}`} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            handleRoleToggle(roleName, formData.roles, (nextRoles) =>
+                              setFormData((prev) => ({ ...prev, roles: nextRoles }))
+                            )
+                          }
+                          className="w-4 h-4 rounded border-slate-300"
+                        />
+                        <span>{roleName}</span>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-widest">Office Location</label>
                 <select
-                  value={formData.officeLocation || 'USA'}
+                  value={formData.officeLocation || locationOptions[0] || 'USA'}
                   onChange={(e) => setFormData({ ...formData, officeLocation: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {OFFICE_LOCATIONS.map(location => (
-                    <option key={location} value={location}>{location}</option>
+                  {(locationOptions.length > 0 ? locationOptions : ['USA', 'AUSTRALIA', 'JAPAN']).map((location) => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -330,7 +438,9 @@ const UserManagementPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   className="w-4 h-4 rounded border-slate-300"
                 />
-                <label htmlFor="isActive" className="text-xs font-bold text-slate-600 uppercase tracking-widest">Active</label>
+                <label htmlFor="isActive" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                  Active
+                </label>
               </div>
             </div>
 
@@ -352,16 +462,12 @@ const UserManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Edit User Modal */}
       {showEditModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-slate-900">Edit User</h2>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
@@ -374,7 +480,6 @@ const UserManagementPage: React.FC = () => {
                   value={editFormData.fullName || ''}
                   onChange={(e) => setEditFormData({ ...editFormData, fullName: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="John Doe"
                 />
               </div>
 
@@ -385,32 +490,44 @@ const UserManagementPage: React.FC = () => {
                   value={editFormData.phone || ''}
                   onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="+1 (555) 000-0000"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-widest">Role</label>
-                <select
-                  value={editFormData.role || 'USER'}
-                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {ROLES.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-widest">Roles *</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3">
+                  {roleOptions.map((roleName) => {
+                    const checked = (editFormData.roles || []).includes(roleName)
+                    return (
+                      <label key={`edit-${roleName}`} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            handleRoleToggle(roleName, editFormData.roles, (nextRoles) =>
+                              setEditFormData((prev) => ({ ...prev, roles: nextRoles }))
+                            )
+                          }
+                          className="w-4 h-4 rounded border-slate-300"
+                        />
+                        <span>{roleName}</span>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-widest">Office Location</label>
                 <select
-                  value={editFormData.officeLocation || 'USA'}
+                  value={editFormData.officeLocation || locationOptions[0] || 'USA'}
                   onChange={(e) => setEditFormData({ ...editFormData, officeLocation: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {OFFICE_LOCATIONS.map(location => (
-                    <option key={location} value={location}>{location}</option>
+                  {(locationOptions.length > 0 ? locationOptions : ['USA', 'AUSTRALIA', 'JAPAN']).map((location) => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -423,7 +540,9 @@ const UserManagementPage: React.FC = () => {
                   onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.checked })}
                   className="w-4 h-4 rounded border-slate-300"
                 />
-                <label htmlFor="editIsActive" className="text-xs font-bold text-slate-600 uppercase tracking-widest">Active</label>
+                <label htmlFor="editIsActive" className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                  Active
+                </label>
               </div>
             </div>
 

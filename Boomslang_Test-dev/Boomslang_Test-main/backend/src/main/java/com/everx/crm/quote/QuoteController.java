@@ -32,7 +32,7 @@ public class QuoteController {
     private PdfService pdfService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<QuoteDto>>> getAllQuotes(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/quotes");
@@ -41,7 +41,7 @@ public class QuoteController {
     }
 
     @GetMapping("/{quoteId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<QuoteDto>> getQuoteById(@PathVariable UUID quoteId) {
         log.info("GET /api/v1/crm/quotes/{}", quoteId);
         QuoteDto quote = quoteService.getQuoteById(quoteId);
@@ -49,7 +49,7 @@ public class QuoteController {
     }
 
     @GetMapping("/deal/{dealId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<QuoteDto>>> getQuotesByDeal(
             @PathVariable UUID dealId,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -59,7 +59,7 @@ public class QuoteController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<QuoteDto>> createQuote(@Valid @RequestBody CreateQuoteRequest request) {
         log.info("POST /api/v1/crm/quotes");
         QuoteDto quote = quoteService.createQuote(request);
@@ -67,7 +67,7 @@ public class QuoteController {
     }
 
     @PutMapping("/{quoteId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<QuoteDto>> updateQuote(
             @PathVariable UUID quoteId,
             @Valid @RequestBody UpdateQuoteRequest request) {
@@ -77,7 +77,7 @@ public class QuoteController {
     }
 
     @DeleteMapping("/{quoteId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteQuote(@PathVariable UUID quoteId) {
         log.info("DELETE /api/v1/crm/quotes/{}", quoteId);
         quoteService.deleteQuote(quoteId);
@@ -85,7 +85,7 @@ public class QuoteController {
     }
 
     @GetMapping("/{quoteId}/pdf")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<byte[]> generateQuotePdf(@PathVariable UUID quoteId) {
         log.info("GET /api/v1/crm/quotes/{}/pdf", quoteId);
         QuoteDto quote = quoteService.getQuoteById(quoteId);

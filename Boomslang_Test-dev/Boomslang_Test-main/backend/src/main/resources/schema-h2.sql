@@ -47,6 +47,45 @@ CREATE TABLE IF NOT EXISTS everx_auth.refresh_tokens (
     version BIGINT NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS everx_auth.roles (
+    id UUID PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description VARCHAR(255),
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_auth.permissions (
+    id UUID PRIMARY KEY,
+    permission_key VARCHAR(100) NOT NULL UNIQUE,
+    module VARCHAR(100) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    description VARCHAR(255),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_auth.role_permissions (
+    role_id UUID NOT NULL,
+    permission_id UUID NOT NULL,
+    PRIMARY KEY (role_id, permission_id)
+);
+
+CREATE TABLE IF NOT EXISTS everx_auth.user_roles (
+    user_id UUID NOT NULL,
+    role_id UUID NOT NULL,
+    PRIMARY KEY (user_id, role_id)
+);
+
 -- CRM schema tables
 CREATE TABLE IF NOT EXISTS everx_crm.accounts (
     id UUID PRIMARY KEY,

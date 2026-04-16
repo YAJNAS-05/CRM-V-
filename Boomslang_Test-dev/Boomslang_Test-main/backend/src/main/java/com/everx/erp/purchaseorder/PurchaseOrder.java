@@ -45,7 +45,7 @@ public class PurchaseOrder extends BaseEntity {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod;
 
-    @Column(name = "shipping_docs", columnDefinition = "TEXT[]")
+    @Column(name = "shipping_docs", columnDefinition = "TEXT ARRAY")
     private String[] shippingDocs;
 
     @Column(columnDefinition = "TEXT")

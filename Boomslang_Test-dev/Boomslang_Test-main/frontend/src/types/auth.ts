@@ -4,6 +4,8 @@ export interface User {
   fullName: string
   phone: string
   role: string
+  roles: string[]
+  permissions: string[]
   officeLocation: string
   isActive: boolean
   lastLogin: string | null
@@ -15,7 +17,8 @@ export interface CreateUserRequest {
   password: string
   fullName: string
   phone: string
-  role: string
+  role?: string
+  roles: string[]
   officeLocation: string
   isActive: boolean
 }
@@ -25,8 +28,44 @@ export interface UpdateUserRequest {
   fullName?: string
   phone?: string
   role?: string
+  roles?: string[]
   officeLocation?: string
   isActive?: boolean
+}
+
+export interface PermissionDefinition {
+  id: string
+  permissionKey: string
+  module: string
+  action: string
+  description?: string
+  isActive: boolean
+}
+
+export interface RoleDefinition {
+  id: string
+  name: string
+  description?: string
+  isSystem: boolean
+  isActive: boolean
+  permissionKeys: string[]
+  permissions?: PermissionDefinition[]
+}
+
+export interface CreateRoleRequest {
+  name: string
+  description?: string
+  isActive?: boolean
+  permissionKeys: string[]
+}
+
+export interface UpdateRoleRequest {
+  description?: string
+  isActive?: boolean
+}
+
+export interface UpdateRolePermissionsRequest {
+  permissionKeys: string[]
 }
 
 export interface LoginRequest {

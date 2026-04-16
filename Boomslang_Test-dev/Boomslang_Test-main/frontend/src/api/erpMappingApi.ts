@@ -4,7 +4,7 @@ export const erpMappingApi = {
   // Get mappings between two modules
   getMappingsByModules: async (sourceModule: string, targetModule: string) => {
     const response = await axiosInstance.get(
-      `/api/v1/erp/mappings/source/${sourceModule}/target/${targetModule}`
+      `/v1/erp/mappings/source/${sourceModule}/target/${targetModule}`
     )
     return response.data
   },
@@ -12,7 +12,7 @@ export const erpMappingApi = {
   // Get all mappings for a source module
   getMappingsBySourceModule: async (sourceModule: string) => {
     const response = await axiosInstance.get(
-      `/api/v1/erp/mappings/source/${sourceModule}`
+      `/v1/erp/mappings/source/${sourceModule}`
     )
     return response.data
   },
@@ -20,7 +20,7 @@ export const erpMappingApi = {
   // Get required mappings for a module
   getRequiredMappings: async (sourceModule: string) => {
     const response = await axiosInstance.get(
-      `/api/v1/erp/mappings/source/${sourceModule}/required`
+      `/v1/erp/mappings/source/${sourceModule}/required`
     )
     return response.data
   },
@@ -28,7 +28,7 @@ export const erpMappingApi = {
   // Get target modules available for a source module
   getTargetModules: async (sourceModule: string) => {
     const response = await axiosInstance.get(
-      `/api/v1/erp/mappings/source/${sourceModule}/targets`
+      `/v1/erp/mappings/source/${sourceModule}/targets`
     )
     return response.data
   },
@@ -36,7 +36,7 @@ export const erpMappingApi = {
   // Get lookup values for a mapped field
   getLookupValues: async (sourceModule: string, targetModule: string, sourceField: string) => {
     const response = await axiosInstance.get(
-      `/api/v1/erp/mappings/${sourceModule}/${targetModule}/${sourceField}/lookups`
+      `/v1/erp/mappings/${sourceModule}/${targetModule}/${sourceField}/lookups`
     )
     return response.data
   },
@@ -47,7 +47,7 @@ export const erpMappingApi = {
     targetModule: string,
     fieldValues: Record<string, string>
   ) => {
-    const response = await axiosInstance.post('/api/v1/erp/mappings/validate', fieldValues, {
+    const response = await axiosInstance.post('/v1/erp/mappings/validate', fieldValues, {
       params: {
         sourceModule,
         targetModule,
@@ -58,7 +58,7 @@ export const erpMappingApi = {
 
   // Get all mappings with pagination
   getAllMappings: async (page = 0, size = 20) => {
-    const response = await axiosInstance.get('/api/v1/erp/mappings', {
+    const response = await axiosInstance.get('/v1/erp/mappings', {
       params: { page, size },
     })
     return response.data
@@ -76,7 +76,7 @@ export const erpMappingApi = {
     lookupValues?: string
     description?: string
   }) => {
-    const response = await axiosInstance.post('/api/v1/erp/mappings', data)
+    const response = await axiosInstance.post('/v1/erp/mappings', data)
     return response.data
   },
 
@@ -93,19 +93,19 @@ export const erpMappingApi = {
       description?: string
     }
   ) => {
-    const response = await axiosInstance.put(`/api/v1/erp/mappings/${mappingId}`, data)
+    const response = await axiosInstance.put(`/v1/erp/mappings/${mappingId}`, data)
     return response.data
   },
 
   // Deactivate a mapping
   deactivateMapping: async (mappingId: string) => {
-    const response = await axiosInstance.put(`/api/v1/erp/mappings/${mappingId}/deactivate`)
+    const response = await axiosInstance.put(`/v1/erp/mappings/${mappingId}/deactivate`)
     return response.data
   },
 
   // Delete a mapping
   deleteMapping: async (mappingId: string) => {
-    const response = await axiosInstance.delete(`/api/v1/erp/mappings/${mappingId}`)
+    const response = await axiosInstance.delete(`/v1/erp/mappings/${mappingId}`)
     return response.data
   },
 }

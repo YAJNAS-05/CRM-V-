@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { equipmentApi } from '../../api/erpApi'
 import { Equipment } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function EquipmentListPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -26,6 +27,26 @@ export default function EquipmentListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = equipment.map((item) => ({
+      Code: item.internalCode,
+      Make: item.make,
+      Model: item.model,
+      SerialNumber: item.serialNumber || '',
+      Category: item.category,
+      Status: item.status,
+      Warehouse: item.warehouseLocation,
+      Currency: item.askingCurrency || '',
+      AskingPrice: item.askingPrice || 0,
+      Notes: item.notes || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Equipment_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Equipment',
+    })
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       AVAILABLE: 'bg-green-100 text-green-800',
@@ -45,12 +66,21 @@ export default function EquipmentListPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Equipment Inventory</h1>
-        <button
-          onClick={() => navigate('/erp/equipment/new')}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Add Equipment
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={equipment.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => navigate('/erp/equipment/new')}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Add Equipment
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

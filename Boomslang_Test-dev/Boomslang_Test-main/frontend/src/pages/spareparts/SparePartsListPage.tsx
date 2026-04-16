@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { sparePartApi } from '../../api/erpApi'
 import { SparePart } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function SparePartsListPage() {
   const [spareParts, setSpareParts] = useState<SparePart[]>([])
@@ -26,6 +27,24 @@ export default function SparePartsListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = spareParts.map((part) => ({
+      PartNumber: part.partNumber,
+      Name: part.name,
+      Category: part.category,
+      StockQty: part.stockQty,
+      ReorderPoint: part.reorderPoint || 0,
+      UnitCost: part.unitCost || 0,
+      Currency: part.currency || '',
+      Warehouse: part.warehouseLocation || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Spare_Parts_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Spare Parts',
+    })
+  }
+
   if (loading) {
     return <div className="p-6">Loading spare parts...</div>
   }
@@ -34,9 +53,18 @@ export default function SparePartsListPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Spare Parts</h1>
-        <button onClick={() => navigate('/erp/spareparts/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          Add Spare Part
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={spareParts.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/spareparts/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            Add Spare Part
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

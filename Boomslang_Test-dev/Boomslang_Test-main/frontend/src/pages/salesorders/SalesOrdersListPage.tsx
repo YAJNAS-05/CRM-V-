@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { salesOrderApi } from '../../api/erpApi'
 import { SalesOrder } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function SalesOrdersListPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([])
@@ -26,6 +27,27 @@ export default function SalesOrdersListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = orders.map((order) => ({
+      SONumber: order.soNumber,
+      AccountId: order.accountId,
+      Status: order.status,
+      OrderDate: order.orderDate || '',
+      ExpectedDelivery: order.expectedDelivery || '',
+      ActualDelivery: order.actualDelivery || '',
+      DestinationCountry: order.destinationCountry || '',
+      Incoterms: order.incoterms || '',
+      TotalAmount: order.totalAmount || 0,
+      Currency: order.currency || '',
+      Notes: order.notes || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Sales_Orders_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Sales Orders',
+    })
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       DRAFT: 'bg-gray-100 text-gray-800',
@@ -43,7 +65,16 @@ export default function SalesOrdersListPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Sales Orders</h1>
-        <button onClick={() => navigate('/erp/sales-orders/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create SO</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={orders.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/sales-orders/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create SO</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

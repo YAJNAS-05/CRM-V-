@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { warrantyApi } from '../../api/erpApi'
 import { Warranty } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function WarrantiesListPage() {
   const [warranties, setWarranties] = useState<Warranty[]>([])
@@ -26,6 +27,28 @@ export default function WarrantiesListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = warranties.map((warranty) => {
+      const daysRemaining = Math.ceil((new Date(warranty.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      return {
+        Type: warranty.type,
+        Status: warranty.status,
+        StartDate: warranty.startDate,
+        EndDate: warranty.endDate,
+        DaysRemaining: daysRemaining > 0 ? daysRemaining : 0,
+        EquipmentId: warranty.equipmentId || '',
+        SalesOrderId: warranty.soId || '',
+        AccountId: warranty.accountId,
+        Notes: warranty.notes || '',
+      }
+    })
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Warranties_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Warranties',
+    })
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       ACTIVE: 'bg-green-100 text-green-800',
@@ -41,7 +64,16 @@ export default function WarrantiesListPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Warranties</h1>
-        <button onClick={() => navigate('/erp/warranties/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Warranty</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={warranties.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/warranties/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Warranty</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

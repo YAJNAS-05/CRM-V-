@@ -33,7 +33,7 @@ public class LeadController {
     private LeadConversionService leadConversionService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<LeadDto>>> getAllLeads(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/leads");
@@ -42,7 +42,7 @@ public class LeadController {
     }
 
     @GetMapping("/{leadId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<LeadDto>> getLeadById(@PathVariable UUID leadId) {
         log.info("GET /api/v1/crm/leads/{}", leadId);
         LeadDto lead = leadService.getLeadById(leadId);
@@ -50,7 +50,7 @@ public class LeadController {
     }
 
     @GetMapping("/account/{accountId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<LeadDto>>> getLeadsByAccount(
             @PathVariable UUID accountId,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -60,7 +60,7 @@ public class LeadController {
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<LeadDto>>> getLeadsByStatus(
             @PathVariable String status,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -70,7 +70,7 @@ public class LeadController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<LeadDto>> createLead(@Valid @RequestBody CreateLeadRequest request) {
         log.info("POST /api/v1/crm/leads");
         LeadDto lead = leadService.createLead(request);
@@ -78,7 +78,7 @@ public class LeadController {
     }
 
     @PutMapping("/{leadId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<LeadDto>> updateLead(
             @PathVariable UUID leadId,
             @Valid @RequestBody UpdateLeadRequest request) {
@@ -88,7 +88,7 @@ public class LeadController {
     }
 
     @DeleteMapping("/{leadId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteLead(@PathVariable UUID leadId) {
         log.info("DELETE /api/v1/crm/leads/{}", leadId);
         leadService.deleteLead(leadId);
@@ -96,7 +96,7 @@ public class LeadController {
     }
 
     @PostMapping("/{leadId}/convert")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<LeadDto>> convertLead(
             @PathVariable UUID leadId,
             @Valid @RequestBody LeadConvertRequest request) {

@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { reportApi } from '../../api/crmApi'
+import {
+  ReportActivity,
+  ReportConversion,
+  ReportDashboardKPIs,
+  ReportPipeline,
+  ReportUserPerformance,
+} from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -14,12 +22,42 @@ const STAGE_COLORS: Record<string, string> = {
   PROSPECTING: '#9ca3af', QUALIFICATION: '#3b82f6', PROPOSAL: '#f59e0b', NEGOTIATION: '#f97316', CLOSED_WON: '#10b981', CLOSED_LOST: '#ef4444',
 }
 
+const TEAM_SCOPE_ROLES = ['SUPER_ADMIN', 'ADMIN', 'SALES_MANAGER', 'MANAGER']
+
+const formatCurrencyShort = (raw: number) => {
+  const val = Number(raw || 0)
+  if (val >= 1_000_000) return `Rs ${(val / 1_000_000).toFixed(1)}M`
+  if (val >= 1_000) return `Rs ${(val / 1_000).toFixed(1)}K`
+  return `Rs ${val.toLocaleString()}`
+}
+
+const formatCompact = (raw: number) => {
+  const val = Number(raw || 0)
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`
+  return `${val}`
+}
+
 const DashboardPage: React.FC = () => {
-  const [kpi, setKpi] = useState<any>(null)
-  const [pipeline, setPipeline] = useState<any>(null)
-  const [conversion, setConversion] = useState<any>(null)
-  const [activities, setActivities] = useState<any>(null)
+  const user = useAuthStore((state) => state.user)
+
+  const [kpi, setKpi] = useState<ReportDashboardKPIs | null>(null)
+  const [pipeline, setPipeline] = useState<ReportPipeline | null>(null)
+  const [conversion, setConversion] = useState<ReportConversion | null>(null)
+  const [activities, setActivities] = useState<ReportActivity | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const userRoles = useMemo(() => {
+    if (!user) return []
+    return user.roles && user.roles.length > 0 ? user.roles : user.role ? [user.role] : []
+  }, [user])
+
+  const isManagerRole = useMemo(
+    () => userRoles.some((role) => TEAM_SCOPE_ROLES.includes(role)),
+    [userRoles]
+  )
+
+  const teamRows = (kpi?.userPerformance ?? []) as ReportUserPerformance[]
 
   useEffect(() => { fetchData() }, [])
 
@@ -29,10 +67,10 @@ const DashboardPage: React.FC = () => {
       const [d, p, c, a] = await Promise.allSettled([
         reportApi.getDashboard(), reportApi.getPipeline(), reportApi.getConversion(), reportApi.getActivities(),
       ])
-      if (d.status === 'fulfilled') setKpi(d.value.data.data)
-      if (p.status === 'fulfilled') setPipeline(p.value.data.data)
-      if (c.status === 'fulfilled') setConversion(c.value.data.data)
-      if (a.status === 'fulfilled') setActivities(a.value.data.data)
+      if (d.status === 'fulfilled' && d.value.data.data) setKpi(d.value.data.data)
+      if (p.status === 'fulfilled' && p.value.data.data) setPipeline(p.value.data.data)
+      if (c.status === 'fulfilled' && c.value.data.data) setConversion(c.value.data.data)
+      if (a.status === 'fulfilled' && a.value.data.data) setActivities(a.value.data.data)
     } catch { toast.error('Failed to load dashboard') } finally { setIsLoading(false) }
   }
 
@@ -45,11 +83,24 @@ const DashboardPage: React.FC = () => {
     </div>
   )
 
-  const fmt = (val: number) => {
-    if (val >= 1_000_000) return `₹${(val / 1_000_000).toFixed(1)}M`
-    if (val >= 1_000) return `₹${(val / 1_000).toFixed(1)}K`
-    return `₹${val.toLocaleString()}`
-  }
+  const scopeLabel = kpi?.visibilityScope ?? (isManagerRole ? 'TEAM' : 'SELF')
+  const topPerformer = teamRows.length > 0 ? teamRows[0] : null
+  const trackedMembers = kpi?.teamMemberCount ?? teamRows.filter((row) => Boolean(row.userId)).length
+
+  const totalTeamActivities = teamRows.reduce((sum, row) => sum + row.activities, 0)
+  const avgLeadConversion =
+    teamRows.length > 0
+      ? teamRows.reduce((sum, row) => sum + row.leadConversionRate, 0) / teamRows.length
+      : 0
+  const avgPipelinePerUser = trackedMembers > 0
+    ? Number(kpi?.totalPipelineValue || 0) / trackedMembers
+    : 0
+  const highestOverdueMember = teamRows.reduce<ReportUserPerformance | null>((acc, row) => {
+    if (!acc || row.overdueActivities > acc.overdueActivities) {
+      return row
+    }
+    return acc
+  }, null)
 
   const pipeData = pipeline ? Object.entries(pipeline.dealValueByStage || {}).map(([s, v]) => ({
     stage: s.replace('_', ' '), value: v as number, count: (pipeline.dealCountByStage?.[s] || 0) as number, fill: STAGE_COLORS[s] || '#6b7280',
@@ -67,26 +118,189 @@ const DashboardPage: React.FC = () => {
     type: t, count: c as number,
   })) : []
 
+  const teamPipelineData = teamRows.slice(0, 8).map((row) => ({
+    userName: row.userName,
+    pipelineValue: Number(row.pipelineValue || 0),
+  }))
+
+  const teamConversionData = teamRows.slice(0, 8).map((row) => ({
+    userName: row.userName,
+    leadConversionRate: row.leadConversionRate,
+  }))
+
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">CRM performance overview</p>
+    <div className="space-y-6">
+      <div className="shell-card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500 font-semibold">CRM analytics cockpit</p>
+              <h1 className="text-2xl font-bold text-slate-900 mt-1">Dashboard</h1>
+              <p className="text-sm text-slate-600 mt-2 max-w-2xl">
+            {scopeLabel === 'TEAM'
+                  ? 'Manager view with full CRM team coverage, user-wise accountability, and stage-level trends.'
+                  : 'Personal view showing only your own CRM performance, pipeline movement, and pending execution.'}
+          </p>
+        </div>
+            <ScopePill scope={scopeLabel} />
+          </div>
+
+        <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <InsightTile
+            label="Scope"
+            value={scopeLabel === 'TEAM' ? 'TEAM' : 'SELF'}
+            tone="slate"
+            hint={scopeLabel === 'TEAM' ? 'All assigned CRM users' : 'Only your owned records'}
+          />
+          <InsightTile
+            label="Tracked users"
+            value={scopeLabel === 'TEAM' ? trackedMembers : 1}
+            tone="blue"
+            hint={scopeLabel === 'TEAM' ? 'User-wise detail enabled' : 'Your own execution only'}
+          />
+          <InsightTile
+            label="Pipeline"
+            value={formatCurrencyShort(Number(kpi?.totalPipelineValue || 0))}
+            tone="emerald"
+            hint="Open deal value"
+          />
+          <InsightTile
+            label="Win rate"
+            value={`${(kpi?.winRate ?? 0).toFixed(1)}%`}
+            tone="amber"
+            hint="Closed won ratio"
+          />
+        </div>
       </div>
 
       {/* KPI Row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KPI icon="👥" bg="bg-blue-50" title="Total Leads" value={kpi?.totalLeads ?? 0} />
-        <KPI icon="📇" bg="bg-green-50" title="Contacts" value={kpi?.totalContacts ?? 0} />
-        <KPI icon="📈" bg="bg-purple-50" title="Open Deals" value={kpi?.openDeals ?? 0} />
-        <KPI icon="💰" bg="bg-amber-50" title="Pipeline Value" value={fmt(kpi?.totalPipelineValue ?? 0)} />
+        <KPI iconPath="M17 20h5v-2a3 3 0 00-5.36-1.86M9 20H4v-2a3 3 0 015.36-1.86M16 7a4 4 0 11-8 0 4 4 0 018 0z" iconBg="bg-blue-50" iconColor="text-blue-600" title="Total Leads" value={kpi?.totalLeads ?? 0} />
+        <KPI iconPath="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M16 7a4 4 0 11-8 0 4 4 0 018 0z" iconBg="bg-emerald-50" iconColor="text-emerald-600" title="Contacts" value={kpi?.totalContacts ?? 0} />
+        <KPI iconPath="M3 3v18h18M7 14l3-3 3 2 4-5" iconBg="bg-indigo-50" iconColor="text-indigo-600" title="Open Deals" value={kpi?.openDeals ?? 0} />
+        <KPI iconPath="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8V6m0 10v2m9-6a9 9 0 11-18 0 9 9 0 0118 0z" iconBg="bg-amber-50" iconColor="text-amber-600" title="Pipeline Value" value={formatCurrencyShort(Number(kpi?.totalPipelineValue ?? 0))} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KPI icon="✅" bg="bg-green-50" title="Won Deals" value={kpi?.wonDeals ?? 0} />
-        <KPI icon="❌" bg="bg-red-50" title="Lost Deals" value={kpi?.lostDeals ?? 0} />
-        <KPI icon="⚡" bg="bg-orange-50" title="Activities" value={activities?.totalActivities ?? 0} />
-        <KPI icon="📊" bg="bg-teal-50" title="Win Rate" value={`${(kpi?.winRate ?? 0).toFixed(1)}%`} />
+        <KPI iconPath="M5 13l4 4L19 7" iconBg="bg-emerald-50" iconColor="text-emerald-600" title="Won Deals" value={kpi?.wonDeals ?? 0} />
+        <KPI iconPath="M6 18L18 6M6 6l12 12" iconBg="bg-rose-50" iconColor="text-rose-600" title="Lost Deals" value={kpi?.lostDeals ?? 0} />
+        <KPI iconPath="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.59a1 1 0 01.7.29l3.41 3.41a1 1 0 01.3.71V16a1 1 0 01-1 1h-1" iconBg="bg-orange-50" iconColor="text-orange-600" title="Activities" value={activities?.totalActivities ?? 0} />
+        <KPI iconPath="M3 3v18h18M8 14l3-3 2 2 4-5" iconBg="bg-cyan-50" iconColor="text-cyan-700" title="Win Rate" value={`${(kpi?.winRate ?? 0).toFixed(1)}%`} />
       </div>
+
+      {scopeLabel === 'TEAM' && teamRows.length > 0 && (
+        <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <InsightTile
+            label="Team activities"
+            value={formatCompact(totalTeamActivities)}
+            tone="indigo"
+            hint="Completed + pending"
+          />
+          <InsightTile
+            label="Avg conversion"
+            value={`${avgLeadConversion.toFixed(1)}%`}
+            tone="emerald"
+            hint="Across tracked users"
+          />
+          <InsightTile
+            label="Avg pipeline/user"
+            value={formatCurrencyShort(avgPipelinePerUser)}
+            tone="blue"
+            hint="Distribution health"
+          />
+          <InsightTile
+            label="Highest overdue"
+            value={highestOverdueMember ? `${highestOverdueMember.overdueActivities}` : '0'}
+            tone="rose"
+            hint={highestOverdueMember ? highestOverdueMember.userName : 'No overdue load'}
+          />
+        </div>
+
+        <div className="shell-card p-5 mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">Team Performance by CRM User</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Segregated lead, deal, pipeline and activity metrics for each assigned CRM user.
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Tracked users</p>
+              <p className="text-lg font-bold text-slate-900">{trackedMembers}</p>
+            </div>
+          </div>
+
+          {topPerformer && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Top performer</p>
+              <p className="text-sm font-bold text-emerald-900 mt-0.5">{topPerformer.userName}</p>
+              <p className="text-xs text-emerald-800 mt-1">
+                {topPerformer.deals} deals, {formatCurrencyShort(Number(topPerformer.pipelineValue || 0))} pipeline, {topPerformer.leadConversionRate.toFixed(1)}% conversion
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
+            {teamRows.slice(0, 6).map((row, index) => (
+              <MemberPerformanceCard key={`${row.userId || 'UNASSIGNED'}-${index}`} row={row} />
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="py-2 pr-3 font-semibold">CRM User</th>
+                  <th className="py-2 pr-3 font-semibold">Leads</th>
+                  <th className="py-2 pr-3 font-semibold">Converted</th>
+                  <th className="py-2 pr-3 font-semibold">Deals</th>
+                  <th className="py-2 pr-3 font-semibold">Open</th>
+                  <th className="py-2 pr-3 font-semibold">Won</th>
+                  <th className="py-2 pr-3 font-semibold">Lost</th>
+                  <th className="py-2 pr-3 font-semibold">Pipeline</th>
+                  <th className="py-2 pr-3 font-semibold">Activities</th>
+                  <th className="py-2 pr-3 font-semibold">Completed</th>
+                  <th className="py-2 pr-3 font-semibold">Overdue</th>
+                  <th className="py-2 pr-0 font-semibold">Lead Conv.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamRows.map((row, index) => (
+                  <tr key={`${row.userId || 'UNASSIGNED'}-${index}`} className="border-b border-slate-100 last:border-none">
+                    <td className="py-2 pr-3 font-medium text-slate-800">{row.userName}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.leads}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.convertedLeads}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.deals}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.openDeals}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.wonDeals}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.lostDeals}</td>
+                    <td className="py-2 pr-3 font-semibold text-slate-800">{formatCurrencyShort(Number(row.pipelineValue || 0))}</td>
+                    <td className="py-2 pr-3 text-slate-600">{row.activities}</td>
+                    <td className="py-2 pr-3 text-emerald-700">{row.completedActivities}</td>
+                    <td className="py-2 pr-3 text-rose-600">{row.overdueActivities}</td>
+                    <td className="py-2 pr-0 text-slate-700">{row.leadConversionRate.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        </>
+      )}
+
+      {scopeLabel === 'SELF' && (
+        <div className="shell-card p-5 mb-6 border border-blue-100 bg-blue-50/40">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Personal scope</p>
+          <p className="text-sm text-blue-900 mt-1">
+            This dashboard is automatically filtered to your own leads, deals and activity execution.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <InsightTile label="My leads" value={kpi?.totalLeads ?? 0} tone="blue" hint="Owned + created" />
+            <InsightTile label="My deals" value={kpi?.totalDeals ?? 0} tone="indigo" hint="All stages" />
+            <InsightTile label="My overdue" value={activities?.overdueActivities ?? 0} tone="rose" hint="Immediate attention" />
+            <InsightTile label="My conversion" value={`${conversion?.conversionRate?.toFixed(1) ?? '0.0'}%`} tone="emerald" hint="Lead conversion" />
+          </div>
+        </div>
+      )}
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -95,9 +309,9 @@ const DashboardPage: React.FC = () => {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={pipeData} layout="vertical" margin={{ left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="#f1f5f9" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={fmt} />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={formatCurrencyShort} />
                 <YAxis type="category" dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#475569' }} width={100} />
-                <Tooltip formatter={(v: number) => [fmt(v), 'Value']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => [formatCurrencyShort(v), 'Value']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
                   {pipeData.map((e, i) => <Cell key={i} fill={e.fill} />)}
                 </Bar>
@@ -172,9 +386,41 @@ const DashboardPage: React.FC = () => {
         </ChartCard>
       </div>
 
+      {scopeLabel === 'TEAM' && teamRows.length > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <ChartCard title="Team Pipeline by User (Top 8)">
+            {teamPipelineData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={teamPipelineData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="userName" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={formatCompact} />
+                  <Tooltip formatter={(value: number) => [formatCurrencyShort(value), 'Pipeline']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                  <Bar dataKey="pipelineValue" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={42} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <Empty />}
+          </ChartCard>
+
+          <ChartCard title="Lead Conversion by User (Top 8)">
+            {teamConversionData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={teamConversionData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="userName" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                  <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, 'Conversion']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                  <Bar dataKey="leadConversionRate" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={42} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <Empty />}
+          </ChartCard>
+        </div>
+      )}
+
       {/* Conversion Funnel */}
       {conversion && (
-        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
+        <div className="shell-card p-5 mb-6">
           <h3 className="text-sm font-semibold text-gray-800 mb-4">Conversion Funnel</h3>
           <div className="flex items-center justify-center space-x-2">
             <Funnel label="Total Leads" value={conversion.totalLeads} color="bg-blue-500" />
@@ -189,17 +435,99 @@ const DashboardPage: React.FC = () => {
   )
 }
 
-const KPI = ({ icon, bg, title, value }: { icon: string; bg: string; title: string; value: string | number }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow">
+const ScopePill = ({ scope }: { scope: string }) => {
+  const isTeam = scope === 'TEAM'
+  return (
+    <div className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${isTeam ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+      {isTeam ? 'Team dashboard' : 'My dashboard'}
+    </div>
+  )
+}
+
+const KPI = ({
+  iconPath,
+  iconBg,
+  iconColor,
+  title,
+  value,
+}: {
+  iconPath: string
+  iconBg: string
+  iconColor: string
+  title: string
+  value: string | number
+}) => (
+  <div className="shell-card p-4 hover:shadow-sm transition-shadow">
     <div className="flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center text-lg`}>{icon}</div>
+      <div className={`h-10 w-10 rounded-lg ${iconBg} ${iconColor} flex items-center justify-center`}>
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={iconPath} />
+        </svg>
+      </div>
       <div><p className="text-xs text-gray-500">{title}</p><p className="text-lg font-bold text-gray-900 leading-tight">{value}</p></div>
     </div>
   </div>
 )
 
+const InsightTile = ({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string
+  value: string | number
+  hint: string
+  tone: 'slate' | 'blue' | 'emerald' | 'amber' | 'rose' | 'indigo'
+}) => {
+  const toneClasses: Record<typeof tone, string> = {
+    slate: 'border-slate-200 bg-slate-50 text-slate-900',
+    blue: 'border-blue-200 bg-blue-50 text-blue-900',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    amber: 'border-amber-200 bg-amber-50 text-amber-900',
+    rose: 'border-rose-200 bg-rose-50 text-rose-900',
+    indigo: 'border-indigo-200 bg-indigo-50 text-indigo-900',
+  }
+
+  return (
+    <div className={`rounded-xl border p-3 ${toneClasses[tone]}`}>
+      <p className="text-[11px] uppercase tracking-wide opacity-80">{label}</p>
+      <p className="text-lg font-bold mt-1 leading-tight">{value}</p>
+      <p className="text-[11px] opacity-80 mt-1">{hint}</p>
+    </div>
+  )
+}
+
+const MemberPerformanceCard = ({ row }: { row: ReportUserPerformance }) => (
+  <div className="rounded-xl border border-slate-200 bg-white p-3">
+    <div className="flex items-start justify-between gap-2">
+      <div>
+        <p className="text-sm font-semibold text-slate-800 leading-tight">{row.userName}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">{row.leads} leads • {row.deals} deals</p>
+      </div>
+      <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+        {row.leadConversionRate.toFixed(1)}%
+      </span>
+    </div>
+    <div className="grid grid-cols-3 gap-2 mt-3 text-[11px]">
+      <div>
+        <p className="text-slate-500">Pipeline</p>
+        <p className="font-semibold text-slate-800">{formatCurrencyShort(Number(row.pipelineValue || 0))}</p>
+      </div>
+      <div>
+        <p className="text-slate-500">Completed</p>
+        <p className="font-semibold text-emerald-700">{row.completedActivities}</p>
+      </div>
+      <div>
+        <p className="text-slate-500">Overdue</p>
+        <p className="font-semibold text-rose-600">{row.overdueActivities}</p>
+      </div>
+    </div>
+  </div>
+)
+
 const ChartCard = ({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-5">
+  <div className="shell-card p-5">
     <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center justify-between">{title}{action}</h3>
     <div className="h-[280px] flex items-center">{children}</div>
   </div>

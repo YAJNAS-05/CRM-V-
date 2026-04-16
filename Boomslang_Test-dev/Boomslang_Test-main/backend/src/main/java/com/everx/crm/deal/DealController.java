@@ -34,7 +34,7 @@ public class DealController {
     private DealService dealService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<DealDto>>> getAllDeals(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/deals");
@@ -43,7 +43,7 @@ public class DealController {
     }
 
     @GetMapping("/{dealId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<DealDto>> getDealById(@PathVariable @NonNull UUID dealId) {
         log.info("GET /api/v1/crm/deals/{}", dealId);
         DealDto deal = dealService.getDealById(dealId);
@@ -51,7 +51,7 @@ public class DealController {
     }
 
     @GetMapping("/account/{accountId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<DealDto>>> getDealsByAccount(
             @PathVariable @NonNull UUID accountId,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -61,7 +61,7 @@ public class DealController {
     }
 
     @GetMapping("/stage/{stage}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<DealDto>>> getDealsByStage(
             @PathVariable DealStage stage,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -71,7 +71,7 @@ public class DealController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<DealDto>> createDeal(@Valid @RequestBody CreateDealRequest request) {
         log.info("POST /api/v1/crm/deals");
         DealDto deal = dealService.createDeal(Objects.requireNonNull(request));
@@ -79,7 +79,7 @@ public class DealController {
     }
 
     @PutMapping("/{dealId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<DealDto>> updateDeal(
             @PathVariable @NonNull UUID dealId,
             @Valid @RequestBody @NonNull UpdateDealRequest request) {
@@ -89,7 +89,7 @@ public class DealController {
     }
 
     @DeleteMapping("/{dealId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteDeal(@PathVariable @NonNull UUID dealId) {
         log.info("DELETE /api/v1/crm/deals/{}", dealId);
         dealService.deleteDeal(dealId);

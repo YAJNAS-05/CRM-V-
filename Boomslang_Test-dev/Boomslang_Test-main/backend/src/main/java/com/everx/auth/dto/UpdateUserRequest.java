@@ -1,11 +1,12 @@
 package com.everx.auth.dto;
 
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -20,7 +21,10 @@ public class UpdateUserRequest {
 
     private String phone;
 
-    private String role; // Optional, can be updated separately
+    private String role;
+
+    @Builder.Default
+    private List<String> roles = List.of();
 
     private String officeLocation;
 

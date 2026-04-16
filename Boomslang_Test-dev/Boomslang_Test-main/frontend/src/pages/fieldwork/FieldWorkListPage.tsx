@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { fieldworkApi } from '../../api/fieldworkApi'
 import { FieldJobDto } from '../../types/fieldwork'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 interface FieldWorkOrder {
   id: number | string
@@ -17,6 +18,38 @@ interface FieldWorkOrder {
   estimatedDuration: number
   category: string
   description: string
+}
+
+const mapJobStatus = (status: FieldJobDto['jobStatus']): FieldWorkOrder['status'] => {
+  switch (status) {
+    case 'IN_PROGRESS':
+    case 'PENDING_SIGN_OFF':
+      return 'IN_PROGRESS'
+    case 'COMPLETED':
+      return 'COMPLETED'
+    case 'CANCELLED':
+    case 'REVERSED':
+      return 'CANCELLED'
+    case 'DRAFT':
+    case 'ENGINEER_ASSIGNED':
+    case 'SCHEDULED':
+    default:
+      return 'SCHEDULED'
+  }
+}
+
+const mapJobPriority = (priority: FieldJobDto['priority']): FieldWorkOrder['priority'] => {
+  switch (priority) {
+    case 'EMERGENCY':
+      return 'URGENT'
+    case 'CRITICAL':
+      return 'HIGH'
+    case 'URGENT':
+      return 'MEDIUM'
+    case 'ROUTINE':
+    default:
+      return 'LOW'
+  }
 }
 
 export const FieldWorkListPage = () => {
@@ -39,21 +72,21 @@ export const FieldWorkListPage = () => {
     }
   })
 
-  const workOrders = (response || []).map((job: FieldJobDto) => ({
-    id: job.fieldJobId || '',
-    workOrderNumber: `WO-${job.jobNumber}`,
+  const workOrders: FieldWorkOrder[] = (response || []).map((job: FieldJobDto) => ({
+    id: job.fieldJobId || job.jobNumber,
+    workOrderNumber: job.jobNumber ? `WO-${job.jobNumber}` : `WO-${job.fieldJobId ?? 'N/A'}`,
     title: job.jobType || 'Untitled',
-    location: job.siteCity || '',
-    assignedTo: job.primaryEngineerName || 'Unassigned',
-    status: (job.jobStatus as any) || 'SCHEDULED',
-    priority: job.priority || 'MEDIUM',
+    location: [job.siteCity, job.siteCountry].filter(Boolean).join(', '),
+    assignedTo: job.primaryEngineerName || (job.primaryEngineerId ? `Engineer #${job.primaryEngineerId}` : 'Unassigned'),
+    status: mapJobStatus(job.jobStatus),
+    priority: mapJobPriority(job.priority),
     scheduledDate: job.scheduledStartDate || new Date().toISOString(),
     estimatedDuration: job.estimatedDurationDays || 0,
     category: job.jobType || '',
-    description: job.linkedEntity || ''
+    description: job.internalNotes || job.clientBriefNotes || job.linkedEntity || ''
   }))
 
-  const filteredOrders = workOrders.filter((order: FieldWorkOrder) =>
+  const filteredOrders = workOrders.filter((order) =>
     order.title.toLowerCase().includes(search.toLowerCase()) ||
     order.workOrderNumber.toLowerCase().includes(search.toLowerCase())
   )
@@ -88,6 +121,26 @@ export const FieldWorkListPage = () => {
     }
   }
 
+  const handleExport = () => {
+    const rows = filteredOrders.map((order) => ({
+      WorkOrderNumber: order.workOrderNumber,
+      Title: order.title,
+      Status: order.status,
+      Priority: order.priority,
+      Location: order.location,
+      AssignedTo: order.assignedTo,
+      ScheduledDate: order.scheduledDate,
+      EstimatedDurationHours: order.estimatedDuration,
+      Category: order.category,
+      Description: order.description,
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Work_Orders_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Work Orders',
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -116,12 +169,21 @@ export const FieldWorkListPage = () => {
             <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
-        <button
-          onClick={() => navigate('/fieldwork/new')}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-        >
-          + New Work Order
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={filteredOrders.length === 0}
+            className="px-4 py-2 border border-border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => navigate('/fieldwork/new')}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+          >
+            + New Work Order
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -144,7 +206,7 @@ export const FieldWorkListPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredOrders.map((order: FieldWorkOrder) => (
+          {filteredOrders.map((order) => (
             <div
               key={order.id}
               className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"

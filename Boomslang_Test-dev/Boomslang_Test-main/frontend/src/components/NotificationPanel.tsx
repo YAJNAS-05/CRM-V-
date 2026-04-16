@@ -6,7 +6,7 @@ import { useNotificationStore } from '@/store/notificationStore'
  * Displays in-app notifications from the notification store
  */
 const NotificationPanel: React.FC = () => {
-  const { notifications, removeNotification } = useNotificationStore()
+  const { notifications, removeNotification, clearNotifications } = useNotificationStore()
 
   if (notifications.length === 0) {
     return null
@@ -28,7 +28,21 @@ const NotificationPanel: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-20 right-4 z-50 space-y-2 max-w-md">
+    <section
+      aria-live="polite"
+      aria-atomic="false"
+      className="fixed left-2 right-2 top-20 z-50 space-y-2 sm:left-auto sm:right-4 sm:w-[22rem]"
+    >
+      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 shadow-sm backdrop-blur-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">In-app notifications</p>
+        <button
+          type="button"
+          onClick={clearNotifications}
+          className="text-xs font-medium text-slate-500 hover:text-slate-700"
+        >
+          Dismiss all
+        </button>
+      </div>
       {notifications.map((notification) => {
         const { icon, bgColor, textColor, borderColor } = getIconAndColor(notification.type)
 
@@ -45,6 +59,8 @@ const NotificationPanel: React.FC = () => {
               </div>
             </div>
             <button
+              type="button"
+              aria-label={`Dismiss ${notification.title} notification`}
               onClick={() => removeNotification(notification.id)}
               className="ml-2 text-lg hover:opacity-70 transition"
             >
@@ -53,7 +69,7 @@ const NotificationPanel: React.FC = () => {
           </div>
         )
       })}
-    </div>
+    </section>
   )
 }
 

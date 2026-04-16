@@ -19,31 +19,31 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('DASHBOARD_VIEW')")
     public ResponseEntity<ApiResponse<ReportResponse.DashboardKPIs>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getDashboardKPIs(), "Dashboard KPIs retrieved"));
     }
 
     @GetMapping("/pipeline")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAnyAuthority('DASHBOARD_VIEW','REPORT_VIEW')")
     public ResponseEntity<ApiResponse<ReportResponse.PipelineReport>> getPipeline() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getPipelineReport(), "Pipeline report retrieved"));
     }
 
     @GetMapping("/conversion")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAnyAuthority('DASHBOARD_VIEW','REPORT_VIEW')")
     public ResponseEntity<ApiResponse<ReportResponse.ConversionReport>> getConversion() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getConversionReport(), "Conversion report retrieved"));
     }
 
     @GetMapping("/activities")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAnyAuthority('DASHBOARD_VIEW','REPORT_VIEW')")
     public ResponseEntity<ApiResponse<ReportResponse.ActivityReport>> getActivities() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getActivityReport(), "Activity report retrieved"));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('REPORT_VIEW')")
     public ResponseEntity<ApiResponse<ReportResponse>> getFullReport() {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getFullReport(), "Full report retrieved"));
     }

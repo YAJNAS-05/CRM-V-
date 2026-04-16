@@ -28,4 +28,10 @@ public interface ReportDefinitionRepository extends JpaRepository<ReportDefiniti
     List<ReportDefinitionEntity> findActiveByModule(@Param("module") String module);
 
     boolean existsByReportName(String reportName);
+
+    Optional<ReportDefinitionEntity> findByOwnedByIgnoreCaseAndModuleIgnoreCaseAndReportNameIgnoreCaseAndIsActiveTrue(
+        String ownedBy,
+        String module,
+        String reportName
+    );
 }

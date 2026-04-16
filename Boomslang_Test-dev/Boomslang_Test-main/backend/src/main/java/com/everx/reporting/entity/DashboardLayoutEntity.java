@@ -24,7 +24,7 @@ public class DashboardLayoutEntity {
     @Column(name = "user_email", nullable = false, unique = true, length = 100)
     private String userEmail;
 
-    @Column(name = "layout_config", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "layout_config", nullable = false, columnDefinition = "JSON")
     @JdbcTypeCode(SqlTypes.JSON)
     private Object layoutConfig;
 

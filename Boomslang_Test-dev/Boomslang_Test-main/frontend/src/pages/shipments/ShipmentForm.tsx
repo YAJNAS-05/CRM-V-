@@ -1,37 +1,57 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { shipmentApi } from '../../api/erpApi'
+import {
+  shipmentApi,
+  salesOrderApi,
+  purchaseOrderApi,
+  subcontractorApi,
+  equipmentApi,
+  supplierApi,
+} from '../../api/erpApi'
+import { Equipment, PurchaseOrder, SalesOrder, Subcontractor, Supplier } from '../../types/erp'
 import { toast } from 'react-hot-toast'
+import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
 
 const SHIPMENT_STATUSES = ['PENDING', 'IN_TRANSIT', 'CUSTOMS_CLEARANCE', 'DELIVERED', 'RETURNED', 'CANCELLED']
+const SHIPMENT_TYPES = ['SEA', 'AIR', 'ROAD']
+const CARRIERS = ['DHL', 'FEDEX', 'TNT', 'MAERSK', 'MSC', 'HAPAG_LLOYD', 'AIR_FREIGHT', 'ROAD', 'OTHER']
+const CURRENCIES = ['AUD', 'USD', 'JPY', 'EUR', 'GBP']
 
 interface FormData {
   trackingNumber: string
   carrier: string
+  shipmentType: string
   originCountry: string
   destinationCountry: string
   status: string
   shippedDate: string
   estimatedArrival: string
+  actualArrival: string
   freightCost: string
   currency: string
   soId: string
   poId: string
+  equipmentId: string
+  subcontractorId: string
   notes: string
 }
 
 const defaultForm: FormData = {
   trackingNumber: '',
   carrier: '',
+  shipmentType: 'SEA',
   originCountry: '',
   destinationCountry: '',
   status: 'PENDING',
   shippedDate: '',
   estimatedArrival: '',
+  actualArrival: '',
   freightCost: '',
   currency: 'USD',
   soId: '',
   poId: '',
+  equipmentId: '',
+  subcontractorId: '',
   notes: '',
 }
 
@@ -42,10 +62,43 @@ export default function ShipmentForm() {
   const [form, setForm] = useState<FormData>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([])
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
+  const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
+  const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+
+  useEffect(() => {
+    loadLookups()
+  }, [])
 
   useEffect(() => {
     if (isEdit && id) loadItem()
-  }, [id])
+  }, [id, isEdit])
+
+  const loadLookups = async () => {
+    try {
+      setLookupLoading(true)
+      const [salesOrderResponse, purchaseOrderResponse, subcontractorResponse, equipmentResponse, supplierResponse] = await Promise.all([
+        salesOrderApi.getAll(0, 200),
+        purchaseOrderApi.getAll(0, 200),
+        subcontractorApi.getAll(0, 200),
+        equipmentApi.getAll(0, 200),
+        supplierApi.getAll(0, 200),
+      ])
+
+      setSalesOrders(salesOrderResponse.data?.data?.content || [])
+      setPurchaseOrders(purchaseOrderResponse.data?.data?.content || [])
+      setSubcontractors(subcontractorResponse.data?.data?.content || [])
+      setEquipment(equipmentResponse.data?.content || [])
+      setSuppliers(supplierResponse.data?.data?.content || [])
+    } catch {
+      toast.error('Failed to load shipment lookups')
+    } finally {
+      setLookupLoading(false)
+    }
+  }
 
   const loadItem = async () => {
     try {
@@ -54,19 +107,33 @@ export default function ShipmentForm() {
       const d = response.data
       if (d.success && d.data) {
         const e = d.data
+        const rawNotes = e.notes || ''
+        const shipmentType = rawNotes.match(/Shipment Type:\s*([A-Z_]+)/)?.[1] || 'SEA'
+        const equipmentId = rawNotes.match(/Equipment ID:\s*([A-Za-z0-9-]+)/)?.[1] || ''
+        const subcontractorId = rawNotes.match(/Subcontractor ID:\s*([A-Za-z0-9-]+)/)?.[1] || ''
+        const cleanedNotes = rawNotes
+          .replace(/Shipment Type:\s*[A-Z_]+\n?/g, '')
+          .replace(/Equipment ID:\s*[A-Za-z0-9-]+\n?/g, '')
+          .replace(/Subcontractor ID:\s*[A-Za-z0-9-]+\n?/g, '')
+          .trim()
+
         setForm({
           trackingNumber: e.trackingNumber || '',
           carrier: e.carrier || '',
+          shipmentType,
           originCountry: e.originCountry || '',
           destinationCountry: e.destinationCountry || '',
           status: e.status || 'PENDING',
           shippedDate: e.shippedDate || '',
           estimatedArrival: e.estimatedArrival || '',
+          actualArrival: e.actualArrival || '',
           freightCost: e.freightCost?.toString() || '',
           currency: e.currency || 'USD',
           soId: e.soId || '',
           poId: e.poId || '',
-          notes: e.notes || '',
+          equipmentId,
+          subcontractorId,
+          notes: cleanedNotes,
         })
       }
     } catch { toast.error('Failed to load shipment') }
@@ -77,19 +144,129 @@ export default function ShipmentForm() {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
+  const handleLookupChange = (name: string, value: string) => {
+    if (name === 'soId') {
+      const selectedSo = salesOrders.find((order) => order.id === value)
+      const firstEquipmentId = selectedSo?.items?.[0]?.equipmentId || ''
+
+      setForm((prev) => ({
+        ...prev,
+        soId: value,
+        destinationCountry: selectedSo?.destinationCountry || prev.destinationCountry,
+        equipmentId: firstEquipmentId || prev.equipmentId,
+      }))
+      return
+    }
+
+    if (name === 'poId') {
+      const selectedPo = purchaseOrders.find((order) => order.id === value)
+      const supplier = suppliers.find((item) => item.id === selectedPo?.supplierId)
+      const firstEquipmentId = selectedPo?.items?.[0]?.equipmentId || ''
+
+      setForm((prev) => ({
+        ...prev,
+        poId: value,
+        originCountry: supplier?.country || prev.originCountry,
+        equipmentId: firstEquipmentId || prev.equipmentId,
+      }))
+      return
+    }
+
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const salesOrderOptions = useMemo(
+    () =>
+      salesOrders.map((order) => ({
+        value: order.id,
+        label: order.soNumber,
+        meta: order.destinationCountry || order.status,
+      })),
+    [salesOrders]
+  )
+
+  const purchaseOrderOptions = useMemo(
+    () =>
+      purchaseOrders.map((order) => {
+        const supplier = suppliers.find((item) => item.id === order.supplierId)
+        return {
+          value: order.id,
+          label: order.poNumber,
+          meta: supplier?.companyName || order.status,
+        }
+      }),
+    [purchaseOrders, suppliers]
+  )
+
+  const equipmentOptions = useMemo(
+    () =>
+      equipment.map((item) => ({
+        value: item.id,
+        label: `${item.internalCode} | ${item.make || ''} ${item.model || ''}`.trim(),
+        meta: item.status,
+      })),
+    [equipment]
+  )
+
+  const subcontractorOptions = useMemo(
+    () =>
+      subcontractors.map((item) => ({
+        value: item.id,
+        label: item.companyName,
+        meta: [item.country, item.currency].filter(Boolean).join(' | ') || undefined,
+      })),
+    [subcontractors]
+  )
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.status) { toast.error('Status is required'); return }
+    if (!form.status) {
+      toast.error('Status is required')
+      return
+    }
+
+    if (!form.soId && !form.poId) {
+      toast.error('Select either a Sales Order or a Purchase Order')
+      return
+    }
+
+    if (form.shippedDate && form.estimatedArrival && form.estimatedArrival < form.shippedDate) {
+      toast.error('Estimated arrival must be on or after shipped date')
+      return
+    }
+
+    if (form.shippedDate && form.actualArrival && form.actualArrival < form.shippedDate) {
+      toast.error('Actual arrival must be on or after shipped date')
+      return
+    }
+
     try {
       setSaving(true)
+      const notesWithWorkflowFields = [
+        form.notes?.trim() || null,
+        `Shipment Type: ${form.shipmentType}`,
+        form.equipmentId ? `Equipment ID: ${form.equipmentId}` : null,
+        form.subcontractorId ? `Subcontractor ID: ${form.subcontractorId}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n')
+
       const payload = {
-        ...form,
-        freightCost: form.freightCost ? parseFloat(form.freightCost) : null,
+        trackingNumber: form.trackingNumber,
+        carrier: form.carrier || null,
+        originCountry: form.originCountry || null,
+        destinationCountry: form.destinationCountry || null,
+        status: form.status,
         shippedDate: form.shippedDate || null,
         estimatedArrival: form.estimatedArrival || null,
+        actualArrival: form.actualArrival || null,
+        freightCost: form.freightCost ? parseFloat(form.freightCost) : null,
+        currency: form.currency,
         soId: form.soId || null,
         poId: form.poId || null,
+        notes: notesWithWorkflowFields || null,
       }
+
       if (isEdit) {
         const response = await shipmentApi.update(id!, payload)
         if (response.data.success) { toast.success('Shipment updated'); navigate('/erp/shipments') }
@@ -123,12 +300,25 @@ export default function ShipmentForm() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Carrier</label>
-                <input type="text" name="carrier" value={form.carrier} onChange={handleChange} maxLength={50} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <select name="carrier" value={form.carrier} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">Select Carrier</option>
+                  {CARRIERS.map((carrier) => (
+                    <option key={carrier} value={carrier}>{carrier.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
                 <select name="status" value={form.status} onChange={handleChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   {SHIPMENT_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shipment Type</label>
+                <select name="shipmentType" value={form.shipmentType} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  {SHIPMENT_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -153,27 +343,67 @@ export default function ShipmentForm() {
                 <input type="date" name="estimatedArrival" value={form.estimatedArrival} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Actual Arrival</label>
+                <input type="date" name="actualArrival" value={form.actualArrival} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Freight Cost</label>
                 <input type="number" step="0.01" name="freightCost" value={form.freightCost} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <input type="text" name="currency" value={form.currency} onChange={handleChange} maxLength={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <select name="currency" value={form.currency} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  {CURRENCIES.map((currency) => (
+                    <option key={currency} value={currency}>{currency}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
           <div>
             <h2 className="text-lg font-semibold mb-3 text-gray-700">Linked Orders</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sales Order ID</label>
-                <input type="text" name="soId" value={form.soId} onChange={handleChange} placeholder="UUID (optional)" className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Order ID</label>
-                <input type="text" name="poId" value={form.poId} onChange={handleChange} placeholder="UUID (optional)" className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              </div>
+              <SearchableLookupSelect
+                label="Sales Order"
+                name="soId"
+                value={form.soId}
+                options={salesOrderOptions}
+                onChange={handleLookupChange}
+                disabled={lookupLoading}
+                placeholder="Search sales orders by SO number"
+              />
+              <SearchableLookupSelect
+                label="Purchase Order"
+                name="poId"
+                value={form.poId}
+                options={purchaseOrderOptions}
+                onChange={handleLookupChange}
+                disabled={lookupLoading}
+                placeholder="Search purchase orders by PO number"
+              />
+              <SearchableLookupSelect
+                label="Equipment"
+                name="equipmentId"
+                value={form.equipmentId}
+                options={equipmentOptions}
+                onChange={handleLookupChange}
+                disabled={lookupLoading}
+                placeholder="Equipment auto-fills from SO/PO selection"
+              />
+              <SearchableLookupSelect
+                label="Subcontractor / Delivery Agent"
+                name="subcontractorId"
+                value={form.subcontractorId}
+                options={subcontractorOptions}
+                onChange={handleLookupChange}
+                disabled={lookupLoading}
+                placeholder="Search subcontractor"
+              />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button type="button" onClick={() => navigate('/erp/shipments')} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>

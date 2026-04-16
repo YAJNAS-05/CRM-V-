@@ -97,9 +97,9 @@ const AssetAuditPage: React.FC = () => {
           </thead>
           <tbody>
             {audits.map(audit => (
-              <tr key={audit.auditId} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-3 text-blue-600 font-medium">{audit.auditId}</td>
-                <td className="px-6 py-3">{audit.equipmentSku}</td>
+              <tr key={audit.id || `${audit.assetId}-${audit.auditDate}`} className="border-b hover:bg-gray-50">
+                <td className="px-6 py-3 text-blue-600 font-medium">{audit.id || '-'}</td>
+                <td className="px-6 py-3">{audit.assetId}</td>
                 <td className="px-6 py-3">{audit.auditDate?.toString().split('T')[0]}</td>
                 <td className="px-6 py-3">{audit.completionDate?.toString().split('T')[0] || '-'}</td>
                 <td className="px-6 py-3">

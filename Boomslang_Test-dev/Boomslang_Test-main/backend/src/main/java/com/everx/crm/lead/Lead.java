@@ -115,7 +115,7 @@ public class Lead extends BaseEntity {
     @Column(name = "source", length = 50)
     private String source;
 
-    @Column(name = "equipment_interest", columnDefinition = "text[]")
+    @Column(name = "equipment_interest", columnDefinition = "TEXT ARRAY")
     private String[] equipmentInterest;
 
     @Column(name = "currency", length = 3)

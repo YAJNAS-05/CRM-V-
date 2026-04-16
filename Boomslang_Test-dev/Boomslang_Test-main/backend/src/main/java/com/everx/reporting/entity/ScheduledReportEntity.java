@@ -33,13 +33,13 @@ public class ScheduledReportEntity {
     @Column(name = "frequency", nullable = false, length = 20)
     private String frequency;                       // DAILY / WEEKLY / MONTHLY
 
-    @Column(name = "recipients", nullable = false, columnDefinition = "text[]")
+    @Column(name = "recipients", nullable = false, columnDefinition = "TEXT ARRAY")
     private String[] recipients;
 
     @Column(name = "export_format", nullable = false, length = 10)
     private String exportFormat;                    // CSV / EXCEL / PDF
 
-    @Column(name = "filters", columnDefinition = "jsonb")
+    @Column(name = "filters", columnDefinition = "JSON")
     @JdbcTypeCode(SqlTypes.JSON)
     private Object filters;
 

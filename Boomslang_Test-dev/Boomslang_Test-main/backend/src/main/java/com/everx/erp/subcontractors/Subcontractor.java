@@ -28,10 +28,10 @@ public class Subcontractor extends BaseEntity {
     @Column(length = 100)
     private String country;
 
-    @Column(name = "coverage_regions", columnDefinition = "TEXT[]")
+    @Column(name = "coverage_regions", columnDefinition = "TEXT ARRAY")
     private String[] coverageRegions;
 
-    @Column(columnDefinition = "TEXT[]")
+    @Column(columnDefinition = "TEXT ARRAY")
     private String[] specialisations;
 
     @Column(name = "hourly_rate", precision = 10, scale = 2)

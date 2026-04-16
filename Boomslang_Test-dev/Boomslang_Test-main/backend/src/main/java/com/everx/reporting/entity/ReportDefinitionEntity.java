@@ -36,7 +36,7 @@ public class ReportDefinitionEntity {
     @Column(name = "description")
     private String description;
 
-    @Column(name = "definition", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "definition", nullable = false, columnDefinition = "JSON")
     @JdbcTypeCode(SqlTypes.JSON)
     private Object definition;
 

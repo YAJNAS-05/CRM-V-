@@ -19,7 +19,7 @@ interface AuthStore {
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
@@ -27,8 +27,16 @@ export const useAuthStore = create<AuthStore>()(
       isLoading: false,
 
       setUser: (user) => set({ user }),
-      setAccessToken: (accessToken) => set({ accessToken }),
-      setRefreshToken: (refreshToken) => set({ refreshToken }),
+      setAccessToken: (accessToken) =>
+        set({
+          accessToken,
+          isAuthenticated: Boolean(accessToken && get().refreshToken && get().user),
+        }),
+      setRefreshToken: (refreshToken) =>
+        set({
+          refreshToken,
+          isAuthenticated: Boolean(refreshToken && get().accessToken && get().user),
+        }),
       setIsLoading: (isLoading) => set({ isLoading }),
 
       login: (user, accessToken, refreshToken) =>
@@ -53,8 +61,17 @@ export const useAuthStore = create<AuthStore>()(
         user: state.user,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        const hasSession = Boolean(state.user && state.accessToken && state.refreshToken)
+        state.setIsLoading(false)
+        if (hasSession) {
+          state.login(state.user!, state.accessToken!, state.refreshToken!)
+        } else {
+          state.logout()
+        }
+      },
     }
   )
 )

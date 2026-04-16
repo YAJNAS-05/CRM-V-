@@ -1,5 +1,11 @@
 import api from './axiosInstance'
-import { CreateUserRequest, UpdateUserRequest } from '../types/auth'
+import {
+  CreateRoleRequest,
+  CreateUserRequest,
+  UpdateRolePermissionsRequest,
+  UpdateRoleRequest,
+  UpdateUserRequest,
+} from '../types/auth'
 
 // Admin & Dashboard API
 export const adminApi = {
@@ -30,6 +36,28 @@ export const adminApi = {
     
   toggleUserStatus: (userId: string) =>
     api.patch(`/v1/admin/users/${userId}/toggle-status`),
+
+  // Role & Permission APIs
+  getRoles: () =>
+    api.get('/v1/admin/roles'),
+
+  getPermissions: () =>
+    api.get('/v1/admin/roles/permissions'),
+
+  getLocations: () =>
+    api.get('/v1/admin/roles/locations'),
+
+  createRole: (data: CreateRoleRequest) =>
+    api.post('/v1/admin/roles', data),
+
+  updateRole: (roleId: string, data: UpdateRoleRequest) =>
+    api.put(`/v1/admin/roles/${roleId}`, data),
+
+  updateRolePermissions: (roleId: string, data: UpdateRolePermissionsRequest) =>
+    api.put(`/v1/admin/roles/${roleId}/permissions`, data),
+
+  deleteRole: (roleId: string) =>
+    api.delete(`/v1/admin/roles/${roleId}`),
 };
 
 export default api;

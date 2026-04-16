@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supplierApi } from '../../api/erpApi'
 import { Supplier } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function SuppliersListPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -26,13 +27,43 @@ export default function SuppliersListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = suppliers.map((supplier) => ({
+      CompanyName: supplier.companyName,
+      Country: supplier.country || '',
+      ContactName: supplier.contactName || '',
+      Email: supplier.email || '',
+      Phone: supplier.phone || '',
+      SupplierType: supplier.supplierType || '',
+      PaymentTerms: supplier.paymentTerms || '',
+      PaymentMethod: supplier.paymentMethod || '',
+      Currency: supplier.currency || '',
+      Active: supplier.active || false,
+      Notes: supplier.notes || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Suppliers_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Suppliers',
+    })
+  }
+
   if (loading) return <div className="p-6">Loading suppliers...</div>
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Suppliers</h1>
-        <button onClick={() => navigate('/erp/suppliers/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Supplier</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={suppliers.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/suppliers/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Supplier</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

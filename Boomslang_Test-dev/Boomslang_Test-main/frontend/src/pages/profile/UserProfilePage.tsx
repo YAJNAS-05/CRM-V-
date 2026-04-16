@@ -73,6 +73,8 @@ const UserProfilePage: React.FC = () => {
     )
   }
 
+  const displayRoles = user.roles && user.roles.length > 0 ? user.roles : [user.role]
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
       <h1 className="text-3xl font-bold mb-8">User Profile</h1>
@@ -97,9 +99,13 @@ const UserProfilePage: React.FC = () => {
               )}
               <h2 className="text-xl font-bold mb-2">{editedProfile.fullName}</h2>
               <p className="text-gray-600 mb-1">{user.email}</p>
-              <span className="inline-block bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full">
-                {user.role.replace('_', ' ')}
-              </span>
+              <div className="flex flex-wrap items-center justify-center gap-1">
+                {displayRoles.map((roleName) => (
+                  <span key={roleName} className="inline-block bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full">
+                    {roleName.replace('_', ' ')}
+                  </span>
+                ))}
+              </div>
               <p className="text-sm text-gray-500 mt-4">
                 {user.officeLocation} Office
               </p>

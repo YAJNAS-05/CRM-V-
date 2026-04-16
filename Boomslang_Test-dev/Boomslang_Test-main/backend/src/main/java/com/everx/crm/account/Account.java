@@ -77,6 +77,6 @@ public class Account extends BaseEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @Column(name = "tags", columnDefinition = "TEXT ARRAY")
     private String[] tags;
 }

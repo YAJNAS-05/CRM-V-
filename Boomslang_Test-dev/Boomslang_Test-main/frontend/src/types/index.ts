@@ -4,6 +4,8 @@ export interface User {
   fullName: string
   phone: string
   role: string
+  roles: string[]
+  permissions: string[]
   officeLocation: string
   isActive: boolean
   lastLogin: string | null

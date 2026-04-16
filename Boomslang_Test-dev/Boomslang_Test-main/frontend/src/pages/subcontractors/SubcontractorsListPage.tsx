@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { subcontractorApi } from '../../api/erpApi'
 import { Subcontractor } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function SubcontractorsListPage() {
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
@@ -26,13 +27,42 @@ export default function SubcontractorsListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = subcontractors.map((subcontractor) => ({
+      CompanyName: subcontractor.companyName,
+      Country: subcontractor.country || '',
+      ContactName: subcontractor.contactName || '',
+      Email: subcontractor.email || '',
+      Phone: subcontractor.phone || '',
+      CoverageRegions: subcontractor.coverageRegions?.join(', ') || '',
+      Specialisations: subcontractor.specialisations?.join(', ') || '',
+      HourlyRate: subcontractor.hourlyRate || 0,
+      Currency: subcontractor.currency || '',
+      Notes: subcontractor.notes || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Subcontractors_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Subcontractors',
+    })
+  }
+
   if (loading) return <div className="p-6">Loading subcontractors...</div>
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Subcontractors</h1>
-        <button onClick={() => navigate('/erp/subcontractors/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Subcontractor</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={subcontractors.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/subcontractors/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Subcontractor</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

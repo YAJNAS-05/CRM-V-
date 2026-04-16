@@ -3,6 +3,13 @@ import { currencyRateApi } from '../../api/financeApi'
 import { CurrencyRate } from '../../types/finance'
 import { toast } from 'sonner'
 
+const extractList = <T,>(payload: unknown): T[] => {
+  if (!payload || typeof payload !== 'object') return []
+  const wrapped = payload as { data?: unknown }
+  const data = wrapped.data ?? payload
+  return Array.isArray(data) ? (data as T[]) : []
+}
+
 const CurrencyRatePage: React.FC = () => {
   const [rates, setRates] = useState<CurrencyRate[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -18,7 +25,7 @@ const CurrencyRatePage: React.FC = () => {
     try {
       setIsLoading(true)
       const response = await currencyRateApi.getAll()
-      setRates(response.data.data || [])
+      setRates(extractList<CurrencyRate>(response.data))
     } catch (error) {
       toast.error('Failed to load currency rates')
     } finally {
@@ -107,7 +114,7 @@ const CurrencyRatePage: React.FC = () => {
       </div>
 
       {showUpdateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl">
             <h2 className="text-xl font-bold mb-2">Manual Adjust</h2>
             <p className="text-sm text-gray-500 mb-6 font-medium">Set manual rate for {selectedRate?.baseCurrency} &rarr; {selectedRate?.targetCurrency}</p>

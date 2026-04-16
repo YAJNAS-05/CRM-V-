@@ -36,7 +36,7 @@ public class UserController {
      * Get all users with pagination
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_VIEW')")
     public ResponseEntity<ApiResponse<Page<UserDto>>> getAllUsers(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) @NonNull Pageable pageable) {
         log.info("GET /api/v1/admin/users");
@@ -48,7 +48,7 @@ public class UserController {
      * Get user by ID
      */
     @GetMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_VIEW')")
     public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable @NonNull UUID userId) {
         log.info("GET /api/v1/admin/users/{}", userId);
         UserDto user = userService.getUserById(userId);
@@ -59,7 +59,7 @@ public class UserController {
      * Get users by role
      */
     @GetMapping("/role/{role}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_VIEW')")
     public ResponseEntity<ApiResponse<Page<UserDto>>> getUsersByRole(
             @PathVariable @NonNull String role,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) @NonNull Pageable pageable) {
@@ -72,7 +72,7 @@ public class UserController {
      * Create new user
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
     public ResponseEntity<ApiResponse<UserDto>> createUser(@Valid @RequestBody @NonNull CreateUserRequest request) {
         log.info("POST /api/v1/admin/users - email: {}", request.getEmail());
         UserDto user = userService.createUser(request);
@@ -84,7 +84,7 @@ public class UserController {
      * Update user
      */
     @PutMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_EDIT')")
     public ResponseEntity<ApiResponse<UserDto>> updateUser(
             @PathVariable @NonNull UUID userId,
             @Valid @RequestBody @NonNull UpdateUserRequest request) {
@@ -97,7 +97,7 @@ public class UserController {
      * Delete user (soft delete)
      */
     @DeleteMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable @NonNull UUID userId) {
         log.info("DELETE /api/v1/admin/users/{}", userId);
         userService.deleteUser(userId);
@@ -108,7 +108,7 @@ public class UserController {
      * Change password
      */
     @PostMapping("/{userId}/change-password")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_EDIT')")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @PathVariable @NonNull UUID userId,
             @Valid @RequestBody @NonNull ChangePasswordRequest request) {
@@ -123,7 +123,7 @@ public class UserController {
      * Toggle user active status
      */
     @PatchMapping("/{userId}/toggle-status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_EDIT')")
     public ResponseEntity<ApiResponse<UserDto>> toggleUserStatus(@PathVariable @NonNull UUID userId) {
         log.info("PATCH /api/v1/admin/users/{}/toggle-status", userId);
         UserDto user = userService.toggleUserStatus(userId);

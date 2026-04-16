@@ -29,7 +29,7 @@ public class ContactController {
     private ContactService contactService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<ContactDto>>> getAllContacts(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/contacts");
@@ -38,7 +38,7 @@ public class ContactController {
     }
 
     @GetMapping("/{contactId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<ContactDto>> getContactById(@PathVariable UUID contactId) {
         log.info("GET /api/v1/crm/contacts/{}", contactId);
         ContactDto contact = contactService.getContactById(contactId);
@@ -46,7 +46,7 @@ public class ContactController {
     }
 
     @GetMapping("/account/{accountId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER','SALES_REP')")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<ContactDto>>> getContactsByAccount(
             @PathVariable UUID accountId,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -56,7 +56,7 @@ public class ContactController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<ContactDto>> createContact(@Valid @RequestBody CreateContactRequest request) {
         log.info("POST /api/v1/crm/contacts");
         ContactDto contact = contactService.createContact(request);
@@ -64,7 +64,7 @@ public class ContactController {
     }
 
     @PutMapping("/{contactId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<ContactDto>> updateContact(
             @PathVariable UUID contactId,
             @Valid @RequestBody UpdateContactRequest request) {
@@ -74,7 +74,7 @@ public class ContactController {
     }
 
     @DeleteMapping("/{contactId}")
-    @PreAuthorize("hasAnyRole('ADMIN','SALES_MANAGER')")
+    @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteContact(@PathVariable UUID contactId) {
         log.info("DELETE /api/v1/crm/contacts/{}", contactId);
         contactService.deleteContact(contactId);

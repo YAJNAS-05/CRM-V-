@@ -14,7 +14,7 @@ import java.util.UUID;
  * REST Controller for FX rate management.
  * 
  * Manages exchange rates for FX gain/loss calculation and historical reversal.
- * Only FINANCE role can record rates.
+ * Access is controlled via FINANCE_* permissions.
  */
 @RestController
 @RequestMapping("/api/v1/finance/fx-rates")
@@ -30,6 +30,7 @@ public class FxRateHistoryController {
      * @return List of all FX rates
      */
     @GetMapping
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<List<FxRateResponse>> getAll() {
         return ResponseEntity.ok(
             fxRateRepository.findAll().stream()
@@ -49,6 +50,7 @@ public class FxRateHistoryController {
      * @return Current exchange rate
      */
     @GetMapping("/current")
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<BigDecimal> getCurrentRate(
             @RequestParam String fromCurrency,
             @RequestParam String toCurrency) {
@@ -68,6 +70,7 @@ public class FxRateHistoryController {
      * @return Historical exchange rate
      */
     @GetMapping("/historical")
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<BigDecimal> getHistoricalRate(
             @RequestParam String fromCurrency,
             @RequestParam String toCurrency,
@@ -93,7 +96,7 @@ public class FxRateHistoryController {
      * @return Created rate with HTTP 201 Created
      */
     @PostMapping
-    @PreAuthorize("hasRole('FINANCE')")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<FxRateResponse> recordRate(@RequestBody RecordFxRateRequest request) {
         FxRateHistory rate = fxRateService.recordRate(
             request.getFromCurrency(),
@@ -121,7 +124,7 @@ public class FxRateHistoryController {
      * @return FX gain (positive) or loss (negative)
      */
     @PostMapping("/calculate-gain-loss")
-    @PreAuthorize("hasRole('FINANCE')")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<BigDecimal> calculateFxGainLoss(@RequestBody CalculateFxGainLossRequest request) {
         BigDecimal gainLoss = fxRateService.calculateFxGainLoss(
             request.getAmount(),

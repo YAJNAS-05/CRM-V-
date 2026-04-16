@@ -16,11 +16,20 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
-    @Query("SELECT u FROM User u WHERE u.isDeleted = false ORDER BY u.createdAt DESC")
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar LEFT JOIN FETCH ar.permissions WHERE u.email = :email AND u.isDeleted = false")
+    Optional<User> findByEmailWithRolesAndPermissions(@Param("email") String email);
+
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar LEFT JOIN FETCH ar.permissions WHERE u.id = :userId AND u.isDeleted = false")
+    Optional<User> findByIdWithRolesAndPermissions(@Param("userId") UUID userId);
+
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN u.assignedRoles ar WHERE u.isDeleted = false ORDER BY u.createdAt DESC")
     Page<User> findAllActive(Pageable pageable);
 
-    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.role = :role")
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN u.assignedRoles ar WHERE u.isDeleted = false AND (u.role = :role OR ar.name = :role)")
     Page<User> findByRole(@Param("role") User.UserRole role, Pageable pageable);
+
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN u.assignedRoles ar WHERE u.isDeleted = false AND ar.name = :roleName")
+    Page<User> findByAssignedRoleName(@Param("roleName") String roleName, Pageable pageable);
 
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email AND u.isDeleted = false")
     boolean existsActiveByEmail(@Param("email") String email);

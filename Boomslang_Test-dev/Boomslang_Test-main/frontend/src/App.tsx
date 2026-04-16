@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
@@ -66,15 +66,13 @@ import { FieldWorkDetailPage } from './pages/fieldwork/FieldWorkDetailPage'
 
 // Dashboard, Reports & Admin
 import DashboardPage from './pages/dashboard/DashboardPage'
-import ReportsPage from './pages/reports/ReportsPage'
+import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage'
 import { ReportListPage } from './pages/reports/ReportListPage'
-import { ReportDetailPage } from './pages/reports/ReportDetailPage'
-import { ReportBuilderPage } from './pages/reports/ReportBuilderPage'
-import { CustomReportPage } from './pages/reports/CustomReportPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
 import UserManagementPage from './pages/admin/UserManagementPage'
 import AuditLogPage from './pages/admin/AuditLogPage'
 import ERPFieldMappingPage from './pages/admin/ERPFieldMappingPage'
+import RoleManagementPage from './pages/admin/RoleManagementPage'
 
 // Inventory Pages
 import InventoryList from './pages/erp/inventory/InventoryList'
@@ -86,13 +84,53 @@ import Layout from './components/layout/Layout'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  requiredPermissions?: string[]
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const inferRoutePermissions = (pathname: string): string[] => {
+  if (pathname === '/crm/dashboard') return ['DASHBOARD_VIEW']
+  if (pathname.startsWith('/crm/')) return ['CRM_VIEW']
+  if (pathname.startsWith('/erp/')) return ['ERP_VIEW']
+  if (pathname.startsWith('/finance/')) return ['FINANCE_VIEW']
+  if (pathname.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
+  if (pathname.startsWith('/reports')) return ['REPORT_VIEW']
+  return []
+}
+
+const getFirstAuthorizedPath = (permissions: string[]): string => {
+  if (permissions.includes('DASHBOARD_VIEW')) return '/crm/dashboard'
+  if (permissions.includes('CRM_VIEW')) return '/crm/accounts'
+  if (permissions.includes('ERP_VIEW')) return '/erp/equipment'
+  if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
+  if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
+  if (permissions.includes('REPORT_VIEW')) return '/reports'
+  return '/profile'
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermissions }) => {
+  const location = useLocation()
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const user = useAuthStore((state) => state.user)
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  const userPermissions = user?.permissions || []
+
+  const inferredPermissions = inferRoutePermissions(location.pathname)
+  const effectiveRequiredPermissions =
+    requiredPermissions && requiredPermissions.length > 0 ? requiredPermissions : inferredPermissions
+
+  if (effectiveRequiredPermissions.length > 0) {
+    const hasPermissionAccess =
+      effectiveRequiredPermissions.length > 0
+        ? userPermissions.some((permission) => effectiveRequiredPermissions.includes(permission))
+        : false
+
+    if (!hasPermissionAccess) {
+      return <Navigate to={getFirstAuthorizedPath(userPermissions)} replace />
+    }
   }
 
   return (
@@ -102,12 +140,38 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   )
 }
 
+const NotFoundPage: React.FC = () => {
+  return (
+    <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">404</p>
+      <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Page not found</h1>
+      <p className="mt-2 text-sm text-slate-600">
+        The page you requested does not exist or may have been moved.
+      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <Link
+          to="/crm/dashboard"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Go to dashboard
+        </Link>
+        <Link
+          to="/reports"
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Open reports
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const queryClient = new QueryClient()
   
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <NotificationPanel />
         <Toaster richColors position="top-right" />
         <Routes>
@@ -120,6 +184,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+        
+
+        
         <Route
           path="/crm/dashboard"
           element={
@@ -277,12 +344,12 @@ function App() {
           }
         />
 
-        {/* CRM Reports Route */}
+        {/* CRM Reports Route (legacy redirect) */}
         <Route
           path="/crm/reports"
           element={
             <ProtectedRoute>
-              <ReportsPage />
+              <Navigate to="/reports" replace />
             </ProtectedRoute>
           }
         />
@@ -733,15 +800,23 @@ function App() {
         <Route
           path="/admin/users"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['USER_VIEW']}>
               <UserManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <ProtectedRoute requiredPermissions={['ROLE_VIEW']}>
+              <RoleManagementPage />
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/audit"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['AUDIT_VIEW']}>
               <AuditLogPage />
             </ProtectedRoute>
           }
@@ -749,7 +824,7 @@ function App() {
         <Route
           path="/admin/erp-mappings"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['ERP_MAPPING_VIEW']}>
               <ERPFieldMappingPage />
             </ProtectedRoute>
           }
@@ -768,7 +843,7 @@ function App() {
           path="/reports/builder"
           element={
             <ProtectedRoute>
-              <ReportBuilderPage />
+              <Navigate to="/reports/custom" replace />
             </ProtectedRoute>
           }
         />
@@ -776,7 +851,15 @@ function App() {
           path="/reports/custom"
           element={
             <ProtectedRoute>
-              <CustomReportPage />
+              <CustomReportBuilderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/custom/:reportId"
+          element={
+            <ProtectedRoute>
+              <CustomReportBuilderPage />
             </ProtectedRoute>
           }
         />
@@ -792,7 +875,7 @@ function App() {
           path="/reports/:reportId/edit"
           element={
             <ProtectedRoute>
-              <CustomReportPage />
+              <Navigate to="/reports" replace />
             </ProtectedRoute>
           }
         />
@@ -800,12 +883,20 @@ function App() {
           path="/reports/:reportId"
           element={
             <ProtectedRoute>
-              <ReportDetailPage />
+              <Navigate to="/reports" replace />
             </ProtectedRoute>
           }
         />
 
         <Route path="/" element={<Navigate to="/crm/dashboard" replace />} />
+        <Route
+          path="*"
+          element={
+            <ProtectedRoute>
+              <NotFoundPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
       </Router>
     </QueryClientProvider>

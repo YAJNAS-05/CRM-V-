@@ -30,7 +30,7 @@ public class ReportRunLogEntity {
     @Column(name = "run_at", nullable = false)
     private LocalDateTime runAt;
 
-    @Column(name = "filters_applied", columnDefinition = "jsonb")
+    @Column(name = "filters_applied", columnDefinition = "JSON")
     @JdbcTypeCode(SqlTypes.JSON)
     private Object filtersApplied;
 

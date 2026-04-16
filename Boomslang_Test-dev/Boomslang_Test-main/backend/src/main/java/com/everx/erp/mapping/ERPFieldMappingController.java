@@ -28,7 +28,7 @@ public class ERPFieldMappingController {
      * Get all field mappings between source and target modules
      */
     @GetMapping("/source/{sourceModule}/target/{targetModule}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<List<ERPFieldMapping>>> getMappingsByModules(
             @PathVariable String sourceModule,
             @PathVariable String targetModule) {
@@ -41,7 +41,7 @@ public class ERPFieldMappingController {
      * Get all field mappings for a source module
      */
     @GetMapping("/source/{sourceModule}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<List<ERPFieldMapping>>> getMappingsBySourceModule(
             @PathVariable String sourceModule) {
         log.info("GET mappings for source module: {}", sourceModule);
@@ -53,6 +53,7 @@ public class ERPFieldMappingController {
      * Get required field mappings for a source module
      */
     @GetMapping("/source/{sourceModule}/required")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<List<ERPFieldMapping>>> getRequiredMappings(
             @PathVariable String sourceModule) {
         log.info("GET required mappings for source module: {}", sourceModule);
@@ -64,6 +65,7 @@ public class ERPFieldMappingController {
      * Get available target modules for a source module
      */
     @GetMapping("/source/{sourceModule}/targets")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<List<String>>> getTargetModulesForSource(
             @PathVariable String sourceModule) {
         log.info("GET target modules for source: {}", sourceModule);
@@ -75,6 +77,7 @@ public class ERPFieldMappingController {
      * Get lookup values for a mapped field
      */
     @GetMapping("/{sourceModule}/{targetModule}/{sourceField}/lookups")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<List<String>>> getLookupValues(
             @PathVariable String sourceModule,
             @PathVariable String targetModule,
@@ -88,6 +91,7 @@ public class ERPFieldMappingController {
      * Validate required mappings
      */
     @PostMapping("/validate")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> validateMappings(
             @RequestParam String sourceModule,
             @RequestParam String targetModule,
@@ -107,7 +111,7 @@ public class ERPFieldMappingController {
      * Get all mappings with pagination
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_VIEW')")
     public ResponseEntity<ApiResponse<Page<ERPFieldMapping>>> getAllMappings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -121,7 +125,7 @@ public class ERPFieldMappingController {
      * Create a new field mapping
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_EDIT')")
     public ResponseEntity<ApiResponse<ERPFieldMapping>> createMapping(
             @Valid @RequestBody CreateERPFieldMappingRequest request) {
         log.info("Creating mapping: {} -> {}/{}", request.getSourceModule(), 
@@ -135,7 +139,7 @@ public class ERPFieldMappingController {
      * Update an existing field mapping
      */
     @PutMapping("/{mappingId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_EDIT')")
     public ResponseEntity<ApiResponse<ERPFieldMapping>> updateMapping(
             @PathVariable UUID mappingId,
             @Valid @RequestBody CreateERPFieldMappingRequest request) {
@@ -148,7 +152,7 @@ public class ERPFieldMappingController {
      * Deactivate a field mapping
      */
     @PutMapping("/{mappingId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_EDIT')")
     public ResponseEntity<ApiResponse<Void>> deactivateMapping(@PathVariable UUID mappingId) {
         log.info("Deactivating mapping: {}", mappingId);
         mappingService.deactivateMapping(mappingId);
@@ -159,7 +163,7 @@ public class ERPFieldMappingController {
      * Delete a field mapping
      */
     @DeleteMapping("/{mappingId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ERP_MAPPING_EDIT')")
     public ResponseEntity<ApiResponse<Void>> deleteMapping(@PathVariable UUID mappingId) {
         log.info("Deleting mapping: {}", mappingId);
         mappingService.deleteMapping(mappingId);

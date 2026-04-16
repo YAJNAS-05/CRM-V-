@@ -159,6 +159,6 @@ public class Equipment extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
-    @Column(columnDefinition = "TEXT[]")
+    @Column(columnDefinition = "TEXT ARRAY")
     private String[] images;
 }

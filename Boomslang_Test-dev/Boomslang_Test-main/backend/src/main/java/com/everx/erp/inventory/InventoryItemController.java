@@ -30,7 +30,7 @@ public class InventoryItemController {
     private InventoryItemService inventoryItemService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER','INVENTORY_CLERK')")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<Page<InventoryItemDto>>> getAllInventoryItems(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/erp/inventory");
@@ -39,7 +39,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/{itemId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER','INVENTORY_CLERK')")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<InventoryItemDto>> getInventoryItemById(@PathVariable UUID itemId) {
         log.info("GET /api/v1/erp/inventory/{}", itemId);
         InventoryItemDto item = inventoryItemService.getInventoryItemById(itemId);
@@ -47,7 +47,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/code/{itemCode}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER','INVENTORY_CLERK')")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<InventoryItemDto>> getInventoryItemByCode(@PathVariable String itemCode) {
         log.info("GET /api/v1/erp/inventory/code/{}", itemCode);
         InventoryItemDto item = inventoryItemService.getInventoryItemByCode(itemCode);
@@ -55,7 +55,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/category/{category}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER','INVENTORY_CLERK')")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<Page<InventoryItemDto>>> getInventoryItemsByCategory(
             @PathVariable String category,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -65,7 +65,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER','INVENTORY_CLERK')")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<Page<InventoryItemDto>>> getInventoryItemsByStatus(
             @PathVariable String status,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -75,7 +75,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/low-stock")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER','INVENTORY_CLERK')")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<List<InventoryItemDto>>> getLowStockItems() {
         log.info("GET /api/v1/erp/inventory/low-stock");
         List<InventoryItemDto> items = inventoryItemService.getLowStockItems();
@@ -83,7 +83,7 @@ public class InventoryItemController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER')")
+    @PreAuthorize("hasAuthority('ERP_CREATE')")
     public ResponseEntity<ApiResponse<InventoryItemDto>> createInventoryItem(@Valid @RequestBody CreateInventoryItemRequest request) {
         log.info("POST /api/v1/erp/inventory");
         InventoryItemDto item = inventoryItemService.createInventoryItem(request);
@@ -91,7 +91,7 @@ public class InventoryItemController {
     }
 
     @PutMapping("/{itemId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER')")
+    @PreAuthorize("hasAuthority('ERP_EDIT')")
     public ResponseEntity<ApiResponse<InventoryItemDto>> updateInventoryItem(
             @PathVariable UUID itemId,
             @Valid @RequestBody UpdateInventoryItemRequest request) {
@@ -101,7 +101,7 @@ public class InventoryItemController {
     }
 
     @DeleteMapping("/{itemId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','WAREHOUSE_MANAGER')")
+    @PreAuthorize("hasAuthority('ERP_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteInventoryItem(@PathVariable UUID itemId) {
         log.info("DELETE /api/v1/erp/inventory/{}", itemId);
         inventoryItemService.deleteInventoryItem(itemId);

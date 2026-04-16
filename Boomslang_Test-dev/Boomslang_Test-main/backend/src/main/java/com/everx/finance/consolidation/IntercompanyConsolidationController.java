@@ -15,12 +15,11 @@ import java.util.UUID;
  * REST Controller for intercompany transaction elimination.
  * 
  * Manages consolidation elimination for intercompany transactions.
- * Only FINANCE or ADMIN role can manage consolidation.
+ * Access is controlled via FINANCE_* permissions.
  */
 @RestController
 @RequestMapping("/api/v1/finance/consolidation")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('FINANCE', 'ADMIN')")
 public class IntercompanyConsolidationController {
 
     private final IntercompanyTransactionRepository icRepository;
@@ -36,6 +35,7 @@ public class IntercompanyConsolidationController {
      * @return List of pending transactions
      */
     @GetMapping("/pending")
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<List<IntercompanyTransactionResponse>> getPendingTransactions(
             @RequestParam String period) {
         return ResponseEntity.ok(
@@ -57,6 +57,7 @@ public class IntercompanyConsolidationController {
      * @return List of transactions
      */
     @GetMapping("/between")
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<List<IntercompanyTransactionResponse>> getTransactionsBetweenEntities(
             @RequestParam String fromEntity,
             @RequestParam String toEntity,
@@ -87,6 +88,7 @@ public class IntercompanyConsolidationController {
      * @return Created transaction with HTTP 201 Created
      */
     @PostMapping
+    @PreAuthorize("hasAuthority('FINANCE_CREATE')")
     public ResponseEntity<IntercompanyTransactionResponse> recordTransaction(
             @RequestBody RecordIntercompanyTransactionRequest request) {
         IntercompanyTransaction ic = IntercompanyTransaction.builder()
@@ -113,6 +115,7 @@ public class IntercompanyConsolidationController {
      * @return Updated transaction
      */
     @PostMapping("/{id}/eliminate")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<IntercompanyTransactionResponse> eliminateTransaction(
             @PathVariable UUID id,
             @RequestBody(required = false) String notes) {
@@ -136,6 +139,7 @@ public class IntercompanyConsolidationController {
      * @return Updated transaction
      */
     @PostMapping("/{id}/reverse-elimination")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<IntercompanyTransactionResponse> reverseElimination(
             @PathVariable UUID id,
             @RequestBody(required = false) String notes) {
@@ -159,6 +163,7 @@ public class IntercompanyConsolidationController {
      * @return HTTP 204 No Content
      */
     @PostMapping("/execute/{period}")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<Void> executeConsolidation(@PathVariable String period) {
         eliminationService.eliminateIntercompanyTransactions(
             Integer.parseInt(period.substring(0, 4)),

@@ -294,6 +294,26 @@ export interface ReportDashboardKPIs {
   totalPipelineValue: number
   wonValue: number
   winRate: number
+  visibilityScope?: 'TEAM' | 'SELF'
+  viewerUserId?: string
+  teamMemberCount?: number
+  userPerformance?: ReportUserPerformance[]
+}
+
+export interface ReportUserPerformance {
+  userId: string | null
+  userName: string
+  leads: number
+  convertedLeads: number
+  deals: number
+  openDeals: number
+  wonDeals: number
+  lostDeals: number
+  pipelineValue: number
+  activities: number
+  completedActivities: number
+  overdueActivities: number
+  leadConversionRate: number
 }
 
 export interface ReportPipeline {

@@ -3,15 +3,20 @@ package com.everx.reporting.service;
 import com.everx.reporting.dto.*;
 import com.everx.reporting.entity.ReportDefinitionEntity;
 import com.everx.reporting.repository.ReportDefinitionRepository;
+import com.everx.shared.exception.ValidationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -34,10 +39,43 @@ public class ReportDefinitionService {
     }
 
     public ReportDefinitionEntity create(CreateReportRequest request, UserDetails user) {
+        if (user == null) {
+            throw new SecurityException("User authentication is required to create reports");
+        }
+
+        if (request == null || request.getReportName() == null || request.getReportName().isBlank()) {
+            throw new ValidationException("reportName", "Report name is required");
+        }
+        if (request.getModule() == null || request.getModule().isBlank()) {
+            throw new ValidationException("module", "Module is required");
+        }
+
+        String normalizedReportName = request.getReportName().trim();
+        String normalizedModule = request.getModule().trim();
+        String reportKey = generateDeterministicReportKey(user.getUsername(), normalizedModule, normalizedReportName);
+
+        // De-duplicate save: same user + module + report name updates existing report instead of creating another row.
+        var existing = reportDefRepo.findByOwnedByIgnoreCaseAndModuleIgnoreCaseAndReportNameIgnoreCaseAndIsActiveTrue(
+            user.getUsername(),
+            normalizedModule,
+            normalizedReportName
+        );
+
+        if (existing.isPresent()) {
+            ReportDefinitionEntity entity = existing.get();
+            entity.setDescription(request.getDescription());
+            entity.setDefinition(request.getDefinition());
+            entity.setReportType("CUSTOM");
+            entity.setReportKey(reportKey);
+            entity.setUpdatedAt(LocalDateTime.now());
+            return reportDefRepo.save(entity);
+        }
+        
         ReportDefinitionEntity entity = ReportDefinitionEntity.builder()
-            .reportName(request.getReportName())
+            .reportName(normalizedReportName)
+            .reportKey(reportKey)
             .reportType("CUSTOM")
-            .module(request.getModule())
+            .module(normalizedModule)
             .description(request.getDescription())
             .definition(request.getDefinition())
             .createdBy(user.getUsername())
@@ -47,10 +85,20 @@ public class ReportDefinitionService {
             .runCount(0)
             .build();
 
-        return reportDefRepo.save(entity);
+        try {
+            return reportDefRepo.save(entity);
+        } catch (DataIntegrityViolationException ex) {
+            // Handles concurrent duplicate create requests safely.
+            return reportDefRepo.findByReportKey(reportKey)
+                .orElseThrow(() -> new ValidationException("reportName", "A report with this name already exists"));
+        }
     }
 
     public ReportDefinitionEntity update(Long reportId, UpdateReportRequest request, UserDetails user) {
+        if (user == null) {
+            throw new SecurityException("User authentication is required to update reports");
+        }
+        
         ReportDefinitionEntity entity = getReport(reportId);
 
         // Only owner or admin can update
@@ -58,7 +106,26 @@ public class ReportDefinitionService {
             throw new SecurityException("Not authorized to update this report");
         }
 
-        entity.setReportName(request.getReportName());
+        if (request == null || request.getReportName() == null || request.getReportName().isBlank()) {
+            throw new ValidationException("reportName", "Report name is required");
+        }
+
+        String normalizedReportName = request.getReportName().trim();
+
+        var duplicate = reportDefRepo.findByOwnedByIgnoreCaseAndModuleIgnoreCaseAndReportNameIgnoreCaseAndIsActiveTrue(
+            entity.getOwnedBy(),
+            entity.getModule(),
+            normalizedReportName
+        );
+
+        if (duplicate.isPresent() && !duplicate.get().getReportId().equals(entity.getReportId())) {
+            throw new ValidationException("reportName", "A report with this name already exists");
+        }
+
+        String reportKey = generateDeterministicReportKey(entity.getOwnedBy(), entity.getModule(), normalizedReportName);
+
+        entity.setReportName(normalizedReportName);
+        entity.setReportKey(reportKey);
         entity.setDescription(request.getDescription());
         entity.setDefinition(request.getDefinition());
         entity.setUpdatedAt(LocalDateTime.now());
@@ -67,10 +134,30 @@ public class ReportDefinitionService {
     }
 
     public ReportDefinitionEntity clone(Long reportId, String newName, UserDetails user) {
+        if (user == null) {
+            throw new SecurityException("User authentication is required to clone reports");
+        }
+        if (newName == null || newName.isBlank()) {
+            throw new ValidationException("reportName", "Report name is required");
+        }
+        
         ReportDefinitionEntity original = getReport(reportId);
 
+        String normalizedName = newName.trim();
+        var duplicate = reportDefRepo.findByOwnedByIgnoreCaseAndModuleIgnoreCaseAndReportNameIgnoreCaseAndIsActiveTrue(
+            user.getUsername(),
+            original.getModule(),
+            normalizedName
+        );
+        if (duplicate.isPresent()) {
+            throw new ValidationException("reportName", "A report with this name already exists");
+        }
+
+        String reportKey = generateDeterministicReportKey(user.getUsername(), original.getModule(), normalizedName);
+
         ReportDefinitionEntity cloned = ReportDefinitionEntity.builder()
-            .reportName(newName)
+            .reportName(normalizedName)
+            .reportKey(reportKey)
             .reportType("CUSTOM")
             .module(original.getModule())
             .description(original.getDescription())
@@ -93,5 +180,20 @@ public class ReportDefinitionService {
         }
 
         reportDefRepo.deleteById(reportId);
+    }
+
+    private String generateDeterministicReportKey(String owner, String module, String reportName) {
+        String keySeed = normalizeKeyPart(owner)
+            + "|" + normalizeKeyPart(module)
+            + "|" + normalizeKeyPart(reportName);
+
+        return "USER_" + UUID.nameUUIDFromBytes(keySeed.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String normalizeKeyPart(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 }

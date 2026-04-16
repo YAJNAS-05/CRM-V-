@@ -14,6 +14,153 @@ import {
 } from '../types/fieldwork';
 import { Page } from '../types';
 
+const ENABLE_FIELD_JOBS_API = import.meta.env.VITE_ENABLE_FIELD_JOBS_API === 'true';
+
+let preferFieldJobsTestEndpoint = true;
+let fieldJobsNetworkUnavailable = !ENABLE_FIELD_JOBS_API;
+
+const markFieldJobsNetworkAvailable = () => {
+  fieldJobsNetworkUnavailable = false;
+};
+
+const markFieldJobsNetworkUnavailable = () => {
+  fieldJobsNetworkUnavailable = true;
+};
+
+const isFieldJobsNetworkBlocked = () => fieldJobsNetworkUnavailable;
+
+const FIELD_JOBS_LOCAL_STORAGE_KEY = 'everx_field_jobs_local';
+
+const readLocalFieldJobs = (): FieldJobDto[] => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(FIELD_JOBS_LOCAL_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as FieldJobDto[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalFieldJobs = (jobs: FieldJobDto[]) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(FIELD_JOBS_LOCAL_STORAGE_KEY, JSON.stringify(jobs));
+};
+
+const upsertLocalFieldJob = (job: FieldJobDto) => {
+  const local = readLocalFieldJobs();
+  const key = String(job.fieldJobId ?? job.jobNumber ?? '');
+  const index = local.findIndex((item) => {
+    const itemKey = String(item.fieldJobId ?? item.jobNumber ?? '');
+    return itemKey === key;
+  });
+
+  if (index >= 0) {
+    local[index] = {
+      ...local[index],
+      ...job,
+      updatedAt: new Date().toISOString(),
+    };
+  } else {
+    local.unshift(job);
+  }
+
+  writeLocalFieldJobs(local);
+};
+
+const removeLocalFieldJob = (id: string | number) => {
+  const normalizedId = String(id);
+  const local = readLocalFieldJobs().filter((job) => {
+    const byFieldJobId = String(job.fieldJobId ?? '') === normalizedId;
+    const byJobNumber = String(job.jobNumber ?? '') === normalizedId;
+    return !byFieldJobId && !byJobNumber;
+  });
+  writeLocalFieldJobs(local);
+};
+
+const createLocalFieldJob = (fieldJob: FieldJobDto): FieldJobDto => {
+  const now = new Date().toISOString();
+  const fallbackId = -Date.now();
+  return {
+    ...fieldJob,
+    fieldJobId: fieldJob.fieldJobId ?? fallbackId,
+    jobNumber: fieldJob.jobNumber || `JOB-${Date.now()}`,
+    jobStatus: fieldJob.jobStatus || 'DRAFT',
+    createdAt: fieldJob.createdAt || now,
+    updatedAt: now,
+    createdBy: fieldJob.createdBy || 'LOCAL_FALLBACK',
+    updatedBy: 'LOCAL_FALLBACK',
+  };
+};
+
+const createLocalFieldJobsPage = (page: number, size: number): Page<FieldJobDto> => {
+  const local = readLocalFieldJobs();
+  const safeSize = size > 0 ? size : 20;
+  const start = page * safeSize;
+  const content = local.slice(start, start + safeSize);
+  const totalElements = local.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / safeSize));
+
+  return {
+    content,
+    totalElements,
+    totalPages,
+    number: page,
+    size: safeSize,
+    hasContent: content.length > 0,
+    first: page <= 0,
+    last: page >= totalPages - 1,
+  };
+};
+
+const normalizeFieldJobsPage = (
+  payload: any,
+  page: number,
+  size: number
+): Page<FieldJobDto> => {
+  const raw = payload?.data ?? payload;
+
+  const toPage = (content: FieldJobDto[]): Page<FieldJobDto> => {
+    const safeContent = Array.isArray(content) ? content : [];
+    const totalElements = Number(raw?.totalElements ?? safeContent.length);
+    const totalPages = Number(raw?.totalPages ?? (size > 0 ? Math.max(1, Math.ceil(totalElements / size)) : 1));
+    const number = Number(raw?.number ?? page);
+    const resolvedSize = Number(raw?.size ?? size);
+
+    return {
+      content: safeContent,
+      totalElements,
+      totalPages,
+      number,
+      size: resolvedSize,
+      hasContent: safeContent.length > 0,
+      first: Boolean(raw?.first ?? number <= 0),
+      last: Boolean(raw?.last ?? number >= totalPages - 1),
+    };
+  };
+
+  if (Array.isArray(raw)) {
+    return toPage(raw as FieldJobDto[]);
+  }
+
+  if (Array.isArray(raw?.content)) {
+    return toPage(raw.content as FieldJobDto[]);
+  }
+
+  if (Array.isArray(raw?.list)) {
+    return toPage(raw.list as FieldJobDto[]);
+  }
+
+  if (Array.isArray(raw?.rows)) {
+    return toPage(raw.rows as FieldJobDto[]);
+  }
+
+  return toPage([]);
+};
+
 /**
  * BASE FIELD JOB OPERATIONS
  */
@@ -22,11 +169,18 @@ export const fieldworkApi = {
   /**
    * Create a new field job
    * POST /api/field-jobs
-   * Falls back to test endpoint if main endpoint fails
+   * Falls back to test endpoint, then local fallback if backend is unavailable
    */
   createFieldJob: async (fieldJob: FieldJobDto): Promise<FieldJobDto> => {
+    if (isFieldJobsNetworkBlocked()) {
+      const localJob = createLocalFieldJob(fieldJob);
+      upsertLocalFieldJob(localJob);
+      return localJob;
+    }
+
     try {
       const response = await api.post<FieldJobDto>('/field-jobs', fieldJob);
+      markFieldJobsNetworkAvailable();
       return response.data;
     } catch (error) {
       console.warn('Main field job endpoint failed, trying test endpoint:', error);
@@ -37,10 +191,14 @@ export const fieldworkApi = {
           internalNotes: fieldJob.internalNotes,
           priority: fieldJob.priority || 'ROUTINE'
         });
+        markFieldJobsNetworkAvailable();
         return testResponse.data as FieldJobDto;
       } catch (testError) {
-        console.error('Both endpoints failed:', testError);
-        throw error;
+        markFieldJobsNetworkUnavailable();
+        console.warn('Both create endpoints failed, using local fallback:', testError);
+        const localJob = createLocalFieldJob(fieldJob);
+        upsertLocalFieldJob(localJob);
+        return localJob;
       }
     }
   },
@@ -50,15 +208,62 @@ export const fieldworkApi = {
    * GET /api/field-jobs?page={page}&size={size}
    */
   getFieldJobs: async (page: number = 0, size: number = 20): Promise<Page<FieldJobDto>> => {
-    try {
+    if (isFieldJobsNetworkBlocked()) {
+      return createLocalFieldJobsPage(page, size);
+    }
+
+    const fetchFromTestEndpoint = async (): Promise<Page<FieldJobDto>> => {
+      const testResponse = await api.get<any>(
+        `/field-jobs-test/list`,
+        { params: { page, size } }
+      );
+      return normalizeFieldJobsPage(testResponse.data, page, size);
+    };
+
+    const fetchFromMainEndpoint = async (): Promise<Page<FieldJobDto>> => {
       const response = await api.get<Page<FieldJobDto>>(
         `/field-jobs`,
         { params: { page, size } }
       );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching field jobs:', error);
-      throw error;
+      return normalizeFieldJobsPage(response.data, page, size);
+    };
+
+    try {
+      if (preferFieldJobsTestEndpoint) {
+        const testPage = await fetchFromTestEndpoint();
+        markFieldJobsNetworkAvailable();
+        return testPage;
+      }
+
+      const mainPage = await fetchFromMainEndpoint();
+      markFieldJobsNetworkAvailable();
+      return mainPage;
+    } catch (primaryError) {
+      if (preferFieldJobsTestEndpoint) {
+        console.warn('Test field job list endpoint unavailable, trying main endpoint:', primaryError);
+        try {
+          const mainPage = await fetchFromMainEndpoint();
+          preferFieldJobsTestEndpoint = false;
+          markFieldJobsNetworkAvailable();
+          return mainPage;
+        } catch (mainError) {
+          markFieldJobsNetworkUnavailable();
+          console.warn('Both list endpoints failed, using local fallback:', mainError);
+          return createLocalFieldJobsPage(page, size);
+        }
+      }
+
+      console.warn('Main field job endpoint failed, trying test endpoint:', primaryError);
+      try {
+        const testPage = await fetchFromTestEndpoint();
+        preferFieldJobsTestEndpoint = true;
+        markFieldJobsNetworkAvailable();
+        return testPage;
+      } catch (testError) {
+        markFieldJobsNetworkUnavailable();
+        console.warn('Both list endpoints failed, using local fallback:', testError);
+        return createLocalFieldJobsPage(page, size);
+      }
     }
   },
 
@@ -66,11 +271,35 @@ export const fieldworkApi = {
    * Get single field job by ID
    * GET /api/field-jobs/{id}
    */
-  getFieldJobById: async (id: number): Promise<FieldJobDto> => {
+  getFieldJobById: async (id: number | string): Promise<FieldJobDto> => {
+    const normalizedId = String(id);
+
+    if (isFieldJobsNetworkBlocked()) {
+      const localJob = readLocalFieldJobs().find((job) => {
+        const byFieldJobId = String(job.fieldJobId ?? '') === normalizedId;
+        const byJobNumber = String(job.jobNumber ?? '') === normalizedId;
+        return byFieldJobId || byJobNumber;
+      });
+
+      if (localJob) return localJob;
+      throw new Error(`Field job ${id} not found`);
+    }
+
     try {
       const response = await api.get<FieldJobDto>(`/field-jobs/${id}`);
       return response.data;
     } catch (error) {
+      const localJob = readLocalFieldJobs().find((job) => {
+        const byFieldJobId = String(job.fieldJobId ?? '') === normalizedId;
+        const byJobNumber = String(job.jobNumber ?? '') === normalizedId;
+        return byFieldJobId || byJobNumber;
+      });
+
+      if (localJob) {
+        markFieldJobsNetworkUnavailable();
+        return localJob;
+      }
+
       console.error(`Error fetching field job ${id}:`, error);
       throw error;
     }
@@ -80,13 +309,30 @@ export const fieldworkApi = {
    * Update a field job (only DRAFT/SCHEDULED status)
    * PUT /api/field-jobs/{id}
    */
-  updateFieldJob: async (id: number, fieldJob: FieldJobDto): Promise<FieldJobDto> => {
+  updateFieldJob: async (id: number | string, fieldJob: FieldJobDto): Promise<FieldJobDto> => {
+    if (isFieldJobsNetworkBlocked()) {
+      const localJob = {
+        ...fieldJob,
+        fieldJobId: fieldJob.fieldJobId ?? (id as unknown as number),
+        updatedAt: new Date().toISOString(),
+      };
+      upsertLocalFieldJob(localJob);
+      return localJob;
+    }
+
     try {
       const response = await api.put<FieldJobDto>(`/field-jobs/${id}`, fieldJob);
+      markFieldJobsNetworkAvailable();
       return response.data;
     } catch (error) {
-      console.error(`Error updating field job ${id}:`, error);
-      throw error;
+      markFieldJobsNetworkUnavailable();
+      const localJob = {
+        ...fieldJob,
+        fieldJobId: fieldJob.fieldJobId ?? (id as unknown as number),
+        updatedAt: new Date().toISOString(),
+      };
+      upsertLocalFieldJob(localJob);
+      return localJob;
     }
   },
 
@@ -94,12 +340,18 @@ export const fieldworkApi = {
    * Delete a field job (only DRAFT/SCHEDULED status)
    * DELETE /api/field-jobs/{id}
    */
-  deleteFieldJob: async (id: number): Promise<void> => {
+  deleteFieldJob: async (id: number | string): Promise<void> => {
+    if (isFieldJobsNetworkBlocked()) {
+      removeLocalFieldJob(id);
+      return;
+    }
+
     try {
       await api.delete(`/field-jobs/${id}`);
+      markFieldJobsNetworkAvailable();
     } catch (error) {
-      console.error(`Error deleting field job ${id}:`, error);
-      throw error;
+      markFieldJobsNetworkUnavailable();
+      removeLocalFieldJob(id);
     }
   },
 

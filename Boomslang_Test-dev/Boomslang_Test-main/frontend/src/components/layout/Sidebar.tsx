@@ -1,15 +1,49 @@
-import React, { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuthStore } from '../../store/authStore'
 
 interface SidebarProps {
   collapsed: boolean
+  mobileOpen: boolean
+  onClose: () => void
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
+interface MenuItem {
+  name: string
+  path: string
+  icon: string
+  requiredPermission?: string
+  disabled?: boolean
+}
+
+interface MenuGroup {
+  title: string
+  items: MenuItem[]
+}
+
+const isItemActive = (pathname: string, itemPath: string) =>
+  pathname === itemPath || (itemPath !== '/crm/dashboard' && pathname.startsWith(`${itemPath}/`))
+
+const inferRequiredPermissionsForPath = (path: string): string[] => {
+  if (path === '/crm/dashboard') return ['DASHBOARD_VIEW']
+  if (path.startsWith('/crm/')) return ['CRM_VIEW']
+  if (path.startsWith('/erp/')) return ['ERP_VIEW']
+  if (path.startsWith('/finance/')) return ['FINANCE_VIEW']
+  if (path.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
+  if (path.startsWith('/reports')) return ['REPORT_VIEW']
+  return []
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => {
   const location = useLocation()
-  const navigate = useNavigate()
+  const asideRef = useRef<HTMLElement>(null)
+  const showCollapsed = collapsed && !mobileOpen
+  const user = useAuthStore((state) => state.user)
+  const userPermissions = user?.permissions || []
+  const [menuQuery, setMenuQuery] = useState('')
+  const [activeFlyout, setActiveFlyout] = useState<string | null>(null)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    CRM: true,
+    CRM: false,
     ERP: false,
     FINANCE: false,
     FIELDWORK: false,
@@ -17,8 +51,16 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     SETTINGS: false,
   })
 
+  const moduleViewPermissions: Record<string, string[]> = {
+    CRM: ['CRM_VIEW', 'DASHBOARD_VIEW'],
+    ERP: ['ERP_VIEW'],
+    FINANCE: ['FINANCE_VIEW'],
+    FIELDWORK: ['FIELDWORK_VIEW'],
+    REPORTING: ['REPORT_VIEW'],
+  }
+
   const toggleSection = (title: string) => {
-    setExpandedSections(prev => ({ ...prev, [title]: !prev[title] }))
+    setExpandedSections((prev) => ({ ...prev, [title]: !prev[title] }))
   }
 
   const groupIcons: Record<string, string> = {
@@ -30,16 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     SETTINGS: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
   }
 
-  const groupDefaultPaths: Record<string, string> = {
-    CRM: '/crm/dashboard',
-    ERP: '/erp/equipment',
-    FINANCE: '/finance/invoices',
-    FIELDWORK: '/fieldwork',
-    REPORTING: '/reports',
-    SETTINGS: '/admin/users',
-  }
-
-  const menuGroups = [
+  const menuGroups: MenuGroup[] = [
     {
       title: 'CRM',
       items: [
@@ -49,7 +82,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
         { name: 'Deals', path: '/crm/deals', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
         { name: 'Accounts', path: '/crm/accounts', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
         { name: 'Activities', path: '/crm/activities', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-        { name: 'Reports', path: '/crm/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
       ]
     },
     {
@@ -86,54 +118,206 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
       title: 'REPORTING',
       items: [
         { name: 'Reports', path: '/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+        { name: 'Custom Reports', path: '/reports/custom', icon: 'M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-8 0h8m-8 0H7a2 2 0 01-2-2V7a2 2 0 012-2h2m8 0h-2m2 0a2 2 0 012 2v8a2 2 0 01-2 2h-2m-4-8h.01M12 11h.01M16 11h.01M8 7h8' },
       ]
     },
     {
       title: 'SETTINGS',
       items: [
-        { name: 'Users', path: '/admin/users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-        { name: 'Audit Logs', path: '/admin/audit', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-        { name: 'ERP Mappings', path: '/admin/erp-mappings', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+        { name: 'Roles & Permissions', path: '/admin/roles', icon: 'M9 12h6m-6 4h6M7 7h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H9l-4 3v-3H5a2 2 0 01-2-2V5a2 2 0 012-2z', requiredPermission: 'ROLE_VIEW' },
+        { name: 'Users', path: '/admin/users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', requiredPermission: 'USER_VIEW' },
+        { name: 'Audit Logs', path: '/admin/audit', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', requiredPermission: 'AUDIT_VIEW' },
+        { name: 'ERP Mappings', path: '/admin/erp-mappings', icon: 'M13 10V3L4 14h7v7l9-11h-7z', requiredPermission: 'ERP_MAPPING_VIEW' },
       ]
     }
   ]
 
+  const visibleMenuGroups = useMemo(
+    () =>
+      menuGroups
+        .filter((group) => {
+          if (group.title === 'SETTINGS') {
+            return true
+          }
+
+          const requiredModulePermissions = moduleViewPermissions[group.title]
+          if (!requiredModulePermissions || requiredModulePermissions.length === 0) {
+            return true
+          }
+
+          return requiredModulePermissions.some((permission) =>
+            userPermissions.includes(permission)
+          )
+        })
+        .map((group) => {
+          const visibleItems = group.items.filter((item) => {
+            if (item.requiredPermission) {
+              return userPermissions.includes(item.requiredPermission)
+            }
+
+            const inferredPermissions = inferRequiredPermissionsForPath(item.path)
+            if (inferredPermissions.length === 0) {
+              return true
+            }
+
+            return inferredPermissions.some((permission) =>
+              userPermissions.includes(permission)
+            )
+          })
+
+          return {
+            ...group,
+            items: visibleItems,
+          }
+        })
+        .filter((group) => group.items.length > 0),
+    [menuGroups, userPermissions]
+  )
+
+  const filteredMenuGroups = useMemo(() => {
+    const query = menuQuery.trim().toLowerCase()
+
+    if (!query) {
+      return visibleMenuGroups
+    }
+
+    return visibleMenuGroups
+      .map((group) => {
+        const groupMatches = group.title.toLowerCase().includes(query)
+        const items = groupMatches
+          ? group.items
+          : group.items.filter(
+              (item) =>
+                item.name.toLowerCase().includes(query) ||
+                item.path.toLowerCase().includes(query)
+            )
+
+        return {
+          ...group,
+          items,
+        }
+      })
+      .filter((group) => group.items.length > 0)
+  }, [menuQuery, visibleMenuGroups])
+
+  useEffect(() => {
+    if (showCollapsed) {
+      setMenuQuery('')
+    }
+  }, [showCollapsed])
+
+  useEffect(() => {
+    setActiveFlyout(null)
+  }, [location.pathname, showCollapsed])
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!asideRef.current?.contains(event.target as Node)) {
+        setActiveFlyout(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  const desktopWidthClass = showCollapsed ? 'md:w-16' : 'md:w-64'
+
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-60'} bg-white h-[calc(100vh-56px)] fixed left-0 top-14 border-r border-gray-200 flex flex-col transition-all duration-200 z-40 ${collapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
-      <nav className={`flex-1 py-3 ${collapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden'}`}>
-        {menuGroups.map((group) => {
-          const isGroupActive = group.items.some(item => location.pathname === item.path || (item.path !== '/crm/dashboard' && location.pathname.startsWith(item.path + '/')))
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          className="fixed inset-0 top-16 z-30 bg-slate-900/30 md:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        ref={asideRef}
+        aria-label="Primary navigation"
+        className={`fixed left-0 top-16 bottom-0 z-40 w-72 ${desktopWidthClass} border-r border-slate-200 bg-white flex flex-col transition-all duration-200 ${mobileOpen ? 'translate-x-0 shadow-xl shadow-slate-900/10' : '-translate-x-full'} md:translate-x-0 ${showCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}
+      >
+      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-slate-200">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900 truncate">{user?.fullName || 'User'}</p>
+          <p className="text-xs text-slate-500 truncate">Quick navigation</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close menu"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {!showCollapsed && (
+        <div className="px-3 py-3 border-b border-slate-100">
+          <label htmlFor="sidebar-menu-search" className="sr-only">
+            Search navigation menu
+          </label>
+          <input
+            id="sidebar-menu-search"
+            value={menuQuery}
+            onChange={(event) => setMenuQuery(event.target.value)}
+            placeholder="Search menu"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+      )}
+
+      <nav className={`flex-1 py-3 ${showCollapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden'} overscroll-contain`}>
+        {filteredMenuGroups.length === 0 ? (
+          <div className="px-4 py-8 text-sm text-slate-500">No menu items match your search.</div>
+        ) : (
+          filteredMenuGroups.map((group) => {
+          const isGroupActive = group.items.some((item) => isItemActive(location.pathname, item.path))
+          const isFlyoutOpen = activeFlyout === group.title
           return (
           <div key={group.title} className="mb-1">
-            {collapsed ? (
-              <div className="relative group/fly">
+            {showCollapsed ? (
+              <div className="relative">
                 <button
-                  onClick={() => navigate(groupDefaultPaths[group.title])}
-                  className={`w-full flex items-center justify-center py-3 transition-colors duration-150 ${
-                    isGroupActive ? 'text-indigo-600' : 'text-gray-500 hover:text-gray-900'
+                  type="button"
+                  title={group.title}
+                  aria-label={`Open ${group.title} section`}
+                  aria-expanded={isFlyoutOpen}
+                  onClick={() => {
+                    setActiveFlyout((prev) => (prev === group.title ? null : group.title))
+                  }}
+                  className={`w-full flex items-center justify-center py-3 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
+                    isGroupActive ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isGroupActive ? 2.5 : 2} d={groupIcons[group.title]} />
                   </svg>
                 </button>
-                <div className="absolute left-full top-0 ml-1 w-52 bg-white rounded-lg shadow-xl border border-gray-200 py-2 opacity-0 invisible group-hover/fly:opacity-100 group-hover/fly:visible transition-all duration-150 z-50">
-                  <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
+                <div className={`absolute left-full top-0 ml-1 w-52 bg-white rounded-lg shadow-xl border border-slate-200 py-2 transition-all duration-150 z-50 ${isFlyoutOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+                  <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
                     {group.title}
                   </div>
                   {group.items.map((item) => {
-                    const isActive = location.pathname === item.path || (item.path !== '/crm/dashboard' && location.pathname.startsWith(item.path + '/'))
+                    const isActive = isItemActive(location.pathname, item.path)
                     return (
                       <Link
                         key={item.name}
                         to={item.path}
+                        onClick={() => {
+                          setActiveFlyout(null)
+                          onClose()
+                        }}
                         className={`flex items-center px-3 py-2 mx-1.5 rounded-md text-sm transition-colors duration-150 ${
                           isActive
-                            ? 'bg-indigo-50 text-indigo-700 font-medium'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                         }`}
                       >
-                        <svg className={`w-4 h-4 mr-2.5 shrink-0 ${isActive ? 'text-indigo-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-4 h-4 mr-2.5 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? 2.5 : 2} d={item.icon} />
                         </svg>
                         <span>{item.name}</span>
@@ -145,8 +329,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
             ) : (
               <>
               <button
+                type="button"
+                aria-expanded={expandedSections[group.title]}
                 onClick={() => toggleSection(group.title)}
-                className="w-full flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600"
+                className="w-full flex items-center justify-between px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
               >
                 {group.title}
                 <svg className={`w-3 h-3 transition-transform ${expandedSections[group.title] ? 'rotate-0' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,35 +340,37 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
                 </svg>
               </button>
               {expandedSections[group.title] && group.items.map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== '/crm/dashboard' && location.pathname.startsWith(item.path + '/'))
+              const isActive = isItemActive(location.pathname, item.path)
               const isDisabled = 'disabled' in item && item.disabled
               return (
                 <Link
                   key={item.name}
                   to={isDisabled ? '#' : item.path}
-                  className={`flex items-center px-4 py-2 mx-2 rounded-md text-sm transition-colors duration-150 ${
+                  onClick={isDisabled ? (e) => e.preventDefault() : onClose}
+                  className={`flex items-center px-4 py-2 mx-2 rounded-md text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 ${
                     isDisabled
-                      ? 'text-gray-300 cursor-not-allowed'
+                      ? 'text-slate-300 cursor-not-allowed'
                       : isActive
-                        ? 'bg-indigo-50 text-indigo-700 font-medium'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
-                  onClick={isDisabled ? (e) => e.preventDefault() : undefined}
                 >
-                  <svg className={`w-[18px] h-[18px] mr-3 shrink-0 ${isActive ? 'text-indigo-600' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-[18px] h-[18px] mr-3 shrink-0 ${isActive ? 'text-blue-600' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? 2.5 : 2} d={item.icon} />
                   </svg>
                   <span>{item.name}</span>
-                  {isDisabled ? <span className="ml-auto text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-medium">Soon</span> : null}
+                  {isDisabled ? <span className="ml-auto text-[9px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded font-medium">Soon</span> : null}
                 </Link>
               )
             })}
             </>
             )}
           </div>
-        )})}
+        )})
+      )}
       </nav>
-    </aside>
+      </aside>
+    </>
   )
 }
 

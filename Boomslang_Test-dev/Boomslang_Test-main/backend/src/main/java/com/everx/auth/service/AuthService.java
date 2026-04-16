@@ -16,8 +16,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
@@ -39,7 +41,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         log.info("Login attempt for email: {}", request.getEmail());
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailWithRolesAndPermissions(request.getEmail())
                 .orElseThrow(() -> EntityNotFoundException.ofEntity(User.class, "email", request.getEmail()));
 
         if (!user.getIsActive()) {
@@ -51,7 +53,9 @@ public class AuthService {
         }
 
         // Generate tokens
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
+        List<String> tokenRoles = extractRoles(user);
+        List<String> tokenPermissions = extractPermissions(user);
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), tokenRoles, tokenPermissions);
         String refreshTokenStr = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail());
 
         // Save refresh token to database
@@ -88,14 +92,19 @@ public class AuthService {
             throw new ValidationException("Refresh token is invalid or expired");
         }
 
-        User user = userRepository.findById(refreshToken.getUserId())
+        User user = userRepository.findByIdWithRolesAndPermissions(refreshToken.getUserId())
                 .orElseThrow(() -> EntityNotFoundException.ofEntity(User.class, refreshToken.getUserId()));
 
         if (!user.getIsActive()) {
             throw new ValidationException("User account is not active");
         }
 
-        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
+        String newAccessToken = jwtTokenProvider.generateAccessToken(
+            user.getId(),
+            user.getEmail(),
+            extractRoles(user),
+            extractPermissions(user)
+        );
 
         log.info("Token refreshed successfully for user: {}", user.getEmail());
 
@@ -121,7 +130,51 @@ public class AuthService {
     }
 
     public User getCurrentUser(UUID userId) {
-        return userRepository.findById(userId)
+        return userRepository.findByIdWithRolesAndPermissions(userId)
                 .orElseThrow(() -> EntityNotFoundException.ofEntity(User.class, userId));
+    }
+
+    private List<String> extractRoles(User user) {
+        List<String> assignedRoleNames = user.getAssignedRoles() == null
+            ? List.of()
+            : user.getAssignedRoles().stream()
+            .filter(role -> role != null
+                && Boolean.TRUE.equals(role.getIsActive())
+                && !Boolean.TRUE.equals(role.getIsDeleted())
+                && role.getName() != null
+                && !role.getName().isBlank())
+            .map(com.everx.auth.entity.Role::getName)
+            .distinct()
+            .sorted()
+            .toList();
+
+        if (!assignedRoleNames.isEmpty()) {
+            return assignedRoleNames;
+        }
+
+        if (user.getRole() != null) {
+            return List.of(user.getRole().name());
+        }
+
+        return List.of();
+    }
+
+    private List<String> extractPermissions(User user) {
+        return (user.getAssignedRoles() == null ? Stream.<com.everx.auth.entity.Permission>empty() : user.getAssignedRoles().stream()
+            .filter(role -> role != null
+                && Boolean.TRUE.equals(role.getIsActive())
+                && !Boolean.TRUE.equals(role.getIsDeleted()))
+            .flatMap(role -> role.getPermissions() == null
+                ? Stream.<com.everx.auth.entity.Permission>empty()
+                : role.getPermissions().stream()))
+            .filter(permission -> permission != null
+                && Boolean.TRUE.equals(permission.getIsActive())
+                && !Boolean.TRUE.equals(permission.getIsDeleted())
+                && permission.getPermissionKey() != null
+                && !permission.getPermissionKey().isBlank())
+            .map(com.everx.auth.entity.Permission::getPermissionKey)
+                .distinct()
+                .sorted()
+                .toList();
     }
 }

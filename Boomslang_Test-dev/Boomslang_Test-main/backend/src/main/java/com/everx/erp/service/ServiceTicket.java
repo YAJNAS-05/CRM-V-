@@ -70,6 +70,6 @@ public class ServiceTicket extends BaseEntity {
     @Column(name = "linked_invoice_id")
     private UUID linkedInvoiceId; // Auto-set when invoice is created
 
-    @Column(name = "parts_used_ids", columnDefinition = "TEXT[]")
+    @Column(name = "parts_used_ids", columnDefinition = "UUID ARRAY")
     private UUID[] partsUsedIds; // Array of SparePart IDs consumed
 }

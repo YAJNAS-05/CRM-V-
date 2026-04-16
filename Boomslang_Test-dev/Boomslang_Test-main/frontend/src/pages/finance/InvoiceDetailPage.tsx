@@ -5,6 +5,25 @@ import { Invoice, Payment, InvoiceStatus, PaymentMethod } from '../../types/fina
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 
+const extractEntity = <T,>(payload: unknown): T | null => {
+  if (payload === null || payload === undefined) return null
+  if (typeof payload !== 'object') return payload as T
+  const wrapped = payload as { data?: unknown }
+  const data = wrapped.data
+  return (data ?? payload) as T
+}
+
+const extractList = <T,>(payload: unknown): T[] => {
+  const data = extractEntity<unknown>(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data as T[]
+  if (typeof data === 'object') {
+    const content = (data as { content?: unknown }).content
+    return Array.isArray(content) ? (content as T[]) : []
+  }
+  return []
+}
+
 const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -26,10 +45,10 @@ const InvoiceDetailPage: React.FC = () => {
     try {
       setIsLoading(true)
       const invRes = await invoiceApi.getById(id!)
-      setInvoice(invRes.data.data!)
+      setInvoice(extractEntity<Invoice>(invRes.data))
       
       const payRes = await paymentApi.getByInvoice(id!)
-      setPayments(payRes.data.data || [])
+      setPayments(extractList<Payment>(payRes.data))
     } catch (error) {
       toast.error('Failed to load invoice details')
     } finally {
@@ -41,16 +60,23 @@ const InvoiceDetailPage: React.FC = () => {
     e.preventDefault()
     if (!invoice) return
 
+    const amount = Number(paymentAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Please enter a valid payment amount')
+      return
+    }
+
     try {
       await paymentApi.create({
         invoiceId: invoice.id,
-        amount: parseFloat(paymentAmount),
+        amount,
         paymentDate,
         method: paymentMethod,
         currency: invoice.currency
       })
       toast.success('Payment recorded successfully')
       setShowPaymentModal(false)
+      setPaymentAmount('')
       fetchData()
     } catch (error) {
       toast.error('Failed to record payment')

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { serviceTicketApi } from '../../api/erpApi'
 import { ServiceTicket } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function ServiceTicketsListPage() {
   const [tickets, setTickets] = useState<ServiceTicket[]>([])
@@ -24,6 +25,29 @@ export default function ServiceTicketsListPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleExport = () => {
+    const rows = tickets.map((ticket) => ({
+      TicketNumber: ticket.ticketNumber,
+      Type: ticket.type,
+      Priority: ticket.priority,
+      Status: ticket.status,
+      ReportedDate: ticket.reportedDate || '',
+      ResolvedDate: ticket.resolvedDate || '',
+      AccountId: ticket.accountId,
+      EquipmentId: ticket.equipmentId || '',
+      AssignedTo: ticket.assignedTo || '',
+      SubcontractorId: ticket.subcontractorId || '',
+      ResolutionNotes: ticket.resolutionNotes || '',
+      Cost: ticket.cost || 0,
+      Description: ticket.description || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Service_Tickets_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Service Tickets',
+    })
   }
 
   const getPriorityColor = (priority: string) => {
@@ -52,7 +76,16 @@ export default function ServiceTicketsListPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Service Tickets</h1>
-        <button onClick={() => navigate('/erp/service-tickets/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Ticket</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={tickets.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/service-tickets/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Ticket</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

@@ -13,12 +13,11 @@ import java.util.UUID;
  * REST Controller for AP invoice tolerance configuration.
  * 
  * Manages tolerance rules (% and absolute) per company for AP matching.
- * Only ADMIN role can manage tolerance configurations.
+ * Access is controlled via FINANCE_* permissions.
  */
 @RestController
 @RequestMapping("/api/v1/finance/tolerance-config")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class InvoiceToleranceConfigController {
 
     private final InvoiceToleranceConfigRepository toleranceRepository;
@@ -29,6 +28,7 @@ public class InvoiceToleranceConfigController {
      * @return List of all tolerance configs
      */
     @GetMapping
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<List<InvoiceToleranceConfigResponse>> getAll() {
         return ResponseEntity.ok(
             toleranceRepository.findAll().stream()
@@ -44,6 +44,7 @@ public class InvoiceToleranceConfigController {
      * @return The tolerance config for that company
      */
     @GetMapping("/{companyCode}")
+    @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<InvoiceToleranceConfigResponse> getByCompanyCode(
             @PathVariable String companyCode) {
         return toleranceRepository.findByCompanyCode(companyCode)
@@ -65,6 +66,7 @@ public class InvoiceToleranceConfigController {
      * @return Created/updated config with HTTP 201 Created or 200 OK
      */
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('FINANCE_CREATE','FINANCE_EDIT')")
     public ResponseEntity<InvoiceToleranceConfigResponse> createOrUpdate(
             @RequestBody CreateInvoiceToleranceConfigRequest request) {
         InvoiceToleranceConfig existing = toleranceRepository
@@ -89,6 +91,7 @@ public class InvoiceToleranceConfigController {
      * @return Updated config
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<InvoiceToleranceConfigResponse> update(
             @PathVariable UUID id,
             @RequestBody CreateInvoiceToleranceConfigRequest request) {
@@ -110,6 +113,7 @@ public class InvoiceToleranceConfigController {
      * @return HTTP 204 No Content
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('FINANCE_DELETE')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         toleranceRepository.deleteById(id);
         return ResponseEntity.noContent().build();

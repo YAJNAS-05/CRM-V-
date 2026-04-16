@@ -173,6 +173,8 @@ export const warrantyApi = {
     axiosInstance.get(`/v1/erp/warranties?page=${page}&size=${size}`),
   getById: async (id: string) =>
     axiosInstance.get(`/v1/erp/warranties/${id}`),
+  getByEquipment: async (equipmentId: string) =>
+    axiosInstance.get(`/v1/erp/warranties/equipment/${equipmentId}`),
   create: async (data: any) =>
     axiosInstance.post('/v1/erp/warranties', data),
   update: async (id: string, data: any) =>

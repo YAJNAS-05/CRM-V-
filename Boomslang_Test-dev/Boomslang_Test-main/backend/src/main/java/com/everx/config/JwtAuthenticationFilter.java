@@ -15,7 +15,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -34,22 +35,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UUID userId = tokenProvider.getUserIdFromToken(jwt);
                 String email = tokenProvider.getEmailFromToken(jwt);
                 String role = tokenProvider.getRoleFromToken(jwt);
+                List<String> roles = tokenProvider.getRolesFromToken(jwt);
+                List<String> permissions = tokenProvider.getPermissionsFromToken(jwt);
 
                 if (userId != null && email != null) {
-                    java.util.List<org.springframework.security.core.GrantedAuthority> authorities = new ArrayList<>();
-                    if (role != null) {
-                        authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role));
-                        // SUPER_ADMIN inherits all role authorities
-                        if ("SUPER_ADMIN".equals(role)) {
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MANAGER"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_MANAGER"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_REP"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_FINANCE"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SERVICE_TECH"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_WAREHOUSE_MANAGER"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_INVENTORY_CLERK"));
-                            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_VIEWER"));
+                    LinkedHashSet<org.springframework.security.core.GrantedAuthority> authorities = new LinkedHashSet<>();
+
+                    if ((roles == null || roles.isEmpty()) && role != null) {
+                        roles = List.of(role);
+                    }
+
+                    if (roles != null) {
+                        for (String roleName : roles) {
+                            if (roleName != null && !roleName.isBlank()) {
+                                authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + roleName));
+                            }
+                        }
+                    }
+
+                    if (permissions != null) {
+                        for (String permission : permissions) {
+                            if (permission != null && !permission.isBlank()) {
+                                authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority(permission));
+                            }
                         }
                     }
 
@@ -62,7 +70,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     request.setAttribute("userId", userId);
                     request.setAttribute("userEmail", email);
-                    request.setAttribute("userRole", role);
+                    request.setAttribute("userRole", role != null ? role : (roles == null || roles.isEmpty() ? null : roles.get(0)));
+                    request.setAttribute("userRoles", roles);
+                    request.setAttribute("userPermissions", permissions);
                 }
             }
         } catch (JwtException | IllegalArgumentException e) {

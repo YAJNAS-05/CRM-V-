@@ -17,7 +17,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/analytics")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER', 'FINANCE')")
+    @PreAuthorize("hasAuthority('DASHBOARD_VIEW')")
     public ResponseEntity<ApiResponse<DashboardResponse>> getGlobalAnalytics() {
         DashboardResponse stats = dashboardService.getGlobalAnalytics();
         return ResponseEntity.ok(ApiResponse.ok(stats, "Global analytics retrieved successfully"));

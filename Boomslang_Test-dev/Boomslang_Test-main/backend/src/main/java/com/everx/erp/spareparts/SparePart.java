@@ -27,7 +27,7 @@ public class SparePart extends BaseEntity {
     @Column(length = 50)
     private String category;
 
-    @Column(name = "compatible_models", columnDefinition = "TEXT[]")
+    @Column(name = "compatible_models", columnDefinition = "TEXT ARRAY")
     private String[] compatibleModels;
 
     @Column(name = "stock_qty")

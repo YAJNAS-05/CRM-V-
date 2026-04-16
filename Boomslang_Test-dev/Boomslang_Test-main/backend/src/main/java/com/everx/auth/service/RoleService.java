@@ -1,47 +1,141 @@
 package com.everx.auth.service;
 
+import com.everx.auth.dto.CreateRoleRequest;
+import com.everx.auth.dto.PermissionDto;
+import com.everx.auth.dto.RoleDto;
+import com.everx.auth.dto.UpdateRoleRequest;
 import com.everx.auth.entity.User;
+import com.everx.auth.entity.Permission;
+import com.everx.auth.entity.Role;
+import com.everx.auth.repository.PermissionRepository;
+import com.everx.auth.repository.RoleRepository;
+import com.everx.shared.exception.EntityNotFoundException;
+import com.everx.shared.exception.ValidationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
+@Transactional
 @Slf4j
 public class RoleService {
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PermissionRepository permissionRepository;
 
     /**
      * Get all available roles
      */
-    public List<Map<String, ?>> getAllRoles() {
+    public List<RoleDto> getAllRoles() {
         log.info("Fetching all available roles");
-        return Arrays.stream(User.UserRole.values())
-                .map(role -> {
-                    Map<String, Object> roleMap = new HashMap<>();
-                    roleMap.put("name", role.name());
-                    roleMap.put("description", getRoleDescription(role));
-                    return roleMap;
-                })
-                .collect(Collectors.toList());
+        return roleRepository.findAllActiveWithPermissions().stream()
+                .map(RoleDto::fromEntity)
+                .toList();
+    }
+
+    /**
+     * Get all available permissions
+     */
+    public List<PermissionDto> getAllPermissions() {
+        log.info("Fetching all available permissions");
+        return permissionRepository.findAllActive().stream()
+                .map(PermissionDto::fromEntity)
+                .toList();
+    }
+
+    /**
+     * Create a new custom role
+     */
+    public RoleDto createRole(CreateRoleRequest request) {
+        String roleName = normalizeRoleName(request.getName());
+        log.info("Creating role: {}", roleName);
+
+        if (roleRepository.existsActiveByName(roleName)) {
+            throw new ValidationException("name", "Role already exists: " + roleName);
+        }
+
+        Role role = Role.builder()
+                .name(roleName)
+                .description(request.getDescription())
+                .isSystem(false)
+                .isActive(request.getIsActive() == null || request.getIsActive())
+                .permissions(resolvePermissions(request.getPermissionKeys()))
+                .build();
+
+        Role savedRole = roleRepository.save(java.util.Objects.requireNonNull(role));
+        return RoleDto.fromEntity(savedRole);
+    }
+
+    /**
+     * Update role metadata
+     */
+    public RoleDto updateRole(UUID roleId, UpdateRoleRequest request) {
+        Role role = roleRepository.findByIdWithPermissions(roleId)
+                .orElseThrow(() -> new EntityNotFoundException("Role not found with id: " + roleId));
+
+        if (request.getDescription() != null) {
+            role.setDescription(request.getDescription());
+        }
+
+        if (request.getIsActive() != null) {
+            role.setIsActive(request.getIsActive());
+        }
+
+        Role savedRole = roleRepository.save(java.util.Objects.requireNonNull(role));
+        return RoleDto.fromEntity(savedRole);
+    }
+
+    /**
+     * Replace role permissions
+     */
+    public RoleDto updateRolePermissions(UUID roleId, List<String> permissionKeys) {
+        Role role = roleRepository.findByIdWithPermissions(roleId)
+                .orElseThrow(() -> new EntityNotFoundException("Role not found with id: " + roleId));
+
+        role.setPermissions(resolvePermissions(permissionKeys));
+        return RoleDto.fromEntity(roleRepository.save(role));
+    }
+
+    /**
+     * Soft delete/deactivate role
+     */
+    public void deleteRole(UUID roleId) {
+        Role role = roleRepository.findByIdWithPermissions(roleId)
+                .orElseThrow(() -> new EntityNotFoundException("Role not found with id: " + roleId));
+
+        if (Boolean.TRUE.equals(role.getIsSystem())) {
+            throw new ValidationException("role", "System roles cannot be deleted");
+        }
+
+        role.setIsActive(false);
+        role.setIsDeleted(true);
+        roleRepository.save(role);
     }
 
     /**
      * Get all available office locations
      */
-    public List<Map<String, ?>> getAllOfficeLocations() {
+    public List<java.util.Map<String, Object>> getAllOfficeLocations() {
         log.info("Fetching all available office locations");
-        return Arrays.stream(User.OfficeLocation.values())
+        return java.util.Arrays.stream(User.OfficeLocation.values())
                 .map(location -> {
-                    Map<String, Object> locMap = new HashMap<>();
+                    java.util.Map<String, Object> locMap = new java.util.HashMap<>();
                     locMap.put("name", location.name());
                     locMap.put("code", getLocationCode(location));
                     return locMap;
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**
@@ -52,18 +146,42 @@ public class RoleService {
         return currentUserRole == User.UserRole.ADMIN;
     }
 
-    private String getRoleDescription(User.UserRole role) {
-        return switch (role) {
-            case ADMIN -> "Full system access, user management, configuration";
-            case SUPER_ADMIN -> "Super administrator with unrestricted access";
-            case MANAGER -> "Team management and oversight";
-            case SALES_MANAGER -> "Manage sales team, deals, quotes, reports";
-            case SALES_REP -> "Create and manage leads, deals, quotes";
-            case SERVICE_TECH -> "Manage equipment, service tickets, maintenance";
-            case FINANCE -> "Manage invoices, payments, financial reports";
-            case READ_ONLY -> "View-only access to all data";
-            case VIEWER -> "View-only access to assigned data";
-        };
+    private Set<Permission> resolvePermissions(Collection<String> permissionKeys) {
+        if (permissionKeys == null || permissionKeys.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+
+        Set<String> normalizedKeys = permissionKeys.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(String::toUpperCase)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        List<Permission> permissions = permissionRepository.findActiveByKeys(normalizedKeys);
+        Set<String> matchedKeys = permissions.stream()
+                .map(Permission::getPermissionKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<String> missingKeys = new ArrayList<>();
+        for (String key : normalizedKeys) {
+            if (!matchedKeys.contains(key)) {
+                missingKeys.add(key);
+            }
+        }
+
+        if (!missingKeys.isEmpty()) {
+            throw new ValidationException("permissionKeys", "Unknown permissions: " + String.join(", ", missingKeys));
+        }
+
+        return new LinkedHashSet<>(permissions);
+    }
+
+    private String normalizeRoleName(String roleName) {
+        if (roleName == null || roleName.trim().isEmpty()) {
+            throw new ValidationException("name", "Role name is required");
+        }
+        return roleName.trim().toUpperCase();
     }
 
     private String getLocationCode(User.OfficeLocation location) {

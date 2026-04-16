@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { shipmentApi } from '../../api/erpApi'
 import { Shipment } from '../../types/erp'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
 
 export default function ShipmentsListPage() {
   const [shipments, setShipments] = useState<Shipment[]>([])
@@ -26,6 +27,29 @@ export default function ShipmentsListPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = shipments.map((shipment) => ({
+      TrackingNumber: shipment.trackingNumber || '',
+      Carrier: shipment.carrier || '',
+      OriginCountry: shipment.originCountry || '',
+      DestinationCountry: shipment.destinationCountry || '',
+      Status: shipment.status,
+      ShippedDate: shipment.shippedDate || '',
+      EstimatedArrival: shipment.estimatedArrival || '',
+      ActualArrival: shipment.actualArrival || '',
+      FreightCost: shipment.freightCost || 0,
+      Currency: shipment.currency || '',
+      BillOfLadingUrl: shipment.billOfLadingUrl || '',
+      PackingListUrl: shipment.packingListUrl || '',
+      CustomsDeclarationUrl: shipment.customsDeclarationUrl || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Shipments_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Shipments',
+    })
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       BOOKED: 'bg-gray-100 text-gray-800',
@@ -43,7 +67,16 @@ export default function ShipmentsListPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Shipments & Logistics</h1>
-        <button onClick={() => navigate('/erp/shipments/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Shipment</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={shipments.length === 0}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export
+          </button>
+          <button onClick={() => navigate('/erp/shipments/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Shipment</button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

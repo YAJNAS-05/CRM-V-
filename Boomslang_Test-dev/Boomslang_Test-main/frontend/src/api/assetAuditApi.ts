@@ -5,6 +5,13 @@ import axiosInstance from './axiosInstance';
 import { AssetAudit } from '../types/erp';
 import { ApiResponse } from '../types';
 
+const requireData = <T>(value: T | null | undefined, message: string): T => {
+  if (value == null) {
+    throw new Error(message);
+  }
+  return value;
+};
+
 export const AssetAuditApi = {
   /**
    * Get all asset audits
@@ -25,7 +32,7 @@ export const AssetAuditApi = {
   getAuditById: async (id: string): Promise<{ data: AssetAudit }> => {
     try {
       const response = await axiosInstance.get<ApiResponse<AssetAudit>>(`/v1/erp/asset-audits/${id}`);
-      return { data: response.data.data };
+      return { data: requireData(response.data.data, `Asset audit ${id} not found`) };
     } catch (error) {
       console.error(`Error fetching audit ${id}:`, error);
       throw error;
@@ -38,7 +45,7 @@ export const AssetAuditApi = {
   createAudit: async (audit: AssetAudit): Promise<AssetAudit> => {
     try {
       const response = await axiosInstance.post<ApiResponse<AssetAudit>>('/v1/erp/asset-audits', audit);
-      return response.data.data;
+      return requireData(response.data.data, 'Asset audit create returned no data');
     } catch (error) {
       console.error('Error creating audit:', error);
       throw error;
@@ -51,7 +58,7 @@ export const AssetAuditApi = {
   updateAudit: async (id: string, audit: Partial<AssetAudit>): Promise<AssetAudit> => {
     try {
       const response = await axiosInstance.put<ApiResponse<AssetAudit>>(`/v1/erp/asset-audits/${id}`, audit);
-      return response.data.data;
+      return requireData(response.data.data, `Asset audit ${id} update returned no data`);
     } catch (error) {
       console.error(`Error updating audit ${id}:`, error);
       throw error;

@@ -13,12 +13,11 @@ import java.util.UUID;
  * 
  * Manages mappings between transaction keys, valuation classes, and GL accounts.
  * Enables runtime configuration without code changes.
- * Only ADMIN role can manage account determinations.
+ * Access is controlled via FINANCE_* permissions.
  */
 @RestController
 @RequestMapping("/api/v1/finance/account-determinations")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AccountDeterminationController {
 
     private final AccountDeterminationService accountDeterminationService;
@@ -34,6 +33,7 @@ public class AccountDeterminationController {
      * @return List of all account determinations
      */
     @GetMapping
+        @PreAuthorize("hasAuthority('FINANCE_VIEW')")
     public ResponseEntity<List<AccountDeterminationResponse>> getAll(
             @RequestParam(required = false) String companyCode) {
         List<AccountDetermination> determinations = companyCode != null
@@ -59,6 +59,7 @@ public class AccountDeterminationController {
      * @return Created mapping with HTTP 201 Created
      */
     @PostMapping
+        @PreAuthorize("hasAuthority('FINANCE_CREATE')")
     public ResponseEntity<AccountDeterminationResponse> create(
             @RequestBody CreateAccountDeterminationRequest request) {
         AccountDetermination determination = AccountDetermination.builder()
@@ -86,6 +87,7 @@ public class AccountDeterminationController {
      * @return Updated mapping
      */
     @PutMapping("/{id}")
+        @PreAuthorize("hasAuthority('FINANCE_EDIT')")
     public ResponseEntity<AccountDeterminationResponse> update(
             @PathVariable UUID id,
             @RequestBody CreateAccountDeterminationRequest request) {
@@ -113,6 +115,7 @@ public class AccountDeterminationController {
      * @return Empty response with HTTP 204 No Content
      */
     @DeleteMapping("/{id}")
+        @PreAuthorize("hasAuthority('FINANCE_DELETE')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         accountDeterminationRepository.deleteById(id);
         accountDeterminationService.invalidateCache();  // Refresh cache after deletion
