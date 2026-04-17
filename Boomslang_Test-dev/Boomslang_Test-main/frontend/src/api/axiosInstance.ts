@@ -38,7 +38,7 @@ axiosInstance.interceptors.response.use(
     // Only attempt refresh if 401 and not already retried
     if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
       originalRequest._retry = true
-      const { refreshToken, setAccessToken, logout } = useAuthStore.getState()
+      const { refreshToken, logout } = useAuthStore.getState()
 
       if (refreshToken) {
         try {
@@ -46,12 +46,32 @@ axiosInstance.interceptors.response.use(
           if (!refreshPromise) {
             refreshPromise = axios
               .post(`${API_URL}/v1/auth/refresh`, { refreshToken })
-              .then((r) => r.data.data.accessToken)
+              .then((r) => {
+                const data = r.data?.data
+                if (!data?.accessToken) {
+                  throw new Error('Invalid refresh response')
+                }
+
+                const {
+                  setAccessToken,
+                  setRefreshToken,
+                  setUser,
+                } = useAuthStore.getState()
+
+                setAccessToken(data.accessToken)
+                if (data.refreshToken) {
+                  setRefreshToken(data.refreshToken)
+                }
+                if (data.user) {
+                  setUser(data.user)
+                }
+
+                return data.accessToken as string
+              })
               .finally(() => { refreshPromise = null })
           }
 
           const accessToken = await refreshPromise
-          setAccessToken(accessToken)
           originalRequest.headers.Authorization = `Bearer ${accessToken}`
           return axiosInstance(originalRequest)
         } catch (refreshError) {
