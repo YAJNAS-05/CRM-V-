@@ -3,15 +3,19 @@ package com.everx.auth.controller;
 import com.everx.auth.dto.LoginRequest;
 import com.everx.auth.dto.LoginResponse;
 import com.everx.auth.dto.RefreshTokenRequest;
+import com.everx.auth.dto.UserDto;
 import com.everx.auth.service.AuthService;
 import com.everx.shared.dto.ApiResponse;
+import com.everx.shared.exception.ValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -41,6 +45,16 @@ public class AuthController {
         log.info("Logout request");
         authService.logout(request.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.okMessage("Logout successful"));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserDto>> me(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UUID userId)) {
+            throw new ValidationException("Authentication required");
+        }
+
+        var user = authService.getCurrentUser(userId);
+        return ResponseEntity.ok(ApiResponse.ok(UserDto.fromEntity(user), "Current user retrieved successfully"));
     }
 
     @GetMapping("/health")

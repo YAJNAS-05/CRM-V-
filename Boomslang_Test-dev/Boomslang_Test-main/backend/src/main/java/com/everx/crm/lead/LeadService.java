@@ -3,6 +3,7 @@ package com.everx.crm.lead;
 import com.everx.crm.lead.dto.CreateLeadRequest;
 import com.everx.crm.lead.dto.LeadDto;
 import com.everx.crm.lead.dto.UpdateLeadRequest;
+import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,15 +27,26 @@ public class LeadService {
         return leadRepository.findAllActive(pageable).map(LeadDto::fromEntity);
     }
 
+    public Page<LeadDto> searchLeads(String query, String status, String source, Pageable pageable) {
+        String normalizedQuery = query != null ? query.trim() : null;
+        String normalizedStatus = status != null && !status.isBlank() ? status.trim() : null;
+        String normalizedSource = source != null && !source.isBlank() ? source.trim() : null;
+        log.info("Searching leads with query {} status {} source {}", normalizedQuery, normalizedStatus, normalizedSource);
+        return leadRepository.search(normalizedQuery, normalizedStatus, normalizedSource, pageable)
+                .map(LeadDto::fromEntity);
+    }
+
     public LeadDto getLeadById(UUID leadId) {
         log.info("Fetching lead {}", leadId);
-        Lead lead = leadRepository.findById(leadId)
+        Lead lead = leadRepository.findByIdActive(leadId)
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found with id: " + leadId));
         return LeadDto.fromEntity(lead);
     }
 
     public LeadDto createLead(CreateLeadRequest request) {
         log.info("Creating lead {} {}", request.getFirstName(), request.getLastName());
+        UUID ownerId = request.getOwnerId() != null ? request.getOwnerId() : SecurityUserContext.getCurrentUserIdOrNull();
+
         Lead lead = Lead.builder()
                 .salutation(request.getSalutation())
                 .firstName(request.getFirstName())
@@ -58,14 +70,14 @@ public class LeadService {
                 .employees(request.getEmployees())
                 .description(request.getDescription())
                 .isConverted(false)
-                .ownerId(request.getOwnerId())
+                .ownerId(ownerId)
                 .build();
         return LeadDto.fromEntity(leadRepository.save(lead));
     }
 
     public LeadDto updateLead(UUID leadId, UpdateLeadRequest request) {
         log.info("Updating lead {}", leadId);
-        Lead lead = leadRepository.findById(leadId)
+        Lead lead = leadRepository.findByIdActive(leadId)
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found with id: " + leadId));
 
         if (request.getSalutation() != null) lead.setSalutation(request.getSalutation());
@@ -95,7 +107,7 @@ public class LeadService {
 
     public void deleteLead(UUID leadId) {
         log.info("Soft deleting lead {}", leadId);
-        Lead lead = leadRepository.findById(leadId)
+        Lead lead = leadRepository.findByIdActive(leadId)
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found with id: " + leadId));
         lead.softDelete();
         leadRepository.save(lead);

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { leadApi, activityApi } from '../../api/crmApi'
-import { Lead, Activity, CreateLeadRequest } from '../../types/crm'
+import { leadApi } from '../../api/crmApi'
+import { Lead, CreateLeadRequest } from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import { toast } from 'sonner'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -13,19 +14,26 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'UNQUALIFIED', 'CONVERTED']
-const SOURCES = ['WEB', 'REFERRAL', 'COLD_CALL', 'EMAIL_CAMPAIGN', 'SOCIAL_MEDIA', 'TRADE_SHOW', 'OTHER']
+const SOURCES = ['WEB', 'REFERRAL', 'COLD_CALL', 'EMAIL_CAMPAIGN', 'SOCIAL_MEDIA', 'OTHER']
 
 interface LeadDetailPageProps { isNew?: boolean }
 
 const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const permissions = useAuthStore((state) => state.user?.permissions)
+  const canEdit = permissions?.includes('CRM_EDIT') ?? false
+  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(!isNew)
-  const [tab, setTab] = useState<'details' | 'activities' | 'notes'>('details')
-  const [activities, setActivities] = useState<Activity[]>([])
+  const [tab, setTab] = useState<'details' | 'notes'>('details')
   const [showConvertModal, setShowConvertModal] = useState(false)
-  const [convertForm, setConvertForm] = useState({ createAccount: true, createDeal: true, dealName: '' })
+  const [convertForm, setConvertForm] = useState({
+    createAccount: true,
+    accountName: '',
+    createDeal: true,
+    dealName: '',
+  })
   const [isEditing, setIsEditing] = useState(isNew)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<CreateLeadRequest>({
@@ -37,7 +45,6 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
   useEffect(() => {
     if (id) {
       fetchLead()
-      fetchActivities()
     }
   }, [id])
 
@@ -85,19 +92,17 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
     } catch { toast.error('Failed to load lead') } finally { setLoading(false) }
   }
 
-  const fetchActivities = async () => {
-    try {
-      const resp = await activityApi.getByLead(id!)
-      const data = resp.data.data
-      setActivities(Array.isArray(data) ? data : [])
-    } catch { /* ignore */ }
-  }
-
   const handleConvert = async () => {
     if (!id) return
     try {
+      const resolvedAccountName = convertForm.accountName?.trim() || lead?.company?.trim() || ''
+      if (convertForm.createAccount && !resolvedAccountName) {
+        toast.error('Account name is required to create an account')
+        return
+      }
       await leadApi.convert(id, {
         createAccount: convertForm.createAccount,
+        accountName: resolvedAccountName || undefined,
         createDeal: convertForm.createDeal,
         dealName: convertForm.dealName || `${lead?.firstName} ${lead?.lastName} - Deal`,
       })
@@ -108,6 +113,10 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
   }
 
   const handleDelete = async () => {
+    if (!canDelete) {
+      toast.error('You do not have permission to delete leads')
+      return
+    }
     if (!confirm('Delete this lead?')) return
     try {
       await leadApi.delete(id!)
@@ -272,17 +281,32 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {lead.status !== 'CONVERTED' && (
-              <button onClick={() => { setConvertForm({ ...convertForm, dealName: `${lead.firstName} ${lead.lastName} - Deal` }); setShowConvertModal(true) }} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+            {canEdit && lead.status !== 'CONVERTED' && (
+              <button
+                onClick={() => {
+                  setConvertForm({
+                    createAccount: true,
+                    accountName: lead.company || '',
+                    createDeal: true,
+                    dealName: `${lead.firstName} ${lead.lastName} - Deal`,
+                  })
+                  setShowConvertModal(true)
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+              >
                 Convert
               </button>
             )}
-            <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-              Edit
-            </button>
-            <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">
-              Delete
-            </button>
+            {canEdit && (
+              <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Edit
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">
+                Delete
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -329,7 +353,7 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
         <div className="flex gap-6">
-          {(['details', 'activities', 'notes'] as const).map(t => (
+          {(['details', 'notes'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`pb-3 text-sm font-medium capitalize transition ${tab === t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>
           ))}
         </div>
@@ -377,32 +401,6 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
         </div>
       )}
 
-      {tab === 'activities' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          {activities.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <svg className="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <p className="text-sm">No activities yet</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {activities.map(act => (
-                <div key={act.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-50">
-                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{act.subject}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{act.type} &middot; {new Date(act.dueDate || act.createdAt).toLocaleDateString()}</p>
-                    {act.description && <p className="text-xs text-gray-400 mt-1">{act.description}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {tab === 'notes' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="text-center py-12 text-gray-400">
@@ -426,6 +424,15 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
                 <input type="checkbox" checked={convertForm.createAccount} onChange={(e) => setConvertForm({ ...convertForm, createAccount: e.target.checked })} className="rounded border-gray-300 text-indigo-600" />
                 Create Account
               </label>
+              {convertForm.createAccount && (
+                <input
+                  type="text"
+                  value={convertForm.accountName}
+                  onChange={(e) => setConvertForm({ ...convertForm, accountName: e.target.value })}
+                  placeholder="Account Name"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={convertForm.createDeal} onChange={(e) => setConvertForm({ ...convertForm, createDeal: e.target.checked })} className="rounded border-gray-300 text-indigo-600" />
                 Create Deal

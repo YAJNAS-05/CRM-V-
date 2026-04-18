@@ -2,13 +2,19 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { quoteApi } from '../../api/crmApi'
 import { Quote } from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import { toast } from 'sonner'
 
 const QuoteListPage: React.FC = () => {
   const navigate = useNavigate()
+  const permissions = useAuthStore((state) => state.user?.permissions)
+  const canCreate = permissions?.includes('CRM_CREATE') ?? false
+  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalItems, setTotalItems] = useState(0)
   const pageSize = 20
 
   useEffect(() => {
@@ -19,7 +25,20 @@ const QuoteListPage: React.FC = () => {
     try {
       setIsLoading(true)
       const response = await quoteApi.getAll(page, pageSize)
-      setQuotes(response.data.data?.content || [])
+      const data = response.data.data
+      if (data?.content) {
+        setQuotes(data.content)
+        setTotalPages(data.totalPages || 1)
+        setTotalItems(data.totalElements || data.content.length)
+      } else if (Array.isArray(data)) {
+        setQuotes(data)
+        setTotalPages(1)
+        setTotalItems(data.length)
+      } else {
+        setQuotes([])
+        setTotalPages(0)
+        setTotalItems(0)
+      }
     } catch (error) {
       toast.error('Failed to load quotes')
     } finally {
@@ -28,6 +47,10 @@ const QuoteListPage: React.FC = () => {
   }
 
   const handleDelete = async (id: string) => {
+    if (!canDelete) {
+      toast.error('You do not have permission to delete quotes')
+      return
+    }
     if (!confirm('Are you sure you want to delete this quote?')) return
     try {
       await quoteApi.delete(id)
@@ -50,12 +73,14 @@ const QuoteListPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Quotes</h1>
-        <button
-          onClick={() => navigate('/crm/quotes/new')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-        >
-          New Quote
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => navigate('/crm/quotes/new')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+          >
+            New Quote
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -103,12 +128,14 @@ const QuoteListPage: React.FC = () => {
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() => handleDelete(quote.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Delete
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(quote.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -125,10 +152,10 @@ const QuoteListPage: React.FC = () => {
         >
           Previous
         </button>
-        <span className="text-gray-600">Page {page + 1}</span>
+        <span className="text-gray-600">Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</span>
         <button
           onClick={() => setPage(page + 1)}
-          disabled={quotes.length < pageSize}
+          disabled={page >= totalPages - 1 || totalPages === 0}
           className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-lg disabled:opacity-50"
         >
           Next

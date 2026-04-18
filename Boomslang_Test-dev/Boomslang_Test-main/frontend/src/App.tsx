@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
+import { authApi } from './api/authApi'
 import LoginPage from './pages/auth/LoginPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
 import NotificationPanel from './components/NotificationPanel'
@@ -20,8 +21,6 @@ import DealKanbanPage from './pages/deals/DealKanbanPage'
 import QuoteListPage from './pages/quotes/QuoteListPage'
 import QuoteDetailPage from './pages/quotes/QuoteDetailPage'
 import ActivityListPage from './pages/activities/ActivityListPage'
-import TradeShowListPage from './pages/tradeshows/TradeShowListPage'
-import TradeShowDetailPage from './pages/tradeshows/TradeShowDetailPage'
 
 // ERP Pages
 import EquipmentListPage from './pages/equipment/EquipmentListPage'
@@ -70,8 +69,6 @@ import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage
 import { ReportListPage } from './pages/reports/ReportListPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
 import UserManagementPage from './pages/admin/UserManagementPage'
-import AuditLogPage from './pages/admin/AuditLogPage'
-import ERPFieldMappingPage from './pages/admin/ERPFieldMappingPage'
 import RoleManagementPage from './pages/admin/RoleManagementPage'
 
 // Inventory Pages
@@ -88,7 +85,9 @@ interface ProtectedRouteProps {
 }
 
 const inferRoutePermissions = (pathname: string): string[] => {
-  if (pathname === '/crm/dashboard') return ['DASHBOARD_VIEW']
+  if (pathname === '/crm/dashboard/team') return ['DASHBOARD_TEAM_VIEW']
+  if (pathname === '/crm/dashboard/user') return ['DASHBOARD_SELF_VIEW']
+  if (pathname === '/crm/dashboard') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
   if (pathname.startsWith('/crm/')) return ['CRM_VIEW']
   if (pathname.startsWith('/erp/')) return ['ERP_VIEW']
   if (pathname.startsWith('/finance/')) return ['FINANCE_VIEW']
@@ -98,13 +97,62 @@ const inferRoutePermissions = (pathname: string): string[] => {
 }
 
 const getFirstAuthorizedPath = (permissions: string[]): string => {
-  if (permissions.includes('DASHBOARD_VIEW')) return '/crm/dashboard'
+  if (permissions.includes('DASHBOARD_TEAM_VIEW')) return '/crm/dashboard/team'
+  if (permissions.includes('DASHBOARD_SELF_VIEW')) return '/crm/dashboard/user'
   if (permissions.includes('CRM_VIEW')) return '/crm/accounts'
   if (permissions.includes('ERP_VIEW')) return '/erp/equipment'
   if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
   if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
   if (permissions.includes('REPORT_VIEW')) return '/reports'
   return '/profile'
+}
+
+const DashboardRouteResolver: React.FC = () => {
+  const user = useAuthStore((state) => state.user)
+  const permissions = user?.permissions || []
+
+  if (permissions.includes('DASHBOARD_TEAM_VIEW')) {
+    return <Navigate to="/crm/dashboard/team" replace />
+  }
+
+  if (permissions.includes('DASHBOARD_SELF_VIEW') || permissions.includes('DASHBOARD_VIEW')) {
+    return <Navigate to="/crm/dashboard/user" replace />
+  }
+
+  return <Navigate to={getFirstAuthorizedPath(permissions)} replace />
+}
+
+const AuthSessionSync: React.FC = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const setUser = useAuthStore((state) => state.setUser)
+
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) {
+      return
+    }
+
+    let isMounted = true
+
+    const syncCurrentUser = async () => {
+      try {
+        const currentUser = await authApi.me()
+        if (isMounted && currentUser) {
+          setUser(currentUser)
+        }
+      } catch {
+        // 401/403 are handled by the axios interceptor; ignore transient errors here.
+      }
+    }
+
+    syncCurrentUser()
+
+    return () => {
+      isMounted = false
+    }
+  }, [isAuthenticated, accessToken, setUser])
+
+  return null
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermissions }) => {
@@ -173,6 +221,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <NotificationPanel />
+        <AuthSessionSync />
         <Toaster richColors position="top-right" />
         <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -190,8 +239,24 @@ function App() {
         <Route
           path="/crm/dashboard"
           element={
-            <ProtectedRoute>
-              <DashboardPage />
+            <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']}>
+              <DashboardRouteResolver />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/crm/dashboard/user"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW']}>
+              <DashboardPage mode="SELF" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/crm/dashboard/team"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_TEAM_VIEW']}>
+              <DashboardPage mode="TEAM" />
             </ProtectedRoute>
           }
         />
@@ -208,7 +273,7 @@ function App() {
         <Route
           path="/crm/accounts/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['CRM_CREATE']}>
               <AccountDetailPage isNew={true} />
             </ProtectedRoute>
           }
@@ -234,7 +299,7 @@ function App() {
         <Route
           path="/crm/contacts/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['CRM_CREATE']}>
               <ContactDetailPage isNew={true} />
             </ProtectedRoute>
           }
@@ -260,7 +325,7 @@ function App() {
         <Route
           path="/crm/leads/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['CRM_CREATE']}>
               <LeadDetailPage isNew={true} />
             </ProtectedRoute>
           }
@@ -294,7 +359,7 @@ function App() {
         <Route
           path="/crm/deals/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['CRM_CREATE']}>
               <DealDetailPage isNew={true} />
             </ProtectedRoute>
           }
@@ -320,7 +385,7 @@ function App() {
         <Route
           path="/crm/quotes/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermissions={['CRM_CREATE']}>
               <QuoteDetailPage isNew={true} />
             </ProtectedRoute>
           }
@@ -330,16 +395,6 @@ function App() {
           element={
             <ProtectedRoute>
               <QuoteDetailPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* CRM Activities Routes */}
-        <Route
-          path="/crm/activities"
-          element={
-            <ProtectedRoute>
-              <ActivityListPage />
             </ProtectedRoute>
           }
         />
@@ -354,20 +409,12 @@ function App() {
           }
         />
 
-        {/* CRM Trade Shows Routes */}
+        {/* CRM Activities Route */}
         <Route
-          path="/crm/tradeshows"
+          path="/crm/activities"
           element={
             <ProtectedRoute>
-              <TradeShowListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/crm/tradeshows/:id"
-          element={
-            <ProtectedRoute>
-              <TradeShowDetailPage />
+              <ActivityListPage />
             </ProtectedRoute>
           }
         />
@@ -816,16 +863,16 @@ function App() {
         <Route
           path="/admin/audit"
           element={
-            <ProtectedRoute requiredPermissions={['AUDIT_VIEW']}>
-              <AuditLogPage />
+            <ProtectedRoute>
+              <Navigate to="/admin/users" replace />
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/erp-mappings"
           element={
-            <ProtectedRoute requiredPermissions={['ERP_MAPPING_VIEW']}>
-              <ERPFieldMappingPage />
+            <ProtectedRoute>
+              <Navigate to="/admin/users" replace />
             </ProtectedRoute>
           }
         />

@@ -3,6 +3,7 @@ package com.everx.crm.activity;
 import com.everx.crm.activity.dto.ActivityDto;
 import com.everx.crm.activity.dto.CreateActivityRequest;
 import com.everx.crm.activity.dto.UpdateActivityRequest;
+import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,8 @@ public class ActivityService {
     @Transactional
     public ActivityDto createActivity(CreateActivityRequest request) {
         Activity activity = new Activity();
+        UUID assignedTo = request.getAssignedTo() != null ? request.getAssignedTo() : SecurityUserContext.getCurrentUserIdOrNull();
+
         activity.setType(request.getType());
         activity.setSubject(request.getSubject());
         activity.setDescription(request.getDescription());
@@ -34,7 +37,7 @@ public class ActivityService {
         activity.setDealId(request.getDealId());
         activity.setLeadId(request.getLeadId());
         activity.setAccountId(request.getAccountId());
-        activity.setAssignedTo(request.getAssignedTo());
+        activity.setAssignedTo(assignedTo);
 
         Activity saved = activityRepository.save(activity);
         return toDto(saved);

@@ -3,6 +3,7 @@ package com.everx.crm.account;
 import com.everx.crm.account.dto.AccountDto;
 import com.everx.crm.account.dto.CreateAccountRequest;
 import com.everx.crm.account.dto.UpdateAccountRequest;
+import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,13 +29,15 @@ public class AccountService {
 
     public AccountDto getAccountById(UUID accountId) {
         log.info("Fetching account by ID {}", accountId);
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByIdActive(accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found with id: " + accountId));
         return AccountDto.fromEntity(account);
     }
 
     public AccountDto createAccount(CreateAccountRequest request) {
         log.info("Creating account {}", request.getName());
+        UUID ownerId = request.getOwnerId() != null ? request.getOwnerId() : SecurityUserContext.getCurrentUserIdOrNull();
+
         Account account = Account.builder()
                 .name(request.getName())
                 .industry(request.getIndustry())
@@ -50,14 +53,14 @@ public class AccountService {
                 .annualRevenue(request.getAnnualRevenue())
                 .employees(request.getEmployees())
                 .description(request.getDescription())
-                .ownerId(request.getOwnerId())
+                .ownerId(ownerId)
                 .build();
         return AccountDto.fromEntity(accountRepository.save(account));
     }
 
     public AccountDto updateAccount(UUID accountId, UpdateAccountRequest request) {
         log.info("Updating account {}", accountId);
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByIdActive(accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found with id: " + accountId));
 
         if (request.getName() != null) account.setName(request.getName());
@@ -81,7 +84,7 @@ public class AccountService {
 
     public void deleteAccount(UUID accountId) {
         log.info("Soft deleting account {}", accountId);
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByIdActive(accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found with id: " + accountId));
         account.softDelete();
         accountRepository.save(account);
@@ -89,6 +92,6 @@ public class AccountService {
 
     public Page<AccountDto> searchAccounts(String query, Pageable pageable) {
         log.info("Searching accounts with query {}", query);
-        return accountRepository.findByNameContains(query, pageable).map(AccountDto::fromEntity);
+        return accountRepository.search(query, pageable).map(AccountDto::fromEntity);
     }
 }

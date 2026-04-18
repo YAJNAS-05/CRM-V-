@@ -2,6 +2,35 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { User } from '../types'
 
+const normalizeUser = (user: User | null): User | null => {
+  if (!user) return null
+
+  const normalizedPermissions = Array.from(
+    new Set(
+      (user.permissions || [])
+        .filter((permission): permission is string => typeof permission === 'string')
+        .map((permission) => permission.trim().toUpperCase())
+        .filter((permission) => permission.length > 0)
+    )
+  )
+
+  const normalizedRoles = Array.from(
+    new Set(
+      (user.roles || [])
+        .filter((role): role is string => typeof role === 'string')
+        .map((role) => role.trim().toUpperCase())
+        .filter((role) => role.length > 0)
+    )
+  )
+
+  return {
+    ...user,
+    role: typeof user.role === 'string' ? user.role.trim().toUpperCase() : user.role,
+    roles: normalizedRoles,
+    permissions: normalizedPermissions,
+  }
+}
+
 interface AuthStore {
   user: User | null
   accessToken: string | null
@@ -26,7 +55,11 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: false,
 
-      setUser: (user) => set({ user }),
+      setUser: (user) =>
+        set({
+          user: normalizeUser(user),
+          isAuthenticated: Boolean(get().accessToken && get().refreshToken && normalizeUser(user)),
+        }),
       setAccessToken: (accessToken) =>
         set({
           accessToken,
@@ -41,7 +74,7 @@ export const useAuthStore = create<AuthStore>()(
 
       login: (user, accessToken, refreshToken) =>
         set({
-          user,
+          user: normalizeUser(user),
           accessToken,
           refreshToken,
           isAuthenticated: true,

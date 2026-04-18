@@ -41,7 +41,7 @@ public class LeadController {
         return ResponseEntity.ok(ApiResponse.ok(leads, "Leads retrieved successfully"));
     }
 
-    @GetMapping("/{leadId}")
+    @GetMapping("/{leadId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<LeadDto>> getLeadById(@PathVariable UUID leadId) {
         log.info("GET /api/v1/crm/leads/{}", leadId);
@@ -69,6 +69,18 @@ public class LeadController {
         return ResponseEntity.ok(ApiResponse.ok(leads, "Leads retrieved successfully"));
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
+    public ResponseEntity<ApiResponse<Page<LeadDto>>> searchLeads(
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "source", required = false) String source,
+            @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        log.info("GET /api/v1/crm/leads/search?q={}&status={}&source={}", query, status, source);
+        Page<LeadDto> leads = leadService.searchLeads(query, status, source, pageable);
+        return ResponseEntity.ok(ApiResponse.ok(leads, "Leads search results"));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<LeadDto>> createLead(@Valid @RequestBody CreateLeadRequest request) {
@@ -77,7 +89,7 @@ public class LeadController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(lead, "Lead created successfully"));
     }
 
-    @PutMapping("/{leadId}")
+    @PutMapping("/{leadId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<LeadDto>> updateLead(
             @PathVariable UUID leadId,
@@ -87,7 +99,7 @@ public class LeadController {
         return ResponseEntity.ok(ApiResponse.ok(lead, "Lead updated successfully"));
     }
 
-    @DeleteMapping("/{leadId}")
+    @DeleteMapping("/{leadId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteLead(@PathVariable UUID leadId) {
         log.info("DELETE /api/v1/crm/leads/{}", leadId);
@@ -95,7 +107,7 @@ public class LeadController {
         return ResponseEntity.ok(ApiResponse.okMessage("Lead deleted successfully"));
     }
 
-    @PostMapping("/{leadId}/convert")
+    @PostMapping("/{leadId:[0-9a-fA-F-]{36}}/convert")
     @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<LeadDto>> convertLead(
             @PathVariable UUID leadId,

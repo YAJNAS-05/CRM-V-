@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { activityApi } from '../../api/crmApi'
 import { Activity, CreateActivityRequest } from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 
@@ -17,6 +18,10 @@ const TYPE_ICONS: Record<string, string> = {
 const TYPES = ['ALL', 'CALL', 'EMAIL', 'MEETING', 'TASK', 'NOTE']
 
 export default function ActivityListPage() {
+  const permissions = useAuthStore((state) => state.user?.permissions)
+  const canCreate = permissions?.includes('CRM_CREATE') ?? false
+  const canEdit = permissions?.includes('CRM_EDIT') ?? false
+  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'overdue'>('all')
@@ -35,6 +40,7 @@ export default function ActivityListPage() {
   const resetCreateForm = () => setCreateForm({ type: 'CALL', subject: '', description: '', dueDate: '', status: 'PENDING', durationMins: undefined })
 
   const handleCreate = async () => {
+    if (!canCreate) { toast.error('You do not have permission to create activities'); return }
     if (!createForm.type) { toast.error('Activity type is required'); return }
     if (!createForm.subject?.trim()) { toast.error('Subject is required'); return }
     try {
@@ -67,9 +73,11 @@ export default function ActivityListPage() {
   }
 
   const handleComplete = async (id: string) => {
+    if (!canEdit) { toast.error('You do not have permission to update activities'); return }
     try { await activityApi.complete(id); toast.success('Marked complete'); fetchActivities() } catch { toast.error('Failed') }
   }
   const handleDelete = async (id: string) => {
+    if (!canDelete) { toast.error('You do not have permission to delete activities'); return }
     if (!confirm('Delete this activity?')) return
     try { await activityApi.delete(id); toast.success('Deleted'); fetchActivities() } catch { toast.error('Failed') }
   }
@@ -112,10 +120,12 @@ export default function ActivityListPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export
           </button>
-          <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Add Activity
-          </button>
+          {canCreate && (
+            <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Activity
+            </button>
+          )}
         </div>
       </div>
 
@@ -179,12 +189,14 @@ export default function ActivityListPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {!a.completedAt && (
+                      {canEdit && !a.completedAt && (
                         <button onClick={() => handleComplete(a.id)} className="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100" title="Complete">✓ Done</button>
                       )}
-                      <button onClick={() => handleDelete(a.id)} className="p-1 text-gray-400 hover:text-red-500" title="Delete">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
+                      {canDelete && (
+                        <button onClick={() => handleDelete(a.id)} className="p-1 text-gray-400 hover:text-red-500" title="Delete">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

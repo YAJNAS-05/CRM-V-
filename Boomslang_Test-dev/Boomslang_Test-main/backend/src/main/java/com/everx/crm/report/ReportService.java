@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -37,9 +38,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReportService {
 
-    private static final Set<String> TEAM_SCOPE_ROLES = Set.of("SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "MANAGER");
-        private static final String TEAM_SCOPE_ROLE_KEYWORD = "MANAGER";
-        private static final Set<String> TEAM_SCOPE_PERMISSIONS = Set.of("REPORT_VIEW", "REPORT_EXPORT");
+        private static final String TEAM_SCOPE_PERMISSION = "DASHBOARD_TEAM_VIEW";
+
+        private enum ForcedScope {
+                AUTO,
+                SELF,
+                TEAM
+        }
 
     private final LeadRepository leadRepository;
     private final ContactRepository contactRepository;
@@ -52,6 +57,16 @@ public class ReportService {
     public ReportResponse.DashboardKPIs getDashboardKPIs() {
         return getDashboardKPIs(resolveScope());
     }
+
+        @Transactional(readOnly = true)
+        public ReportResponse.DashboardKPIs getDashboardKPIsForSelf() {
+                return getDashboardKPIs(resolveScope(ForcedScope.SELF));
+        }
+
+        @Transactional(readOnly = true)
+        public ReportResponse.DashboardKPIs getDashboardKPIsForTeam() {
+                return getDashboardKPIs(resolveScope(ForcedScope.TEAM));
+        }
 
     private ReportResponse.DashboardKPIs getDashboardKPIs(ReportScope scope) {
         List<Lead> scopedLeads = getScopedLeads(scope);
@@ -111,6 +126,16 @@ public class ReportService {
                 return getPipelineReport(resolveScope());
         }
 
+        @Transactional(readOnly = true)
+        public ReportResponse.PipelineReport getPipelineReportForSelf() {
+                return getPipelineReport(resolveScope(ForcedScope.SELF));
+        }
+
+        @Transactional(readOnly = true)
+        public ReportResponse.PipelineReport getPipelineReportForTeam() {
+                return getPipelineReport(resolveScope(ForcedScope.TEAM));
+        }
+
         private ReportResponse.PipelineReport getPipelineReport(ReportScope scope) {
                 List<Deal> scopedDeals = getScopedDeals(scope);
 
@@ -118,6 +143,10 @@ public class ReportService {
                 Map<String, BigDecimal> dealValueByStage = new LinkedHashMap<>();
 
                 for (Deal d : scopedDeals) {
+                        if (!isOpenDeal(d)) {
+                                continue;
+                        }
+
             String stage = d.getStage() != null ? d.getStage().name() : "UNKNOWN";
             dealCountByStage.merge(stage, 1L, Long::sum);
             if (d.getAmount() != null) {
@@ -140,23 +169,34 @@ public class ReportService {
         return getConversionReport(resolveScope());
     }
 
+        @Transactional(readOnly = true)
+        public ReportResponse.ConversionReport getConversionReportForSelf() {
+                return getConversionReport(resolveScope(ForcedScope.SELF));
+        }
+
+        @Transactional(readOnly = true)
+        public ReportResponse.ConversionReport getConversionReportForTeam() {
+                return getConversionReport(resolveScope(ForcedScope.TEAM));
+        }
+
     private ReportResponse.ConversionReport getConversionReport(ReportScope scope) {
         List<Lead> scopedLeads = getScopedLeads(scope);
 
         long totalLeads = scopedLeads.size();
-        long converted = scopedLeads.stream().filter(l -> Boolean.TRUE.equals(l.getIsConverted())).count();
+        long converted = scopedLeads.stream().filter(this::isConvertedLead).count();
         double conversionRate = totalLeads > 0
                 ? roundPercentage((double) converted / totalLeads * 100.0)
                 : 0.0;
 
         Map<String, Long> leadsByStatus = scopedLeads.stream()
                 .collect(Collectors.groupingBy(
-                        l -> l.getStatus() != null ? l.getStatus() : "UNKNOWN",
+                        l -> normalizeBucketKey(l.getStatus()),
                         Collectors.counting()));
 
         Map<String, Long> leadsBySource = scopedLeads.stream()
-                .filter(l -> l.getLeadSource() != null)
-                .collect(Collectors.groupingBy(Lead::getLeadSource, Collectors.counting()));
+                .collect(Collectors.groupingBy(
+                        l -> normalizeBucketKey(l.getLeadSource()),
+                        Collectors.counting()));
 
         return ReportResponse.ConversionReport.builder()
                 .totalLeads(totalLeads)
@@ -172,6 +212,16 @@ public class ReportService {
         return getActivityReport(resolveScope());
     }
 
+        @Transactional(readOnly = true)
+        public ReportResponse.ActivityReport getActivityReportForSelf() {
+                return getActivityReport(resolveScope(ForcedScope.SELF));
+        }
+
+        @Transactional(readOnly = true)
+        public ReportResponse.ActivityReport getActivityReportForTeam() {
+                return getActivityReport(resolveScope(ForcedScope.TEAM));
+        }
+
     private ReportResponse.ActivityReport getActivityReport(ReportScope scope) {
         List<Activity> scopedActivities = getScopedActivities(scope);
         Instant now = Instant.now();
@@ -185,11 +235,14 @@ public class ReportService {
                         && a.getDueDate() != null
                         && a.getDueDate().isBefore(now))
                 .count();
-        long pending = total - completed;
+        long pending = scopedActivities.stream()
+                .filter(a -> !isCompletedActivity(a))
+                .filter(a -> a.getDueDate() == null || !a.getDueDate().isBefore(now))
+                .count();
 
         Map<String, Long> byType = scopedActivities.stream()
                 .collect(Collectors.groupingBy(
-                        a -> a.getType() != null ? a.getType() : "UNKNOWN",
+                        a -> normalizeBucketKey(a.getType()),
                         Collectors.counting()));
 
         return ReportResponse.ActivityReport.builder()
@@ -203,7 +256,7 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public ReportResponse getFullReport() {
-                ReportScope scope = resolveScope();
+                                ReportScope scope = resolveScope();
         return ReportResponse.builder()
                                 .dashboard(getDashboardKPIs(scope))
                                 .pipeline(getPipelineReport(scope))
@@ -213,21 +266,24 @@ public class ReportService {
     }
 
         private ReportScope resolveScope() {
+                return resolveScope(ForcedScope.AUTO);
+        }
+
+        private ReportScope resolveScope(ForcedScope forcedScope) {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                 if (authentication == null || !authentication.isAuthenticated()) {
-                        return new ReportScope(true, null);
+                        return new ReportScope(false, null);
                 }
 
-                UUID viewerUserId = authentication.getPrincipal() instanceof UUID
-                                ? (UUID) authentication.getPrincipal()
-                                : null;
+                UUID viewerUserId = extractViewerUserId(authentication);
 
-                Set<String> roleNames = authentication.getAuthorities().stream()
-                                .map(GrantedAuthority::getAuthority)
-                                .filter(authority -> authority != null && authority.startsWith("ROLE_"))
-                                .map(authority -> authority.substring(5))
-                                .map(String::toUpperCase)
-                                .collect(Collectors.toSet());
+                if (forcedScope == ForcedScope.SELF) {
+                        return new ReportScope(false, viewerUserId);
+                }
+
+                if (forcedScope == ForcedScope.TEAM) {
+                        return new ReportScope(true, viewerUserId);
+                }
 
                 Set<String> permissionNames = authentication.getAuthorities().stream()
                                 .map(GrantedAuthority::getAuthority)
@@ -235,20 +291,47 @@ public class ReportService {
                                 .map(String::toUpperCase)
                                 .collect(Collectors.toSet());
 
-                boolean teamScope = roleNames.stream().anyMatch(roleName ->
-                                TEAM_SCOPE_ROLES.contains(roleName)
-                                                || roleName.contains(TEAM_SCOPE_ROLE_KEYWORD))
-                                || permissionNames.stream().anyMatch(TEAM_SCOPE_PERMISSIONS::contains);
+                boolean teamScope = permissionNames.contains(TEAM_SCOPE_PERMISSION);
                 return new ReportScope(teamScope, viewerUserId);
         }
 
-        private List<Lead> getScopedLeads(ReportScope scope) {
-                List<Lead> leads = leadRepository.findAll().stream()
-                                .filter(lead -> !Boolean.TRUE.equals(lead.getIsDeleted()))
-                                .toList();
+        private UUID extractViewerUserId(Authentication authentication) {
+                Object principal = authentication.getPrincipal();
+                if (principal instanceof UUID principalUuid) {
+                        return principalUuid;
+                }
 
-                if (scope.teamScope || scope.viewerUserId == null) {
+                if (principal instanceof String principalString) {
+                        UUID parsed = tryParseUuid(principalString);
+                        if (parsed != null) {
+                                return parsed;
+                        }
+                }
+
+                return tryParseUuid(authentication.getName());
+        }
+
+        private UUID tryParseUuid(String value) {
+                if (value == null || value.isBlank()) {
+                        return null;
+                }
+
+                try {
+                        return UUID.fromString(value);
+                } catch (IllegalArgumentException ignored) {
+                        return null;
+                }
+        }
+
+        private List<Lead> getScopedLeads(ReportScope scope) {
+                List<Lead> leads = leadRepository.findAllActive(Pageable.unpaged()).getContent();
+
+                if (scope.teamScope) {
                         return leads;
+                }
+
+                if (scope.viewerUserId == null) {
+                        return List.of();
                 }
 
                 return leads.stream()
@@ -257,12 +340,14 @@ public class ReportService {
         }
 
         private List<Deal> getScopedDeals(ReportScope scope) {
-                List<Deal> deals = dealRepository.findAll().stream()
-                                .filter(deal -> !Boolean.TRUE.equals(deal.getIsDeleted()))
-                                .toList();
+                List<Deal> deals = dealRepository.findAllActive(Pageable.unpaged()).getContent();
 
-                if (scope.teamScope || scope.viewerUserId == null) {
+                if (scope.teamScope) {
                         return deals;
+                }
+
+                if (scope.viewerUserId == null) {
+                        return List.of();
                 }
 
                 return deals.stream()
@@ -271,12 +356,14 @@ public class ReportService {
         }
 
         private List<Activity> getScopedActivities(ReportScope scope) {
-                List<Activity> activities = activityRepository.findAll().stream()
-                                .filter(activity -> !Boolean.TRUE.equals(activity.getIsDeleted()))
-                                .toList();
+                List<Activity> activities = activityRepository.findAllNotDeleted(Pageable.unpaged()).getContent();
 
-                if (scope.teamScope || scope.viewerUserId == null) {
+                if (scope.teamScope) {
                         return activities;
+                }
+
+                if (scope.viewerUserId == null) {
+                        return List.of();
                 }
 
                 return activities.stream()
@@ -285,8 +372,12 @@ public class ReportService {
         }
 
         private long getScopedContactsCount(ReportScope scope) {
-                if (scope.teamScope || scope.viewerUserId == null) {
+                if (scope.teamScope) {
                         return contactRepository.findAllActive(Pageable.unpaged()).getTotalElements();
+                }
+
+                if (scope.viewerUserId == null) {
+                        return 0L;
                 }
 
                 List<Contact> contacts = contactRepository.findAllActive(Pageable.unpaged()).getContent();
@@ -296,8 +387,12 @@ public class ReportService {
         }
 
         private long getScopedAccountsCount(ReportScope scope) {
-                if (scope.teamScope || scope.viewerUserId == null) {
+                if (scope.teamScope) {
                         return accountRepository.findAllActive(Pageable.unpaged()).getTotalElements();
+                }
+
+                if (scope.viewerUserId == null) {
+                        return 0L;
                 }
 
                 List<Account> accounts = accountRepository.findAllActive(Pageable.unpaged()).getContent();
@@ -339,6 +434,24 @@ public class ReportService {
                 return activity.getCompletedAt() != null || "COMPLETED".equalsIgnoreCase(activity.getStatus());
         }
 
+        private boolean isConvertedLead(Lead lead) {
+                return Boolean.TRUE.equals(lead.getIsConverted())
+                                || "CONVERTED".equalsIgnoreCase(lead.getStatus());
+        }
+
+        private String normalizeBucketKey(String value) {
+                if (value == null) {
+                        return "UNKNOWN";
+                }
+
+                String normalized = value.trim();
+                if (normalized.isEmpty()) {
+                        return "UNKNOWN";
+                }
+
+                return normalized.toUpperCase(Locale.ROOT);
+        }
+
         private List<ReportResponse.UserPerformance> buildUserPerformance(
                         List<Lead> leads,
                         List<Deal> deals,
@@ -350,7 +463,7 @@ public class ReportService {
                         UUID userId = resolveLeadOwnerId(lead);
                         UserPerformanceAccumulator accumulator = metricsByUser.computeIfAbsent(userId, key -> new UserPerformanceAccumulator());
                         accumulator.leads++;
-                        if (Boolean.TRUE.equals(lead.getIsConverted())) {
+                        if (isConvertedLead(lead)) {
                                 accumulator.convertedLeads++;
                         }
                 }

@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { accountApi } from '../../api/crmApi'
 import { Account } from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 
 const AccountListPage: React.FC = () => {
   const navigate = useNavigate()
+  const permissions = useAuthStore((state) => state.user?.permissions)
+  const canCreate = permissions?.includes('CRM_CREATE') ?? false
+  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [accounts, setAccounts] = useState<Account[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -16,12 +20,16 @@ const AccountListPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
 
-  useEffect(() => { fetchAccounts() }, [page, pageSize])
+  useEffect(() => { fetchAccounts() }, [page, pageSize, searchQuery])
+  useEffect(() => { setPage(0); setSelectedRows(new Set()) }, [searchQuery])
 
   const fetchAccounts = async () => {
     try {
       setIsLoading(true)
-      const resp = await accountApi.getAll(page, pageSize)
+      const query = searchQuery.trim()
+      const resp = query
+        ? await accountApi.search(query, page, pageSize)
+        : await accountApi.getAll(page, pageSize)
       const data = resp.data.data
       if (data?.content) { setAccounts(data.content); setTotalPages(data.totalPages || 1); setTotalItems(data.totalElements || data.content.length) }
       else if (Array.isArray(data)) { setAccounts(data); setTotalPages(1); setTotalItems(data.length) }
@@ -31,6 +39,10 @@ const AccountListPage: React.FC = () => {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!canDelete) {
+      toast.error('You do not have permission to delete accounts')
+      return
+    }
     if (!confirm('Delete this account?')) return
     try { await accountApi.delete(id); toast.success('Account deleted'); fetchAccounts() } catch { toast.error('Failed to delete') }
   }
@@ -38,14 +50,8 @@ const AccountListPage: React.FC = () => {
   const toggleRow = (id: string) => { setSelectedRows(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   const toggleAll = () => { setSelectedRows(prev => prev.size === accounts.length ? new Set() : new Set(accounts.map(a => a.id))) }
 
-  const filtered = accounts.filter(a => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return a.name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.phone?.toLowerCase().includes(q) || a.industry?.toLowerCase().includes(q)
-  })
-
   const exportToExcel = () => {
-    const data = filtered.map(a => ({
+    const data = accounts.map(a => ({
       'Account Name': a.name ?? '',
       'Industry': a.industry ?? '',
       'Type': a.accountType ?? '',
@@ -73,10 +79,12 @@ const AccountListPage: React.FC = () => {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export
           </button>
-          <Link to="/crm/accounts/new" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            New Account
-          </Link>
+          {canCreate && (
+            <Link to="/crm/accounts/new" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              New Account
+            </Link>
+          )}
         </div>
       </div>
 
@@ -105,14 +113,16 @@ const AccountListPage: React.FC = () => {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr><td colSpan={8} className="px-4 py-16 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div></td></tr>
-              ) : filtered.length === 0 ? (
+              ) : accounts.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-16 text-center">
                   <div className="text-gray-400">
                     <p className="text-sm font-medium">No Accounts Found</p>
-                    <Link to="/crm/accounts/new" className="inline-block mt-3 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">New Account</Link>
+                    {canCreate && (
+                      <Link to="/crm/accounts/new" className="inline-block mt-3 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">New Account</Link>
+                    )}
                   </div>
                 </td></tr>
-              ) : filtered.map(account => (
+              ) : accounts.map(account => (
                 <tr key={account.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/crm/accounts/${account.id}`)}>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={selectedRows.has(account.id)} onChange={() => toggleRow(account.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
@@ -126,9 +136,11 @@ const AccountListPage: React.FC = () => {
                   <td className="px-4 py-3">{account.website ? <a href={account.website} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-indigo-600 hover:underline text-xs truncate">{account.website}</a> : '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{new Date(account.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <button onClick={e => handleDelete(account.id, e)} className="p-1 text-gray-400 hover:text-red-600 rounded transition">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    {canDelete && (
+                      <button onClick={e => handleDelete(account.id, e)} className="p-1 text-gray-400 hover:text-red-600 rounded transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

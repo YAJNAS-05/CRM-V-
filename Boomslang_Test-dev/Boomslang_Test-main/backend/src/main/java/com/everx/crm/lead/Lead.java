@@ -121,9 +121,6 @@ public class Lead extends BaseEntity {
     @Column(name = "currency", length = 3)
     private String currency;
 
-    @Column(name = "trade_show_id")
-    private UUID tradeShowId;
-
     @Column(name = "follow_up_date")
     private java.time.LocalDate followUpDate;
 }

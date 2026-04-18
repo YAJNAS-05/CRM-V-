@@ -31,7 +31,7 @@ public class QuoteService {
 
     public QuoteDto getQuoteById(UUID quoteId) {
         log.info("Fetching quote {}", quoteId);
-        Quote quote = quoteRepository.findById(quoteId)
+        Quote quote = quoteRepository.findByIdActive(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found with id: " + quoteId));
         return QuoteDto.fromEntity(quote);
     }
@@ -64,7 +64,7 @@ public class QuoteService {
 
     public QuoteDto updateQuote(UUID quoteId, UpdateQuoteRequest request) {
         log.info("Updating quote {}", quoteId);
-        Quote quote = quoteRepository.findById(quoteId)
+        Quote quote = quoteRepository.findByIdActive(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found with id: " + quoteId));
 
         if (request.getDealId() != null) {
@@ -123,7 +123,7 @@ public class QuoteService {
 
     public void deleteQuote(UUID quoteId) {
         log.info("Soft deleting quote {}", quoteId);
-        Quote quote = quoteRepository.findById(quoteId)
+        Quote quote = quoteRepository.findByIdActive(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found with id: " + quoteId));
         quote.softDelete();
         quoteRepository.save(quote);

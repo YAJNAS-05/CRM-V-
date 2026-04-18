@@ -49,6 +49,7 @@ public class RoleService {
      */
     public List<PermissionDto> getAllPermissions() {
         log.info("Fetching all available permissions");
+        ensureDashboardPermissions();
         return permissionRepository.findAllActive().stream()
                 .map(PermissionDto::fromEntity)
                 .toList();
@@ -182,6 +183,50 @@ public class RoleService {
             throw new ValidationException("name", "Role name is required");
         }
         return roleName.trim().toUpperCase();
+    }
+
+    private void ensureDashboardPermissions() {
+        upsertPermission("DASHBOARD_SELF_VIEW", "CRM", "SELF_VIEW", "View CRM user dashboard");
+        upsertPermission("DASHBOARD_TEAM_VIEW", "CRM", "TEAM_VIEW", "View CRM team dashboard");
+    }
+
+    private void upsertPermission(String key, String module, String action, String description) {
+        Permission permission = permissionRepository.findByPermissionKey(key).orElseGet(Permission::new);
+        boolean shouldSave = permission.getId() == null;
+
+        if (!key.equals(permission.getPermissionKey())) {
+            permission.setPermissionKey(key);
+            shouldSave = true;
+        }
+
+        if (!module.equals(permission.getModule())) {
+            permission.setModule(module);
+            shouldSave = true;
+        }
+
+        if (!action.equals(permission.getAction())) {
+            permission.setAction(action);
+            shouldSave = true;
+        }
+
+        if (!description.equals(permission.getDescription())) {
+            permission.setDescription(description);
+            shouldSave = true;
+        }
+
+        if (permission.getIsActive() == null || !permission.getIsActive()) {
+            permission.setIsActive(true);
+            shouldSave = true;
+        }
+
+        if (Boolean.TRUE.equals(permission.getIsDeleted())) {
+            permission.setIsDeleted(false);
+            shouldSave = true;
+        }
+
+        if (shouldSave) {
+            permissionRepository.save(permission);
+        }
     }
 
     private String getLocationCode(User.OfficeLocation location) {

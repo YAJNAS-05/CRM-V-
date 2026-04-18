@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { activityApi } from '../../api/crmApi'
-import { Activity } from '../../types/crm'
 
 const getPageContext = (pathname: string) => {
   if (pathname.startsWith('/crm/leads')) return { title: 'Leads', subtitle: 'Capture and qualify demand' }
   if (pathname.startsWith('/crm/contacts')) return { title: 'Contacts', subtitle: 'Customer and prospect network' }
   if (pathname.startsWith('/crm/deals')) return { title: 'Deals', subtitle: 'Move opportunities to close' }
   if (pathname.startsWith('/crm/accounts')) return { title: 'Accounts', subtitle: 'Customer companies and relationships' }
-  if (pathname.startsWith('/crm/activities')) return { title: 'Activities', subtitle: 'Tasks, calls, and follow-ups' }
+  if (pathname.startsWith('/crm/activities')) return { title: 'Activities', subtitle: 'Plan and track customer follow-ups' }
+  if (pathname.startsWith('/crm/quotes')) return { title: 'Quotes', subtitle: 'Proposals, pricing, and approvals' }
   if (pathname.startsWith('/erp')) return { title: 'ERP', subtitle: 'Operations and fulfillment workflows' }
   if (pathname.startsWith('/finance')) return { title: 'Finance', subtitle: 'Billing, payments, and controls' }
   if (pathname.startsWith('/fieldwork')) return { title: 'Field Work', subtitle: 'Service execution and dispatch' }
@@ -21,20 +20,17 @@ const getPageContext = (pathname: string) => {
 const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout, accessToken } = useAuthStore()
+  const { user, logout } = useAuthStore()
+  const canCreate = user?.permissions?.includes('CRM_CREATE') ?? false
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [showAvatar, setShowAvatar] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [dueActivities, setDueActivities] = useState<Activity[]>([])
   const quickRef = useRef<HTMLDivElement>(null)
   const avatarRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
   const pageContext = useMemo(() => getPageContext(location.pathname), [location.pathname])
 
-  const userPermissions = user?.permissions || []
-  const canReadActivities = userPermissions.includes('CRM_VIEW') || userPermissions.includes('REPORT_VIEW') || userPermissions.includes('DASHBOARD_VIEW')
-
-  const isDashboard = location.pathname === '/crm/dashboard' || location.pathname === '/'
+  const isDashboard = location.pathname.startsWith('/crm/dashboard') || location.pathname === '/'
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -58,52 +54,12 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
     return () => document.removeEventListener('keydown', closeMenusOnEscape)
   }, [])
 
-  // Fetch activities due soon (overdue or due within 1 day)
-  useEffect(() => {
-    if (!accessToken || !canReadActivities) {
-      setDueActivities([])
-      return
-    }
-
-    let canPoll = true
-
-    const fetchDue = async () => {
-      try {
-        const resp = await activityApi.getAll(0, 100)
-        const all: Activity[] = resp.data.data?.content || resp.data.data || []
-        const now = new Date()
-        const oneDayMs = 24 * 60 * 60 * 1000
-        const due = all.filter((a: Activity) => {
-          if (!a.dueDate || a.status === 'COMPLETED') return false
-          const dueTime = new Date(a.dueDate).getTime()
-          return dueTime - now.getTime() <= oneDayMs
-        }).sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime())
-        setDueActivities(due)
-      } catch (error) {
-        const status = (error as { response?: { status?: number } })?.response?.status
-        if (status === 401 || status === 403) {
-          canPoll = false
-          setDueActivities([])
-        }
-      }
-    }
-
-    fetchDue()
-
-    const interval = setInterval(() => {
-      if (canPoll) {
-        void fetchDue()
-      }
-    }, 60000) // refresh every minute
-
-    return () => clearInterval(interval)
-  }, [accessToken, canReadActivities])
-
   const quickCreateItems = [
     { label: 'Lead', href: '/crm/leads/new', iconPath: 'M15 7a3 3 0 11-6 0 3 3 0 016 0zM5 20a7 7 0 0114 0' },
     { label: 'Contact', href: '/crm/contacts/new', iconPath: 'M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M16 7a4 4 0 11-8 0 4 4 0 018 0z' },
     { label: 'Deal', href: '/crm/deals/new', iconPath: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m9-6a9 9 0 11-18 0 9 9 0 0118 0z' },
     { label: 'Account', href: '/crm/accounts/new', iconPath: 'M3 21h18M5 21V7l8-4 8 4v14M9 9h2m4 0h2m-8 4h2m4 0h2' },
+    { label: 'Quote', href: '/crm/quotes/new', iconPath: 'M7 7h10M7 11h10M7 15h6M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H7l-4 3v-3H5a2 2 0 01-2-2V5a2 2 0 012-2z' },
   ]
 
   const handleLogout = () => {
@@ -145,7 +101,7 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-        {isDashboard && (
+        {isDashboard && canCreate && (
           <div className="relative" ref={quickRef}>
             <button
               type="button"
@@ -191,59 +147,18 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            {dueActivities.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                {dueActivities.length > 9 ? '9+' : dueActivities.length}
-              </span>
-            )}
           </button>
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-[20rem] rounded-lg border border-slate-200 bg-white shadow-lg z-50">
               <div className="border-b border-slate-100 px-4 py-3">
                 <p className="text-sm font-semibold text-slate-900">Notifications</p>
-                <p className="text-xs text-slate-400">{dueActivities.length} activity reminder{dueActivities.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-slate-400">No new notifications</p>
               </div>
               <div className="max-h-72 overflow-y-auto">
-                {dueActivities.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-slate-400">No upcoming reminders</p>
-                  </div>
-                ) : (
-                  dueActivities.map((act) => {
-                    const isOverdue = new Date(act.dueDate!).getTime() < Date.now()
-                    return (
-                      <button
-                        key={act.id}
-                        onClick={() => { setShowNotifications(false); navigate('/crm/activities') }}
-                        className="w-full border-b border-slate-50 px-4 py-3 text-left transition hover:bg-slate-50"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${isOverdue ? 'bg-red-500' : 'bg-amber-400'}`} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-900 truncate">{act.subject || act.type}</p>
-                            <p className="mt-0.5 text-xs text-slate-500">
-                              {act.type} &middot; Due {new Date(act.dueDate!).toLocaleDateString()}
-                            </p>
-                            <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {isOverdue ? 'Overdue' : 'Due Soon'}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-              {dueActivities.length > 0 && (
-                  <div className="border-t border-slate-100 px-4 py-2.5">
-                  <button
-                    onClick={() => { setShowNotifications(false); navigate('/crm/activities') }}
-                      className="w-full text-center text-xs font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    View all activities →
-                  </button>
+                <div className="py-8 text-center">
+                  <p className="text-sm text-slate-400">No upcoming reminders</p>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>

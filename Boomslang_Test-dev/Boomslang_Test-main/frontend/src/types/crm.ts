@@ -337,30 +337,3 @@ export interface ReportActivity {
   overdueActivities: number
   activitiesByType: Record<string, number>
 }
-
-export interface TradeShow {
-  id: string
-  name: string
-  location?: string
-  country?: string
-  startDate: string
-  endDate: string
-  attendees?: string[]
-  leadsCaptured?: number
-  estimatedRoi?: number
-  notes?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateTradeShowRequest {
-  name: string
-  location?: string
-  country?: string
-  startDate: string
-  endDate: string
-  attendees?: string[]
-  leadsCaptured?: number
-  estimatedRoi?: number
-  notes?: string
-}

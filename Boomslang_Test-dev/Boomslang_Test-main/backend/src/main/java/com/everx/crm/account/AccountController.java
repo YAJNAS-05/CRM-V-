@@ -37,7 +37,7 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.ok(accounts, "Accounts retrieved successfully"));
     }
 
-    @GetMapping("/{accountId}")
+    @GetMapping("/{accountId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<AccountDto>> getAccountById(@PathVariable UUID accountId) {
         log.info("GET /api/v1/crm/accounts/{}", accountId);
@@ -63,7 +63,7 @@ public class AccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(account, "Account created successfully"));
     }
 
-    @PutMapping("/{accountId}")
+    @PutMapping("/{accountId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<AccountDto>> updateAccount(
             @PathVariable UUID accountId,
@@ -73,7 +73,7 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.ok(account, "Account updated successfully"));
     }
 
-    @DeleteMapping("/{accountId}")
+    @DeleteMapping("/{accountId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable UUID accountId) {
         log.info("DELETE /api/v1/crm/accounts/{}", accountId);

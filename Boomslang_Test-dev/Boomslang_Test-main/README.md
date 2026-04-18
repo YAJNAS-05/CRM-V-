@@ -42,6 +42,7 @@
 - [Security](#security)
 - [Getting Started](#getting-started)
 - [Deployment](#deployment)
+- [Documentation Index](#documentation-index)
 
 ---
 
@@ -934,6 +935,19 @@ VITE_API_URL=http://localhost:8080/api
 ### Environments
 - **Staging**: Auto-deploys from `develop` branch
 - **Production**: Manual approval from `main` branch
+
+---
+
+## Documentation Index
+
+Project documents were reorganized for maintainability. Use the index below to find guides quickly:
+
+- `docs/README.md` — full document map
+- `docs/getting-started/` — setup and startup references
+- `docs/guides/` — implementation and usage guides
+- `docs/reports/` — verification, fixes, and delivery reports
+- `docs/product/` — product planning and enhancement notes
+- `docs/prompts/` — development prompt artifacts
 
 ---
 

@@ -54,10 +54,6 @@ public class RbacDataInitializer implements ApplicationRunner {
                 new PermissionSeed("ROLE_DELETE", "ROLE", "DELETE", "Delete roles"),
                 new PermissionSeed("ROLE_ASSIGN_PERMISSION", "ROLE", "ASSIGN_PERMISSION", "Assign permissions to roles"),
 
-                new PermissionSeed("AUDIT_VIEW", "AUDIT", "VIEW", "View audit logs"),
-                new PermissionSeed("ERP_MAPPING_VIEW", "ERP_MAPPING", "VIEW", "View ERP mappings"),
-                new PermissionSeed("ERP_MAPPING_EDIT", "ERP_MAPPING", "EDIT", "Create and edit ERP mappings"),
-
                 new PermissionSeed("CRM_VIEW", "CRM", "VIEW", "View CRM data"),
                 new PermissionSeed("CRM_CREATE", "CRM", "CREATE", "Create CRM records"),
                 new PermissionSeed("CRM_EDIT", "CRM", "EDIT", "Edit CRM records"),
@@ -80,7 +76,9 @@ public class RbacDataInitializer implements ApplicationRunner {
                 new PermissionSeed("REPORT_VIEW", "REPORT", "VIEW", "View reports"),
                 new PermissionSeed("REPORT_EXPORT", "REPORT", "EXPORT", "Export reports"),
 
-                new PermissionSeed("DASHBOARD_VIEW", "DASHBOARD", "VIEW", "View dashboard")
+                new PermissionSeed("DASHBOARD_VIEW", "CRM", "VIEW", "View CRM dashboard"),
+                new PermissionSeed("DASHBOARD_SELF_VIEW", "CRM", "SELF_VIEW", "View CRM user dashboard"),
+                new PermissionSeed("DASHBOARD_TEAM_VIEW", "CRM", "TEAM_VIEW", "View CRM team dashboard")
         );
 
         for (PermissionSeed seed : seeds) {
@@ -94,7 +92,40 @@ public class RbacDataInitializer implements ApplicationRunner {
             permissionRepository.save(permission);
         }
 
+        deactivateDeprecatedPermissions(Set.of("AUDIT_VIEW", "ERP_MAPPING_VIEW", "ERP_MAPPING_EDIT"));
+
         log.info("RBAC permissions seeded/verified: {}", seeds.size());
+    }
+
+    private void deactivateDeprecatedPermissions(Set<String> deprecatedKeys) {
+        int deactivatedCount = 0;
+
+        for (String key : deprecatedKeys) {
+            Permission permission = permissionRepository.findByPermissionKey(key).orElse(null);
+            if (permission == null) {
+                continue;
+            }
+
+            boolean changed = false;
+            if (Boolean.TRUE.equals(permission.getIsActive())) {
+                permission.setIsActive(false);
+                changed = true;
+            }
+
+            if (Boolean.FALSE.equals(permission.getIsDeleted())) {
+                permission.setIsDeleted(true);
+                changed = true;
+            }
+
+            if (changed) {
+                permissionRepository.save(permission);
+                deactivatedCount++;
+            }
+        }
+
+        if (deactivatedCount > 0) {
+            log.info("RBAC deprecated permissions deactivated: {}", deactivatedCount);
+        }
     }
 
     private Map<String, Role> seedSystemRoles() {
@@ -175,26 +206,26 @@ public class RbacDataInitializer implements ApplicationRunner {
         }
 
         Set<String> viewerSet = Set.of(
-                "CRM_VIEW", "ERP_VIEW", "FINANCE_VIEW", "FIELDWORK_VIEW", "REPORT_VIEW", "DASHBOARD_VIEW"
+            "CRM_VIEW", "ERP_VIEW", "FINANCE_VIEW", "FIELDWORK_VIEW", "REPORT_VIEW", "DASHBOARD_SELF_VIEW"
         );
 
         Map<String, Set<String>> matrix = new LinkedHashMap<>();
         matrix.put(User.UserRole.SUPER_ADMIN.name(), all);
         matrix.put(User.UserRole.ADMIN.name(), all);
         matrix.put(User.UserRole.MANAGER.name(), Set.of(
-                "CRM_VIEW", "CRM_EDIT", "ERP_VIEW", "FINANCE_VIEW", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_VIEW"
+            "CRM_VIEW", "CRM_EDIT", "ERP_VIEW", "FINANCE_VIEW", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_SELF_VIEW", "DASHBOARD_TEAM_VIEW"
         ));
         matrix.put(User.UserRole.SALES_MANAGER.name(), Set.of(
-                "CRM_VIEW", "CRM_CREATE", "CRM_EDIT", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_VIEW"
+            "CRM_VIEW", "CRM_CREATE", "CRM_EDIT", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_SELF_VIEW", "DASHBOARD_TEAM_VIEW"
         ));
         matrix.put(User.UserRole.SALES_REP.name(), Set.of(
-                "CRM_VIEW", "CRM_CREATE", "CRM_EDIT", "DASHBOARD_VIEW"
+            "CRM_VIEW", "CRM_CREATE", "CRM_EDIT", "DASHBOARD_SELF_VIEW"
         ));
         matrix.put(User.UserRole.FINANCE.name(), Set.of(
-                "FINANCE_VIEW", "FINANCE_CREATE", "FINANCE_EDIT", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_VIEW"
+            "FINANCE_VIEW", "FINANCE_CREATE", "FINANCE_EDIT", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_SELF_VIEW"
         ));
         matrix.put(User.UserRole.SERVICE_TECH.name(), Set.of(
-                "ERP_VIEW", "ERP_EDIT", "FIELDWORK_VIEW", "FIELDWORK_CREATE", "FIELDWORK_EDIT", "DASHBOARD_VIEW"
+            "ERP_VIEW", "ERP_EDIT", "FIELDWORK_VIEW", "FIELDWORK_CREATE", "FIELDWORK_EDIT"
         ));
         matrix.put(User.UserRole.VIEWER.name(), viewerSet);
         matrix.put(User.UserRole.READ_ONLY.name(), viewerSet);

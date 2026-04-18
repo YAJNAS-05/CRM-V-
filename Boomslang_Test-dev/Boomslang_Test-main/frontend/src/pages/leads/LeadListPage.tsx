@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { leadApi } from '../../api/crmApi'
 import { Lead } from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 
@@ -14,10 +15,14 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUSES = ['', 'NEW', 'CONTACTED', 'QUALIFIED', 'UNQUALIFIED', 'CONVERTED']
-const SOURCES = ['', 'WEB', 'REFERRAL', 'COLD_CALL', 'EMAIL_CAMPAIGN', 'SOCIAL_MEDIA', 'TRADE_SHOW', 'OTHER']
+const SOURCES = ['', 'WEB', 'REFERRAL', 'COLD_CALL', 'EMAIL_CAMPAIGN', 'SOCIAL_MEDIA', 'OTHER']
 
 const LeadListPage: React.FC = () => {
   const navigate = useNavigate()
+  const permissions = useAuthStore((state) => state.user?.permissions)
+  const canCreate = permissions?.includes('CRM_CREATE') ?? false
+  const canEdit = permissions?.includes('CRM_EDIT') ?? false
+  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [leads, setLeads] = useState<Lead[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -31,16 +36,20 @@ const LeadListPage: React.FC = () => {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
 
-  useEffect(() => { fetchLeads() }, [page, pageSize, statusFilter])
+  useEffect(() => { fetchLeads() }, [page, pageSize, statusFilter, sourceFilter, searchQuery, sortField, sortDir])
+  useEffect(() => { setPage(0); setSelectedRows(new Set()) }, [statusFilter, sourceFilter, searchQuery])
+  useEffect(() => {
+    setSelectedRows((prev) => new Set(Array.from(prev).filter((id) => leads.some((lead) => lead.id === id))))
+  }, [leads])
 
   const fetchLeads = async () => {
     try {
       setIsLoading(true)
-      let url = `/v1/crm/leads?page=${page}&size=${pageSize}&sort=${sortField},${sortDir}`
-      if (statusFilter) url = `/v1/crm/leads/status/${statusFilter}?page=${page}&size=${pageSize}`
-      const resp = statusFilter
-        ? await leadApi.getByStatus(statusFilter, page, pageSize)
-        : await leadApi.getAll(page, pageSize)
+      const query = searchQuery.trim()
+      const shouldSearch = query.length > 0 || statusFilter.length > 0 || sourceFilter.length > 0
+      const resp = shouldSearch
+        ? await leadApi.search(query, page, pageSize, sortField, sortDir, statusFilter || undefined, sourceFilter || undefined)
+        : await leadApi.getAll(page, pageSize, sortField, sortDir)
       const data = resp.data.data
       if (data?.content) {
         setLeads(data.content)
@@ -58,6 +67,10 @@ const LeadListPage: React.FC = () => {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!canDelete) {
+      toast.error('You do not have permission to delete leads')
+      return
+    }
     if (!confirm('Delete this lead?')) return
     try {
       await leadApi.delete(id)
@@ -71,23 +84,98 @@ const LeadListPage: React.FC = () => {
   }
 
   const toggleAll = () => {
-    setSelectedRows(prev => prev.size === leads.length ? new Set() : new Set(leads.map(l => l.id)))
+    setSelectedRows((prev) => {
+      const visibleIds = leads.map((lead) => lead.id)
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id))
+      const next = new Set(prev)
+
+      visibleIds.forEach((id) => {
+        if (allVisibleSelected) next.delete(id)
+        else next.add(id)
+      })
+
+      return next
+    })
   }
 
-  const filtered = leads.filter(l => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return `${l.firstName} ${l.lastName}`.toLowerCase().includes(q)
-      || l.email?.toLowerCase().includes(q)
-      || l.company?.toLowerCase().includes(q)
-      || l.phone?.toLowerCase().includes(q)
-  })
+  const selectedLeadIds = leads.filter((lead) => selectedRows.has(lead.id)).map((lead) => lead.id)
+  const allFilteredSelected = leads.length > 0 && leads.every((lead) => selectedRows.has(lead.id))
+
+  const handleBulkAssign = async () => {
+    if (!canEdit) {
+      toast.error('You do not have permission to edit leads')
+      return
+    }
+    if (selectedLeadIds.length === 0) return
+
+    const ownerId = prompt('Enter owner user ID (UUID) to assign selected leads:')?.trim()
+    if (!ownerId) return
+
+    const results = await Promise.allSettled(selectedLeadIds.map((id) => leadApi.update(id, { ownerId })))
+    const success = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - success
+
+    if (success > 0) {
+      toast.success(`Assigned ${success} lead${success === 1 ? '' : 's'}`)
+      fetchLeads()
+    }
+    if (failed > 0) toast.error(`Failed to assign ${failed} lead${failed === 1 ? '' : 's'}`)
+    setSelectedRows(new Set())
+  }
+
+  const handleBulkStatusChange = async () => {
+    if (!canEdit) {
+      toast.error('You do not have permission to edit leads')
+      return
+    }
+    if (selectedLeadIds.length === 0) return
+
+    const allowedStatuses = STATUSES.filter(Boolean)
+    const nextStatus = prompt(`Enter new status (${allowedStatuses.join(', ')}):`)?.trim().toUpperCase()
+    if (!nextStatus) return
+
+    if (!allowedStatuses.includes(nextStatus)) {
+      toast.error('Invalid status')
+      return
+    }
+
+    const results = await Promise.allSettled(selectedLeadIds.map((id) => leadApi.update(id, { status: nextStatus })))
+    const success = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - success
+
+    if (success > 0) {
+      toast.success(`Updated ${success} lead${success === 1 ? '' : 's'}`)
+      fetchLeads()
+    }
+    if (failed > 0) toast.error(`Failed to update ${failed} lead${failed === 1 ? '' : 's'}`)
+    setSelectedRows(new Set())
+  }
+
+  const handleBulkDelete = async () => {
+    if (!canDelete) {
+      toast.error('You do not have permission to delete leads')
+      return
+    }
+    if (selectedLeadIds.length === 0) return
+    if (!confirm(`Delete ${selectedLeadIds.length} selected lead${selectedLeadIds.length === 1 ? '' : 's'}?`)) return
+
+    const results = await Promise.allSettled(selectedLeadIds.map((id) => leadApi.delete(id)))
+    const success = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - success
+
+    if (success > 0) {
+      toast.success(`Deleted ${success} lead${success === 1 ? '' : 's'}`)
+      fetchLeads()
+    }
+    if (failed > 0) toast.error(`Failed to delete ${failed} lead${failed === 1 ? '' : 's'}`)
+    setSelectedRows(new Set())
+  }
 
   const from = page * pageSize + 1
   const to = Math.min((page + 1) * pageSize, totalItems)
 
   const exportToExcel = () => {
-    const data = filtered.map(l => ({
+    const data = leads.map(l => ({
       'Name': `${l.firstName ?? ''} ${l.lastName ?? ''}`.trim(),
       'Company': l.company ?? '',
       'Email': l.email ?? '',
@@ -118,10 +206,12 @@ const LeadListPage: React.FC = () => {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export
           </button>
-          <Link to="/crm/leads/new" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            New Lead
-          </Link>
+          {canCreate && (
+            <Link to="/crm/leads/new" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              New Lead
+            </Link>
+          )}
         </div>
       </div>
 
@@ -153,13 +243,19 @@ const LeadListPage: React.FC = () => {
       </div>
 
       {/* Bulk Actions Bar */}
-      {selectedRows.size > 0 && (
+      {selectedLeadIds.length > 0 && (canEdit || canDelete) && (
         <div className="bg-indigo-50 rounded-lg p-3 mb-4 flex items-center justify-between">
-          <span className="text-sm text-indigo-700 font-medium">{selectedRows.size} selected</span>
+          <span className="text-sm text-indigo-700 font-medium">{selectedLeadIds.length} selected</span>
           <div className="flex gap-2">
-            <button className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 rounded border hover:bg-gray-50">Assign To</button>
-            <button className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 rounded border hover:bg-gray-50">Change Status</button>
-            <button className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">Delete</button>
+            {canEdit && (
+              <>
+                <button onClick={handleBulkAssign} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 rounded border hover:bg-gray-50">Assign To</button>
+                <button onClick={handleBulkStatusChange} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 rounded border hover:bg-gray-50">Change Status</button>
+              </>
+            )}
+            {canDelete && (
+              <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">Delete</button>
+            )}
           </div>
         </div>
       )}
@@ -171,7 +267,7 @@ const LeadListPage: React.FC = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="w-10 px-4 py-3">
-                  <input type="checkbox" checked={selectedRows.size === leads.length && leads.length > 0} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                  <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:text-gray-900" onClick={() => { setSortField('firstName'); setSortDir(d => d === 'asc' ? 'desc' : 'asc') }}>Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
@@ -188,16 +284,18 @@ const LeadListPage: React.FC = () => {
                 <tr><td colSpan={9} className="px-4 py-16 text-center text-gray-400">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
                 </td></tr>
-              ) : filtered.length === 0 ? (
+              ) : leads.length === 0 ? (
                 <tr><td colSpan={9} className="px-4 py-16 text-center">
                   <div className="text-gray-400">
                     <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     <p className="text-sm font-medium">No Leads Found</p>
                     <p className="text-xs mt-1">Get started by adding your first lead.</p>
-                    <Link to="/crm/leads/new" className="inline-block mt-3 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">New Lead</Link>
+                    {canCreate && (
+                      <Link to="/crm/leads/new" className="inline-block mt-3 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">New Lead</Link>
+                    )}
                   </div>
                 </td></tr>
-              ) : filtered.map((lead) => (
+              ) : leads.map((lead) => (
                 <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/crm/leads/${lead.id}`)}>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selectedRows.has(lead.id)} onChange={() => toggleRow(lead.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
@@ -220,9 +318,11 @@ const LeadListPage: React.FC = () => {
                   <td className="px-4 py-3 text-gray-600 text-xs">{lead.leadSource?.replace('_', ' ') || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{new Date(lead.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={(e) => handleDelete(lead.id, e)} className="p-1 text-gray-400 hover:text-red-600 rounded transition">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    {canDelete && (
+                      <button onClick={(e) => handleDelete(lead.id, e)} className="p-1 text-gray-400 hover:text-red-600 rounded transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -241,9 +341,13 @@ const LeadListPage: React.FC = () => {
             </div>
             <div className="flex gap-1">
               <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => (
-                <button key={i} onClick={() => setPage(i)} className={`px-3 py-1.5 text-xs font-medium border rounded ${page === i ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 hover:bg-gray-100'}`}>{i + 1}</button>
-              ))}
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const startPage = Math.max(0, Math.min(page - 2, totalPages - 5))
+                const pageIndex = startPage + i
+                return (
+                  <button key={pageIndex} onClick={() => setPage(pageIndex)} className={`px-3 py-1.5 text-xs font-medium border rounded ${page === pageIndex ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 hover:bg-gray-100'}`}>{pageIndex + 1}</button>
+                )
+              })}
               <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
             </div>
           </div>

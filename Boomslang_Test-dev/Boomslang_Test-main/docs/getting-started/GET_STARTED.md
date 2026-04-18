@@ -161,71 +161,71 @@ SELECT * FROM everx_crm.contacts;
 
 ## 🔗 API Endpoints (All Real)
 
-Base: `http://localhost:8080/api/v1`
+Base: `http://localhost:8080`
 
 ### Authentication
 ```
-POST   /auth/login           - Login user
-POST   /auth/refresh         - Refresh JWT token
-POST   /auth/logout          - Logout user
-GET    /auth/me              - Get current user
+POST   /api/v1/auth/login           - Login user
+POST   /api/v1/auth/refresh         - Refresh JWT token
+POST   /api/v1/auth/logout          - Logout user
+GET    /api/v1/auth/me              - Get current user
 ```
 
 ### Contacts
 ```
-GET    /crm/contacts                    - List all contacts
-GET    /crm/contacts/{id}               - Get contact details
-POST   /crm/contacts                    - Create contact
-PUT    /crm/contacts/{id}               - Update contact
-DELETE /crm/contacts/{id}               - Delete contact
+GET    /api/v1/crm/contacts                    - List all contacts
+GET    /api/v1/crm/contacts/{id}               - Get contact details
+POST   /api/v1/crm/contacts                    - Create contact
+PUT    /api/v1/crm/contacts/{id}               - Update contact
+DELETE /api/v1/crm/contacts/{id}               - Delete contact
 ```
 
 ### Accounts
 ```
-GET    /crm/accounts                    - List accounts
-POST   /crm/accounts                    - Create account
-PUT    /crm/accounts/{id}               - Update account
-DELETE /crm/accounts/{id}               - Delete account
+GET    /api/v1/crm/accounts                    - List accounts
+POST   /api/v1/crm/accounts                    - Create account
+PUT    /api/v1/crm/accounts/{id}               - Update account
+DELETE /api/v1/crm/accounts/{id}               - Delete account
 ```
 
 ### Deals
 ```
-GET    /crm/deals                       - List deals
-GET    /crm/deals/{id}                  - Get deal details
-POST   /crm/deals                       - Create deal
-PUT    /crm/deals/{id}                  - Update deal
-DELETE /crm/deals/{id}                  - Delete deal
+GET    /api/v1/crm/deals                       - List deals
+GET    /api/v1/crm/deals/{id}                  - Get deal details
+POST   /api/v1/crm/deals                       - Create deal
+PUT    /api/v1/crm/deals/{id}                  - Update deal
+DELETE /api/v1/crm/deals/{id}                  - Delete deal
 ```
 
 ### Invoices
 ```
-GET    /finance/invoices                - List invoices
-POST   /finance/invoices                - Create invoice
-GET    /finance/invoices/{id}           - Get invoice details
-PUT    /finance/invoices/{id}           - Update invoice
-DELETE /finance/invoices/{id}           - Delete invoice
+GET    /api/v1/finance/invoices                - List invoices
+POST   /api/v1/finance/invoices                - Create invoice
+GET    /api/v1/finance/invoices/{id}           - Get invoice details
+PUT    /api/v1/finance/invoices/{id}           - Update invoice
+DELETE /api/v1/finance/invoices/{id}           - Delete invoice
 ```
 
 ### Payments
 ```
-GET    /finance/payments                - List payments
-POST   /finance/payments                - Create payment
+GET    /api/v1/finance/payments                - List payments
+POST   /api/v1/finance/payments                - Create payment
 ```
 
 ### Reports
 ```
-GET    /finance/reports/dashboard       - Dashboard KPIs
-GET    /finance/reports/sales           - Sales report
-GET    /finance/reports/ar-aging        - AR aging report
-GET    /finance/reports/p-l             - P&L report
-GET    /finance/reports/cash-flow       - Cash flow report
+GET    /api/v1/finance/reports/dashboard       - Dashboard KPIs
+GET    /api/v1/finance/reports/sales           - Sales report
+GET    /api/v1/finance/reports/ar-aging        - AR aging report
+GET    /api/v1/finance/reports/p-l             - P&L report
+GET    /api/v1/finance/reports/cash-flow       - Cash flow report
 ```
 
 ### Admin
 ```
-GET    /admin/users                     - List users
-GET    /admin/dashboard                 - Admin dashboard
-GET    /admin/audit-logs                - Audit logs
+GET    /api/v1/admin/users                     - List users
+GET    /api/v1/admin/dashboard                 - Admin dashboard
+GET    /api/v1/admin/audit-logs                - Audit logs
 ```
 
 ---

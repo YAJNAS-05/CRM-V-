@@ -15,6 +15,12 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
+type DashboardMode = 'AUTO' | 'SELF' | 'TEAM'
+
+interface DashboardPageProps {
+  mode?: DashboardMode
+}
+
 const LEAD_STATUS_COLORS: Record<string, string> = {
   NEW: '#3b82f6', CONTACTED: '#f59e0b', QUALIFIED: '#10b981', UNQUALIFIED: '#ef4444', CONVERTED: '#8b5cf6',
 }
@@ -38,7 +44,7 @@ const formatCompact = (raw: number) => {
   return `${val}`
 }
 
-const DashboardPage: React.FC = () => {
+const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
   const user = useAuthStore((state) => state.user)
 
   const [kpi, setKpi] = useState<ReportDashboardKPIs | null>(null)
@@ -46,6 +52,18 @@ const DashboardPage: React.FC = () => {
   const [conversion, setConversion] = useState<ReportConversion | null>(null)
   const [activities, setActivities] = useState<ReportActivity | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const userPermissions = user?.permissions || []
+
+  const canViewUserDashboard = useMemo(
+    () => userPermissions.includes('DASHBOARD_SELF_VIEW'),
+    [userPermissions]
+  )
+
+  const canViewTeamDashboard = useMemo(
+    () => userPermissions.includes('DASHBOARD_TEAM_VIEW'),
+    [userPermissions]
+  )
 
   const userRoles = useMemo(() => {
     if (!user) return []
@@ -59,13 +77,45 @@ const DashboardPage: React.FC = () => {
 
   const teamRows = (kpi?.userPerformance ?? []) as ReportUserPerformance[]
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [mode])
+
+  const getReportCallsForMode = () => {
+    if (mode === 'TEAM') {
+      return {
+        dashboard: reportApi.getDashboardTeam,
+        pipeline: reportApi.getPipelineTeam,
+        conversion: reportApi.getConversionTeam,
+        activities: reportApi.getActivitiesTeam,
+      }
+    }
+
+    if (mode === 'SELF') {
+      return {
+        dashboard: reportApi.getDashboardUser,
+        pipeline: reportApi.getPipelineUser,
+        conversion: reportApi.getConversionUser,
+        activities: reportApi.getActivitiesUser,
+      }
+    }
+
+    return {
+      dashboard: reportApi.getDashboard,
+      pipeline: reportApi.getPipeline,
+      conversion: reportApi.getConversion,
+      activities: reportApi.getActivities,
+    }
+  }
 
   const fetchData = async () => {
     try {
       setIsLoading(true)
+      setKpi(null)
+      setPipeline(null)
+      setConversion(null)
+      setActivities(null)
+      const scopedCalls = getReportCallsForMode()
       const [d, p, c, a] = await Promise.allSettled([
-        reportApi.getDashboard(), reportApi.getPipeline(), reportApi.getConversion(), reportApi.getActivities(),
+        scopedCalls.dashboard(), scopedCalls.pipeline(), scopedCalls.conversion(), scopedCalls.activities(),
       ])
       if (d.status === 'fulfilled' && d.value.data.data) setKpi(d.value.data.data)
       if (p.status === 'fulfilled' && p.value.data.data) setPipeline(p.value.data.data)
@@ -83,14 +133,17 @@ const DashboardPage: React.FC = () => {
     </div>
   )
 
-  const scopeLabel = kpi?.visibilityScope ?? (isManagerRole ? 'TEAM' : 'SELF')
+  const scopeLabel = kpi?.visibilityScope ?? (mode === 'TEAM' ? 'TEAM' : mode === 'SELF' ? 'SELF' : (isManagerRole ? 'TEAM' : 'SELF'))
+  const selectedDashboardMode = mode === 'AUTO' ? scopeLabel : mode
   const topPerformer = teamRows.length > 0 ? teamRows[0] : null
   const trackedMembers = kpi?.teamMemberCount ?? teamRows.filter((row) => Boolean(row.userId)).length
 
   const totalTeamActivities = teamRows.reduce((sum, row) => sum + row.activities, 0)
+  const totalTeamLeads = teamRows.reduce((sum, row) => sum + row.leads, 0)
+  const totalTeamConvertedLeads = teamRows.reduce((sum, row) => sum + row.convertedLeads, 0)
   const avgLeadConversion =
-    teamRows.length > 0
-      ? teamRows.reduce((sum, row) => sum + row.leadConversionRate, 0) / teamRows.length
+    totalTeamLeads > 0
+      ? (totalTeamConvertedLeads / totalTeamLeads) * 100
       : 0
   const avgPipelinePerUser = trackedMembers > 0
     ? Number(kpi?.totalPipelineValue || 0) / trackedMembers
@@ -140,6 +193,27 @@ const DashboardPage: React.FC = () => {
                   ? 'Manager view with full CRM team coverage, user-wise accountability, and stage-level trends.'
                   : 'Personal view showing only your own CRM performance, pipeline movement, and pending execution.'}
           </p>
+
+              {(canViewUserDashboard || canViewTeamDashboard) && (
+                <div className="mt-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  {canViewUserDashboard && (
+                    <Link
+                      to="/crm/dashboard/user"
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedDashboardMode === 'SELF' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      User Dashboard
+                    </Link>
+                  )}
+                  {canViewTeamDashboard && (
+                    <Link
+                      to="/crm/dashboard/team"
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedDashboardMode === 'TEAM' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Team Dashboard
+                    </Link>
+                  )}
+                </div>
+              )}
         </div>
             <ScopePill scope={scopeLabel} />
           </div>
@@ -362,7 +436,7 @@ const DashboardPage: React.FC = () => {
           ) : <Empty />}
         </ChartCard>
 
-        <ChartCard title="Activity Summary" action={<Link to="/crm/activities" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">View all →</Link>}>
+        <ChartCard title="Activity Summary" action={<Link to="/reports" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">View reports →</Link>}>
           {activities ? (
             <div>
               <div className="grid grid-cols-2 gap-3 mb-4">

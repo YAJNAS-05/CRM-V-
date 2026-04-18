@@ -3,6 +3,7 @@ package com.everx.crm.deal;
 import com.everx.crm.deal.dto.CreateDealRequest;
 import com.everx.crm.deal.dto.DealDto;
 import com.everx.crm.deal.dto.UpdateDealRequest;
+import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,18 +29,26 @@ public class DealService {
         return dealRepository.findAllActive(pageable).map(DealDto::fromEntity);
     }
 
+    public Page<DealDto> searchDeals(String query, DealStage stage, Pageable pageable) {
+        String normalizedQuery = query != null ? query.trim() : null;
+        log.info("Searching deals with query {} stage {}", normalizedQuery, stage);
+        return dealRepository.search(normalizedQuery, stage, pageable).map(DealDto::fromEntity);
+    }
+
     /**
      * Get deal by ID
      */
     public DealDto getDealById(@NonNull UUID dealId) {
         log.info("Fetching deal {}", dealId);
-        Deal deal = dealRepository.findById(dealId)
+        Deal deal = dealRepository.findByIdActive(dealId)
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + dealId));
         return DealDto.fromEntity(deal);
     }
 
     public DealDto createDeal(@NonNull CreateDealRequest request) {
         log.info("Creating deal {}", request.getName());
+        UUID ownerId = request.getOwnerId() != null ? request.getOwnerId() : SecurityUserContext.getCurrentUserIdOrNull();
+
         Deal deal = Deal.builder()
                 .name(request.getName())
                 .stage(request.getStage() != null ? request.getStage() : DealStage.PROSPECTING)
@@ -52,7 +61,7 @@ public class DealService {
                 .description(request.getDescription())
                 .nextStep(request.getNextStep())
                 .campaignSource(request.getCampaignSource())
-                .ownerId(request.getOwnerId())
+                .ownerId(ownerId)
                 .build();
         Deal savedDeal = dealRepository.save(deal);
         return DealDto.fromEntity(Objects.requireNonNull(savedDeal, "Saved deal is null"));
@@ -63,7 +72,7 @@ public class DealService {
      */
     public DealDto updateDeal(@NonNull UUID dealId, @NonNull UpdateDealRequest request) {
         log.info("Updating deal {}", dealId);
-        Deal deal = dealRepository.findById(dealId)
+        Deal deal = dealRepository.findByIdActive(dealId)
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + dealId));
 
         if (request.getName() != null) deal.setName(request.getName());
@@ -87,7 +96,7 @@ public class DealService {
 
     public void deleteDeal(@NonNull UUID dealId) {
         log.info("Soft deleting deal {}", dealId);
-        Deal deal = dealRepository.findById(dealId)
+        Deal deal = dealRepository.findByIdActive(dealId)
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + dealId));
         deal.softDelete();
         dealRepository.save(deal);

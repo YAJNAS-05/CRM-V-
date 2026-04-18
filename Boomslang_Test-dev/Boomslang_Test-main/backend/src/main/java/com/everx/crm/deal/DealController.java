@@ -42,7 +42,7 @@ public class DealController {
         return ResponseEntity.ok(ApiResponse.ok(deals, "Deals retrieved successfully"));
     }
 
-    @GetMapping("/{dealId}")
+    @GetMapping("/{dealId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<DealDto>> getDealById(@PathVariable @NonNull UUID dealId) {
         log.info("GET /api/v1/crm/deals/{}", dealId);
@@ -70,6 +70,17 @@ public class DealController {
         return ResponseEntity.ok(ApiResponse.ok(deals, "Deals retrieved successfully"));
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
+    public ResponseEntity<ApiResponse<Page<DealDto>>> searchDeals(
+            @RequestParam("q") String query,
+            @RequestParam(value = "stage", required = false) DealStage stage,
+            @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        log.info("GET /api/v1/crm/deals/search?q={}&stage={}", query, stage);
+        Page<DealDto> deals = dealService.searchDeals(query, stage, Objects.requireNonNull(pageable));
+        return ResponseEntity.ok(ApiResponse.ok(deals, "Deals search results"));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<DealDto>> createDeal(@Valid @RequestBody CreateDealRequest request) {
@@ -78,7 +89,7 @@ public class DealController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(deal, "Deal created successfully"));
     }
 
-    @PutMapping("/{dealId}")
+    @PutMapping("/{dealId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<DealDto>> updateDeal(
             @PathVariable @NonNull UUID dealId,
@@ -88,7 +99,7 @@ public class DealController {
         return ResponseEntity.ok(ApiResponse.ok(deal, "Deal updated successfully"));
     }
 
-    @DeleteMapping("/{dealId}")
+    @DeleteMapping("/{dealId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteDeal(@PathVariable @NonNull UUID dealId) {
         log.info("DELETE /api/v1/crm/deals/{}", dealId);

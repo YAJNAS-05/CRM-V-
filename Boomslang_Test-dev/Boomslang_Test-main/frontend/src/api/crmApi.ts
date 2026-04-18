@@ -7,14 +7,12 @@ import {
   Deal,
   Quote,
   Activity,
-  TradeShow,
   CreateAccountRequest,
   CreateContactRequest,
   CreateLeadRequest,
   CreateDealRequest,
   CreateQuoteRequest,
   CreateActivityRequest,
-  CreateTradeShowRequest,
   LeadConvertRequest,
   ReportDashboardKPIs,
   ReportPipeline,
@@ -26,6 +24,11 @@ import {
 export const accountApi = {
   getAll: (page = 0, size = 20) =>
     axiosInstance.get<ApiResponse<any>>(`/v1/crm/accounts?page=${page}&size=${size}`),
+
+  search: (query: string, page = 0, size = 20) =>
+    axiosInstance.get<ApiResponse<any>>(
+      `/v1/crm/accounts/search?q=${encodeURIComponent(query)}&page=${page}&size=${size}`
+    ),
   
   getById: (id: string) =>
     axiosInstance.get<ApiResponse<Account>>(`/v1/crm/accounts/${id}`),
@@ -44,6 +47,11 @@ export const accountApi = {
 export const contactApi = {
   getAll: (page = 0, size = 20) =>
     axiosInstance.get<ApiResponse<any>>(`/v1/crm/contacts?page=${page}&size=${size}`),
+
+  search: (query: string, page = 0, size = 20) =>
+    axiosInstance.get<ApiResponse<any>>(
+      `/v1/crm/contacts/search?q=${encodeURIComponent(query)}&page=${page}&size=${size}`
+    ),
   
   getById: (id: string) =>
     axiosInstance.get<ApiResponse<Contact>>(`/v1/crm/contacts/${id}`),
@@ -63,14 +71,41 @@ export const contactApi = {
 
 // Lead APIs
 export const leadApi = {
-  getAll: (page = 0, size = 20) =>
-    axiosInstance.get<ApiResponse<any>>(`/v1/crm/leads?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 20, sortField = 'createdAt', sortDir: 'asc' | 'desc' = 'desc') =>
+    axiosInstance.get<ApiResponse<any>>(`/v1/crm/leads?page=${page}&size=${size}&sort=${sortField},${sortDir}`),
+
+  search: (
+    query: string,
+    page = 0,
+    size = 20,
+    sortField = 'createdAt',
+    sortDir: 'asc' | 'desc' = 'desc',
+    status?: string,
+    source?: string
+  ) => {
+    const params = new URLSearchParams({
+      q: query,
+      page: page.toString(),
+      size: size.toString(),
+      sort: `${sortField},${sortDir}`,
+    })
+
+    if (status) {
+      params.set('status', status)
+    }
+
+    if (source) {
+      params.set('source', source)
+    }
+
+    return axiosInstance.get<ApiResponse<any>>(`/v1/crm/leads/search?${params.toString()}`)
+  },
   
   getById: (id: string) =>
     axiosInstance.get<ApiResponse<Lead>>(`/v1/crm/leads/${id}`),
   
-  getByStatus: (status: string, page = 0, size = 20) =>
-    axiosInstance.get<ApiResponse<any>>(`/v1/crm/leads/status/${status}?page=${page}&size=${size}`),
+  getByStatus: (status: string, page = 0, size = 20, sortField = 'createdAt', sortDir: 'asc' | 'desc' = 'desc') =>
+    axiosInstance.get<ApiResponse<any>>(`/v1/crm/leads/status/${status}?page=${page}&size=${size}&sort=${sortField},${sortDir}`),
   
   create: (data: CreateLeadRequest) =>
     axiosInstance.post<ApiResponse<Lead>>('/v1/crm/leads', data),
@@ -89,6 +124,20 @@ export const leadApi = {
 export const dealApi = {
   getAll: (page = 0, size = 20) =>
     axiosInstance.get<ApiResponse<any>>(`/v1/crm/deals?page=${page}&size=${size}`),
+
+  search: (query: string, page = 0, size = 20, stage?: string) => {
+    const params = new URLSearchParams({
+      q: query,
+      page: page.toString(),
+      size: size.toString(),
+    })
+
+    if (stage) {
+      params.set('stage', stage)
+    }
+
+    return axiosInstance.get<ApiResponse<any>>(`/v1/crm/deals/search?${params.toString()}`)
+  },
   
   getById: (id: string) =>
     axiosInstance.get<ApiResponse<Deal>>(`/v1/crm/deals/${id}`),
@@ -168,39 +217,39 @@ export const reportApi = {
   getDashboard: () =>
     axiosInstance.get<ApiResponse<ReportDashboardKPIs>>('/v1/crm/reports/dashboard'),
 
+  getDashboardUser: () =>
+    axiosInstance.get<ApiResponse<ReportDashboardKPIs>>('/v1/crm/reports/dashboard/user'),
+
+  getDashboardTeam: () =>
+    axiosInstance.get<ApiResponse<ReportDashboardKPIs>>('/v1/crm/reports/dashboard/team'),
+
   getPipeline: () =>
     axiosInstance.get<ApiResponse<ReportPipeline>>('/v1/crm/reports/pipeline'),
+
+  getPipelineUser: () =>
+    axiosInstance.get<ApiResponse<ReportPipeline>>('/v1/crm/reports/pipeline/user'),
+
+  getPipelineTeam: () =>
+    axiosInstance.get<ApiResponse<ReportPipeline>>('/v1/crm/reports/pipeline/team'),
 
   getConversion: () =>
     axiosInstance.get<ApiResponse<ReportConversion>>('/v1/crm/reports/conversion'),
 
+  getConversionUser: () =>
+    axiosInstance.get<ApiResponse<ReportConversion>>('/v1/crm/reports/conversion/user'),
+
+  getConversionTeam: () =>
+    axiosInstance.get<ApiResponse<ReportConversion>>('/v1/crm/reports/conversion/team'),
+
   getActivities: () =>
     axiosInstance.get<ApiResponse<ReportActivity>>('/v1/crm/reports/activities'),
 
+  getActivitiesUser: () =>
+    axiosInstance.get<ApiResponse<ReportActivity>>('/v1/crm/reports/activities/user'),
+
+  getActivitiesTeam: () =>
+    axiosInstance.get<ApiResponse<ReportActivity>>('/v1/crm/reports/activities/team'),
+
   getFull: () =>
     axiosInstance.get<ApiResponse<any>>('/v1/crm/reports'),
-}
-
-// TradeShow APIs
-export const tradeShowApi = {
-  getAll: (page = 0, size = 20) =>
-    axiosInstance.get<ApiResponse<any>>(`/v1/crm/tradeshows?page=${page}&size=${size}`),
-  
-  getById: (id: string) =>
-    axiosInstance.get<ApiResponse<TradeShow>>(`/v1/crm/tradeshows/${id}`),
-  
-  getUpcoming: () =>
-    axiosInstance.get<ApiResponse<TradeShow[]>>(`/v1/crm/tradeshows/upcoming`),
-  
-  getByCountry: (country: string) =>
-    axiosInstance.get<ApiResponse<TradeShow[]>>(`/v1/crm/tradeshows/country/${country}`),
-  
-  create: (data: CreateTradeShowRequest) =>
-    axiosInstance.post<ApiResponse<TradeShow>>('/v1/crm/tradeshows', data),
-  
-  update: (id: string, data: Partial<CreateTradeShowRequest>) =>
-    axiosInstance.put<ApiResponse<TradeShow>>(`/v1/crm/tradeshows/${id}`, data),
-  
-  delete: (id: string) =>
-    axiosInstance.delete<ApiResponse<void>>(`/v1/crm/tradeshows/${id}`),
 }

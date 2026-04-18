@@ -206,21 +206,6 @@ CREATE TABLE IF NOT EXISTS everx_crm.activities (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS everx_crm.trade_shows (
-    id UUID PRIMARY KEY,
-    show_name VARCHAR(255) NOT NULL,
-    show_date DATE,
-    location VARCHAR(255),
-    budget NUMERIC(19,2),
-    booth_size VARCHAR(50),
-    status VARCHAR(50),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    created_by VARCHAR(255),
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    version BIGINT NOT NULL DEFAULT 0
-);
-
 -- ERP schema tables
 CREATE TABLE IF NOT EXISTS everx_erp.equipment (
     id UUID PRIMARY KEY,

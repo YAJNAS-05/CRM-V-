@@ -42,7 +42,7 @@ public class AuthService {
         log.info("Login attempt for email: {}", request.getEmail());
 
         User user = userRepository.findByEmailWithRolesAndPermissions(request.getEmail())
-                .orElseThrow(() -> EntityNotFoundException.ofEntity(User.class, "email", request.getEmail()));
+                .orElseThrow(() -> new ValidationException("Invalid email or password"));
 
         if (!user.getIsActive()) {
             throw new ValidationException("User account is not active");

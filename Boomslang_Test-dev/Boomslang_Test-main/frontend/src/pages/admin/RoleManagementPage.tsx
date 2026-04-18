@@ -27,11 +27,20 @@ const RoleManagementPage: React.FC = () => {
 
   const [editPermissionKeys, setEditPermissionKeys] = useState<string[]>([])
 
+  const normalizePermissionModule = (permission: PermissionDefinition): string => {
+    // Dashboard permissions belong to CRM in this product's RBAC UX.
+    if (permission.permissionKey.startsWith('DASHBOARD_')) {
+      return 'CRM'
+    }
+
+    return permission.module || 'GENERAL'
+  }
+
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, PermissionDefinition[]> = {}
 
     for (const permission of permissions) {
-      const moduleName = permission.module || 'GENERAL'
+      const moduleName = normalizePermissionModule(permission)
       if (!groups[moduleName]) {
         groups[moduleName] = []
       }

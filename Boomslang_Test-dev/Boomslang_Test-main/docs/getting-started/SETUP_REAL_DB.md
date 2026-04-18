@@ -344,12 +344,12 @@ POST /auth/refresh
 
 **Get Contacts:**
 ```bash
-GET /crm/contacts?page=0&size=20
+GET /api/v1/crm/contacts?page=0&size=20
 ```
 
 **Create Contact:**
 ```bash
-POST /crm/contacts
+POST /api/v1/crm/contacts
 {
   "firstName": "John",
   "lastName": "Doe",
@@ -360,7 +360,7 @@ POST /crm/contacts
 
 **Get Deals:**
 ```bash
-GET /crm/deals?page=0&size=20
+GET /api/v1/crm/deals?page=0&size=20
 ```
 
 ### Finance Endpoints

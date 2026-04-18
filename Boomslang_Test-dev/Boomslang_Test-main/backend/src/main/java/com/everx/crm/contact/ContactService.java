@@ -3,6 +3,7 @@ package com.everx.crm.contact;
 import com.everx.crm.contact.dto.ContactDto;
 import com.everx.crm.contact.dto.CreateContactRequest;
 import com.everx.crm.contact.dto.UpdateContactRequest;
+import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,15 +27,22 @@ public class ContactService {
         return contactRepository.findAllActive(pageable).map(ContactDto::fromEntity);
     }
 
+    public Page<ContactDto> searchContacts(String query, Pageable pageable) {
+        log.info("Searching contacts with query {}", query);
+        return contactRepository.search(query, pageable).map(ContactDto::fromEntity);
+    }
+
     public ContactDto getContactById(UUID contactId) {
         log.info("Fetching contact {}", contactId);
-        Contact contact = contactRepository.findById(contactId)
+        Contact contact = contactRepository.findByIdActive(contactId)
                 .orElseThrow(() -> new EntityNotFoundException("Contact not found with id: " + contactId));
         return ContactDto.fromEntity(contact);
     }
 
     public ContactDto createContact(CreateContactRequest request) {
         log.info("Creating contact {} {}", request.getFirstName(), request.getLastName());
+        UUID ownerId = request.getOwnerId() != null ? request.getOwnerId() : SecurityUserContext.getCurrentUserIdOrNull();
+
         Contact contact = Contact.builder()
                 .accountId(request.getAccountId())
                 .salutation(request.getSalutation())
@@ -58,14 +66,14 @@ public class ContactService {
                 .description(request.getDescription())
                 .doNotCall(request.getDoNotCall() != null ? request.getDoNotCall() : false)
                 .emailOptOut(request.getEmailOptOut() != null ? request.getEmailOptOut() : false)
-                .ownerId(request.getOwnerId())
+                .ownerId(ownerId)
                 .build();
         return ContactDto.fromEntity(contactRepository.save(contact));
     }
 
     public ContactDto updateContact(UUID contactId, UpdateContactRequest request) {
         log.info("Updating contact {}", contactId);
-        Contact contact = contactRepository.findById(contactId)
+        Contact contact = contactRepository.findByIdActive(contactId)
                 .orElseThrow(() -> new EntityNotFoundException("Contact not found with id: " + contactId));
 
         if (request.getAccountId() != null) contact.setAccountId(request.getAccountId());
@@ -97,7 +105,7 @@ public class ContactService {
 
     public void deleteContact(UUID contactId) {
         log.info("Soft deleting contact {}", contactId);
-        Contact contact = contactRepository.findById(contactId)
+        Contact contact = contactRepository.findByIdActive(contactId)
                 .orElseThrow(() -> new EntityNotFoundException("Contact not found with id: " + contactId));
         contact.softDelete();
         contactRepository.save(contact);

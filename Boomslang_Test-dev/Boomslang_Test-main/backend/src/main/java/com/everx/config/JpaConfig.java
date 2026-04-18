@@ -30,11 +30,35 @@ public class JpaConfig {
                     if (principal instanceof UUID) {
                         return Optional.of((UUID) principal);
                     }
+
+                    if (principal instanceof String principalString) {
+                        UUID parsedPrincipal = tryParseUuid(principalString);
+                        if (parsedPrincipal != null) {
+                            return Optional.of(parsedPrincipal);
+                        }
+                    }
+
+                    UUID parsedName = tryParseUuid(authentication.getName());
+                    if (parsedName != null) {
+                        return Optional.of(parsedName);
+                    }
                 }
             } catch (Exception e) {
                 // User not found, return empty
             }
             return Optional.empty();
         };
+    }
+
+    private UUID tryParseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 }

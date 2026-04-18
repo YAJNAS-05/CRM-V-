@@ -3,8 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { contactApi, accountApi, activityApi } from '../../api/crmApi'
-import { Contact, Account, Activity } from '../../types/crm'
+import { contactApi, accountApi } from '../../api/crmApi'
+import { Contact, Account } from '../../types/crm'
+import { useAuthStore } from '../../store/authStore'
 import { toast } from 'sonner'
 
 const contactSchema = z.object({
@@ -33,20 +34,21 @@ interface ContactDetailPageProps { isNew?: boolean }
 const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const permissions = useAuthStore((state) => state.user?.permissions)
+  const canEdit = permissions?.includes('CRM_EDIT') ?? false
+  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(!isNew)
   const [contact, setContact] = useState<Contact | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
   const [isEditing, setIsEditing] = useState(isNew)
-  const [tab, setTab] = useState<'details' | 'activities'>('details')
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
   })
 
   useEffect(() => {
     fetchAccounts()
-    if (!isNew && id) { fetchContact(); fetchActivities() } else { setIsFetching(false) }
+    if (!isNew && id) { fetchContact() } else { setIsFetching(false) }
   }, [id, isNew])
 
   const fetchAccounts = async () => {
@@ -61,9 +63,6 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
       reset({ accountId: c.accountId, salutation: c.salutation, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone, mobile: c.mobile, jobTitle: c.jobTitle, department: c.department, mailingStreet: c.mailingStreet, mailingCity: c.mailingCity, mailingState: c.mailingState, mailingZip: c.mailingZip, mailingCountry: c.mailingCountry, linkedinUrl: c.linkedinUrl, description: c.description })
     } catch { toast.error('Failed to load contact'); navigate('/crm/contacts') } finally { setIsFetching(false) }
   }
-  const fetchActivities = async () => {
-    try { const r = await activityApi.getByContact(id!); const d = r.data.data; setActivities(Array.isArray(d) ? d : []) } catch {}
-  }
   const onSubmit = async (data: ContactFormData) => {
     setIsLoading(true)
     try {
@@ -75,6 +74,10 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
     } finally { setIsLoading(false) }
   }
   const handleDelete = async () => {
+    if (!canDelete) {
+      toast.error('You do not have permission to delete contacts')
+      return
+    }
     if (!confirm('Delete this contact?')) return
     try { await contactApi.delete(id!); toast.success('Deleted'); navigate('/crm/contacts') } catch { toast.error('Failed') }
   }
@@ -99,8 +102,8 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>
-            <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+            {canEdit && <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>}
+            {canDelete && <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>}
           </div>
         </div>
       </div>
@@ -122,35 +125,14 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
           <p className="text-sm text-gray-700">{[contact.mailingStreet, contact.mailingCity, contact.mailingState, contact.mailingZip, contact.mailingCountry].filter(Boolean).join(', ') || '—'}</p>
         </div>
       </div>
-      <div className="border-b border-gray-200 mb-6">
-        <div className="flex gap-6">
-          {(['details', 'activities'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`pb-3 text-sm font-medium capitalize transition ${tab === t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          {[['First Name', contact.firstName], ['Last Name', contact.lastName], ['Email', contact.email], ['Phone', contact.phone], ['Mobile', contact.mobile], ['Job Title', contact.jobTitle], ['Department', contact.department], ['Lead Source', contact.leadSource], ['LinkedIn', contact.linkedinUrl], ['Created', new Date(contact.createdAt).toLocaleDateString()]].map(([l, v]) => (
+            <div key={l as string}><dt className="text-xs text-gray-400 mb-0.5">{l}</dt><dd className="text-sm text-gray-900">{(v as string) || '—'}</dd></div>
           ))}
         </div>
+        {contact.description && <><h3 className="text-sm font-semibold text-gray-900 mt-6 mb-2">Notes</h3><p className="text-sm text-gray-600">{contact.description}</p></>}
       </div>
-      {tab === 'details' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            {[['First Name', contact.firstName], ['Last Name', contact.lastName], ['Email', contact.email], ['Phone', contact.phone], ['Mobile', contact.mobile], ['Job Title', contact.jobTitle], ['Department', contact.department], ['Lead Source', contact.leadSource], ['LinkedIn', contact.linkedinUrl], ['Created', new Date(contact.createdAt).toLocaleDateString()]].map(([l, v]) => (
-              <div key={l as string}><dt className="text-xs text-gray-400 mb-0.5">{l}</dt><dd className="text-sm text-gray-900">{(v as string) || '—'}</dd></div>
-            ))}
-          </div>
-          {contact.description && <><h3 className="text-sm font-semibold text-gray-900 mt-6 mb-2">Notes</h3><p className="text-sm text-gray-600">{contact.description}</p></>}
-        </div>
-      )}
-      {tab === 'activities' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          {activities.length === 0 ? <p className="text-center py-12 text-sm text-gray-400">No activities yet</p> : (
-            <div className="space-y-4">{activities.map(act => (
-              <div key={act.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-50">
-                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0"><svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                <div><p className="text-sm font-medium text-gray-900">{act.subject}</p><p className="text-xs text-gray-500 mt-0.5">{act.type} · {new Date(act.dueDate || act.createdAt).toLocaleDateString()}</p></div>
-              </div>
-            ))}</div>
-          )}
-        </div>
-      )}
     </div>
   )
 

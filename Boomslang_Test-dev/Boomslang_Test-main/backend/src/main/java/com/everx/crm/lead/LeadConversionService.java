@@ -10,10 +10,13 @@ import com.everx.crm.deal.DealStage;
 import com.everx.crm.lead.dto.LeadConvertRequest;
 import com.everx.crm.lead.dto.LeadDto;
 import com.everx.shared.exception.EntityNotFoundException;
+import com.everx.shared.util.SecurityUserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -38,12 +41,14 @@ public class LeadConversionService {
     public LeadDto convertLead(UUID leadId, LeadConvertRequest request) {
         log.info("Converting lead {}", leadId);
 
-        Lead lead = leadRepository.findById(leadId)
+        Lead lead = leadRepository.findByIdActive(leadId)
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found with id: " + leadId));
 
         if (Boolean.TRUE.equals(lead.getIsConverted())) {
             throw new IllegalStateException("Lead is already converted");
         }
+
+        UUID ownerId = lead.getOwnerId() != null ? lead.getOwnerId() : SecurityUserContext.getCurrentUserIdOrNull();
 
         // 1. Create Contact from Lead
         Contact contact = Contact.builder()
@@ -61,15 +66,26 @@ public class LeadConversionService {
                 .mailingZip(lead.getZip())
                 .mailingCountry(lead.getCountry())
                 .description(lead.getDescription())
-                .ownerId(lead.getOwnerId())
+                .ownerId(ownerId)
                 .build();
         Contact savedContact = contactRepository.save(contact);
         lead.setConvertedContactId(savedContact.getId());
 
         // 2. Create or link Account
         if (Boolean.TRUE.equals(request.getCreateAccount())) {
+            String resolvedAccountName = request.getAccountName() != null && !request.getAccountName().trim().isEmpty()
+                ? request.getAccountName().trim()
+                : (lead.getCompany() != null ? lead.getCompany().trim() : null);
+
+            if (resolvedAccountName == null || resolvedAccountName.isEmpty()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Account name is required when creating an account during lead conversion"
+            );
+            }
+
             Account account = Account.builder()
-                    .name(request.getAccountName() != null ? request.getAccountName() : lead.getCompany())
+                .name(resolvedAccountName)
                     .phone(lead.getPhone())
                     .email(lead.getEmail())
                     .billingStreet(lead.getStreet())
@@ -79,7 +95,7 @@ public class LeadConversionService {
                     .billingCountry(lead.getCountry())
                     .annualRevenue(lead.getAnnualRevenue())
                     .employees(lead.getEmployees())
-                    .ownerId(lead.getOwnerId())
+                    .ownerId(ownerId)
                     .build();
             Account savedAccount = accountRepository.save(account);
             lead.setConvertedAccountId(savedAccount.getId());
@@ -97,7 +113,7 @@ public class LeadConversionService {
                     .leadSource(lead.getLeadSource())
                     .accountId(lead.getConvertedAccountId())
                     .primaryContactId(savedContact.getId())
-                    .ownerId(lead.getOwnerId())
+                    .ownerId(ownerId)
                     .build();
             Deal savedDeal = dealRepository.save(deal);
             lead.setConvertedDealId(savedDeal.getId());

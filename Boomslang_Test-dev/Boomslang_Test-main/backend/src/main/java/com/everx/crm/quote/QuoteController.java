@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -90,10 +91,10 @@ public class QuoteController {
         log.info("GET /api/v1/crm/quotes/{}/pdf", quoteId);
         QuoteDto quote = quoteService.getQuoteById(quoteId);
         byte[] pdfBytes = pdfService.generateQuotePdf(quote);
-        
+
         return ResponseEntity.ok()
-                .header("Content-Type", "text/html")
-                .header("Content-Disposition", "inline; filename=quote-" + quote.getQuoteNumber() + ".html")
+                .contentType(MediaType.APPLICATION_PDF)
+                .header("Content-Disposition", "inline; filename=quote-" + quote.getQuoteNumber() + ".pdf")
                 .body(pdfBytes);
     }
 }

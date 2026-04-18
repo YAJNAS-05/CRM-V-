@@ -37,7 +37,7 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.ok(contacts, "Contacts retrieved successfully"));
     }
 
-    @GetMapping("/{contactId}")
+    @GetMapping("/{contactId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<ContactDto>> getContactById(@PathVariable UUID contactId) {
         log.info("GET /api/v1/crm/contacts/{}", contactId);
@@ -55,6 +55,16 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.ok(contacts, "Contacts retrieved successfully"));
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
+    public ResponseEntity<ApiResponse<Page<ContactDto>>> searchContacts(
+            @RequestParam("q") String query,
+            @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        log.info("GET /api/v1/crm/contacts/search?q={}", query);
+        Page<ContactDto> contacts = contactService.searchContacts(query, pageable);
+        return ResponseEntity.ok(ApiResponse.ok(contacts, "Contacts search results"));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('CRM_CREATE')")
     public ResponseEntity<ApiResponse<ContactDto>> createContact(@Valid @RequestBody CreateContactRequest request) {
@@ -63,7 +73,7 @@ public class ContactController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(contact, "Contact created successfully"));
     }
 
-    @PutMapping("/{contactId}")
+    @PutMapping("/{contactId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_EDIT')")
     public ResponseEntity<ApiResponse<ContactDto>> updateContact(
             @PathVariable UUID contactId,
@@ -73,7 +83,7 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.ok(contact, "Contact updated successfully"));
     }
 
-    @DeleteMapping("/{contactId}")
+    @DeleteMapping("/{contactId:[0-9a-fA-F-]{36}}")
     @PreAuthorize("hasAuthority('CRM_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteContact(@PathVariable UUID contactId) {
         log.info("DELETE /api/v1/crm/contacts/{}", contactId);
