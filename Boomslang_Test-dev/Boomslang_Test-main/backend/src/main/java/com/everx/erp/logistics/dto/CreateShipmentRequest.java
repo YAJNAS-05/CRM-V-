@@ -35,4 +35,7 @@ public class CreateShipmentRequest {
     private BigDecimal freightCost;
     @Size(max = 3)
     private String currency;
+    /** GOOD or DAMAGED — used when status=DELIVERED to determine final equipment state */
+    @Size(max = 10)
+    private String conditionOnDelivery;
 }

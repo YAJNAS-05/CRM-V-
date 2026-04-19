@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { purchaseOrderApi, supplierApi } from '../../api/erpApi'
-import { Supplier } from '../../types/erp'
+import { purchaseOrderApi, supplierApi, equipmentApi } from '../../api/erpApi'
+import { Supplier, Equipment } from '../../types/erp'
 import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
 
@@ -9,6 +9,22 @@ const PO_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SHIPPED', 'DELIVERED', '
 const CURRENCIES = ['AUD', 'USD', 'JPY', 'EUR', 'GBP']
 const PAYMENT_METHODS = ['TT_30', 'TT_60', 'LC', 'INSTALLMENT', 'TT', 'CREDIT_CARD']
 const PO_TYPES = ['EQUIPMENT_ACQUISITION', 'SPARE_PARTS', 'CONSUMABLES']
+
+interface LineItem {
+  equipmentId: string
+  description: string
+  quantity: string
+  unitPrice: string
+  lineTotal: string
+}
+
+const defaultLineItem = (): LineItem => ({
+  equipmentId: '',
+  description: '',
+  quantity: '1',
+  unitPrice: '',
+  lineTotal: '',
+})
 
 interface FormData {
   poNumber: string
@@ -21,6 +37,7 @@ interface FormData {
   totalAmount: string
   paymentMethod: string
   notes: string
+  items: LineItem[]
 }
 
 const defaultForm: FormData = {
@@ -34,6 +51,7 @@ const defaultForm: FormData = {
   totalAmount: '',
   paymentMethod: '',
   notes: '',
+  items: [defaultLineItem()],
 }
 
 export default function PurchaseOrderForm() {
@@ -45,9 +63,11 @@ export default function PurchaseOrderForm() {
   const [saving, setSaving] = useState(false)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([])
 
   useEffect(() => {
     loadSuppliers()
+    loadEquipment()
   }, [])
 
   useEffect(() => {
@@ -66,6 +86,15 @@ export default function PurchaseOrderForm() {
     }
   }
 
+  const loadEquipment = async () => {
+    try {
+      const response = await equipmentApi.getAll(0, 500)
+      setEquipmentList(response.data?.content || [])
+    } catch {
+      // non-fatal
+    }
+  }
+
   const loadItem = async () => {
     try {
       setLoading(true)
@@ -76,6 +105,13 @@ export default function PurchaseOrderForm() {
         const rawNotes = e.notes || ''
         const poTypeMatch = rawNotes.match(/PO Type:\s*([A-Z_]+)/)
         const cleanedNotes = rawNotes.replace(/PO Type:\s*[A-Z_]+\n?/g, '').trim()
+        const existingItems: LineItem[] = (e.items || []).map((item: any) => ({
+          equipmentId: item.equipmentId || '',
+          description: item.description || '',
+          quantity: item.quantity?.toString() || '1',
+          unitPrice: item.unitPrice?.toString() || '',
+          lineTotal: item.lineTotal?.toString() || '',
+        }))
         setForm({
           poNumber: e.poNumber || '',
           supplierId: e.supplierId || '',
@@ -87,6 +123,7 @@ export default function PurchaseOrderForm() {
           totalAmount: e.totalAmount?.toString() || '',
           paymentMethod: e.paymentMethod || '',
           notes: cleanedNotes,
+          items: existingItems.length > 0 ? existingItems : [defaultLineItem()],
         })
       }
     } catch { toast.error('Failed to load purchase order') }
@@ -112,6 +149,47 @@ export default function PurchaseOrderForm() {
     }))
   }
 
+  // Line item helpers
+  const updateItem = (index: number, field: keyof LineItem, value: string) => {
+    setForm(prev => {
+      const items = prev.items.map((item, i) => {
+        if (i !== index) return item
+        const updated = { ...item, [field]: value }
+        // Auto-fill description when equipment selected
+        if (field === 'equipmentId' && value) {
+          const eq = equipmentList.find(e => e.id === value)
+          if (eq) {
+            updated.description = `${eq.make || ''} ${eq.model || ''} (${eq.internalCode || eq.id})`.trim()
+            if (!updated.unitPrice && eq.acquisitionCost) {
+              updated.unitPrice = eq.acquisitionCost.toString()
+            }
+          }
+        }
+        // Auto-calc line total
+        if (field === 'quantity' || field === 'unitPrice') {
+          const qty = parseFloat(field === 'quantity' ? value : updated.quantity) || 0
+          const price = parseFloat(field === 'unitPrice' ? value : updated.unitPrice) || 0
+          updated.lineTotal = qty > 0 && price > 0 ? (qty * price).toFixed(2) : ''
+        }
+        return updated
+      })
+      // Auto-calc total amount from items
+      const total = items.reduce((sum, item) => sum + (parseFloat(item.lineTotal) || 0), 0)
+      return { ...prev, items, totalAmount: total > 0 ? total.toFixed(2) : prev.totalAmount }
+    })
+  }
+
+  const addItem = () => setForm(prev => ({ ...prev, items: [...prev.items, defaultLineItem()] }))
+
+  const removeItem = (index: number) => {
+    setForm(prev => {
+      const items = prev.items.filter((_, i) => i !== index)
+      const remaining = items.length > 0 ? items : [defaultLineItem()]
+      const total = remaining.reduce((sum, item) => sum + (parseFloat(item.lineTotal) || 0), 0)
+      return { ...prev, items: remaining, totalAmount: total > 0 ? total.toFixed(2) : prev.totalAmount }
+    })
+  }
+
   const supplierOptions = useMemo(
     () =>
       suppliers.map((supplier) => ({
@@ -120,6 +198,18 @@ export default function PurchaseOrderForm() {
         meta: [supplier.country, supplier.paymentTerms].filter(Boolean).join(' | ') || undefined,
       })),
     [suppliers]
+  )
+
+  const equipmentOptions = useMemo(
+    () => [
+      { value: '', label: '— Manual entry (no equipment link) —' },
+      ...equipmentList.map(eq => ({
+        value: eq.id,
+        label: `${eq.internalCode || eq.id} — ${eq.make || ''} ${eq.model || ''}`.trim(),
+        meta: eq.status || undefined,
+      }))
+    ],
+    [equipmentList]
   )
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,6 +230,7 @@ export default function PurchaseOrderForm() {
         .filter(Boolean)
         .join('\n')
 
+      const validItems = form.items.filter(item => item.description.trim())
       const payload = {
         poNumber: form.poNumber,
         supplierId: form.supplierId,
@@ -150,6 +241,13 @@ export default function PurchaseOrderForm() {
         currency: form.currency,
         paymentMethod: form.paymentMethod || null,
         notes: notesWithType || null,
+        items: validItems.map(item => ({
+          equipmentId: item.equipmentId || null,
+          description: item.description,
+          quantity: parseInt(item.quantity) || 1,
+          unitPrice: item.unitPrice ? parseFloat(item.unitPrice) : null,
+          lineTotal: item.lineTotal ? parseFloat(item.lineTotal) : null,
+        })),
       }
 
       if (isEdit) {
@@ -248,6 +346,125 @@ export default function PurchaseOrderForm() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
           </div>
+
+          {/* Line Items — Machines / Equipment */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-700">Line Items — Machines &amp; Parts</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Select existing equipment or enter a description manually for new stock being ordered.</p>
+              </div>
+              <button
+                type="button"
+                onClick={addItem}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Add Item
+              </button>
+            </div>
+
+            <table className="w-full border border-gray-200 rounded-lg text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead>
+                <tr className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  <th className="px-3 py-2 text-left border-b border-gray-200 rounded-tl-lg w-72">Equipment / Machine</th>
+                  <th className="px-3 py-2 text-left border-b border-gray-200">Description</th>
+                  <th className="px-3 py-2 text-center border-b border-gray-200 w-16">Qty</th>
+                  <th className="px-3 py-2 text-right border-b border-gray-200 w-28">Unit Price</th>
+                  <th className="px-3 py-2 text-right border-b border-gray-200 w-24">Total</th>
+                  <th className="px-3 py-2 border-b border-gray-200 rounded-tr-lg w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.items.map((item, index) => {
+                  const linkedEq = item.equipmentId ? equipmentList.find(e => e.id === item.equipmentId) : null
+                  return (
+                    <tr key={index} className={index % 2 === 1 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="px-3 py-2 border-b border-gray-100">
+                        <select
+                          value={item.equipmentId}
+                          onChange={e => updateItem(index, 'equipmentId', e.target.value)}
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">— Manual entry —</option>
+                          {equipmentList.map(eq => (
+                            <option key={eq.id} value={eq.id}>
+                              {eq.internalCode ? `[${eq.internalCode}] ` : ''}{eq.make} {eq.model}
+                            </option>
+                          ))}
+                        </select>
+                        {linkedEq && (
+                          <span className={`text-xs mt-1 inline-block px-1.5 py-0.5 rounded font-medium ${
+                            linkedEq.status === 'IN_STOCK' || linkedEq.status === 'IN_WAREHOUSE' ? 'bg-green-100 text-green-700' :
+                            linkedEq.status === 'RESERVED' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {linkedEq.status?.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 border-b border-gray-100">
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={e => updateItem(index, 'description', e.target.value)}
+                          placeholder="Item description"
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-gray-100">
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={e => updateItem(index, 'quantity', e.target.value)}
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-gray-100">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.unitPrice}
+                          onChange={e => updateItem(index, 'unitPrice', e.target.value)}
+                          placeholder="0.00"
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-gray-100 text-right font-medium text-gray-700 whitespace-nowrap">
+                        {item.lineTotal ? parseFloat(item.lineTotal).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}
+                      </td>
+                      <td className="px-3 py-2 border-b border-gray-100 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="p-1 text-gray-400 hover:text-red-500 transition"
+                          title="Remove item"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {form.items.some(i => i.lineTotal) && (
+                <tfoot>
+                  <tr className="bg-blue-50">
+                    <td colSpan={4} className="px-3 py-2 text-right text-sm font-semibold text-blue-800 rounded-bl-lg">
+                      Subtotal ({form.currency})
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-blue-800 whitespace-nowrap">
+                      {form.items.reduce((s, i) => s + (parseFloat(i.lineTotal) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="rounded-br-lg"></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button type="button" onClick={() => navigate('/erp/purchase-orders')} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{saving ? 'Saving...' : isEdit ? 'Update PO' : 'Create PO'}</button>

@@ -105,6 +105,10 @@ export const salesOrderApi = {
     axiosInstance.post('/v1/erp/sales-orders', data),
   update: async (id: string, data: any) =>
     axiosInstance.put(`/v1/erp/sales-orders/${id}`, data),
+  confirm: async (id: string) =>
+    axiosInstance.patch(`/v1/erp/sales-orders/${id}/confirm`),
+  cancel: async (id: string) =>
+    axiosInstance.patch(`/v1/erp/sales-orders/${id}/cancel`),
   delete: async (id: string) =>
     axiosInstance.delete(`/v1/erp/sales-orders/${id}`),
 }

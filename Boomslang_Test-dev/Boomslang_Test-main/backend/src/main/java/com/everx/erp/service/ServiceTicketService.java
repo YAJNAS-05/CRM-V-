@@ -1,7 +1,14 @@
 package com.everx.erp.service;
 
+import com.everx.erp.equipment.Equipment;
+import com.everx.erp.equipment.EquipmentRepository;
+import com.everx.erp.equipment.EquipmentStatus;
 import com.everx.erp.service.dto.CreateServiceTicketRequest;
 import com.everx.erp.service.dto.ServiceTicketDto;
+import com.everx.erp.spareparts.SparePart;
+import com.everx.erp.spareparts.SparePartRepository;
+import com.everx.erp.warranty.Warranty;
+import com.everx.erp.warranty.WarrantyRepository;
 import com.everx.finance.invoice.InvoiceService;
 import com.everx.finance.invoice.dto.CreateInvoiceRequest;
 import com.everx.finance.invoice.Invoice;
@@ -24,11 +31,24 @@ public class ServiceTicketService {
 
     private final ServiceTicketRepository serviceTicketRepository;
     private final InvoiceService invoiceService;
+    private final EquipmentRepository equipmentRepository;
+    private final WarrantyRepository warrantyRepository;
+    private final SparePartRepository sparePartRepository;
 
     @Transactional
     public ServiceTicketDto createServiceTicket(CreateServiceTicketRequest request) {
         if (serviceTicketRepository.findByTicketNumber(request.getTicketNumber()).isPresent()) {
             throw new ValidationException("Service ticket with ticket number " + request.getTicketNumber() + " already exists");
+        }
+
+        // WORKFLOW RULE: Service ticket can only be raised against installed equipment
+        if (request.getEquipmentId() != null) {
+            Equipment equipment = equipmentRepository.findByIdAndNotDeleted(request.getEquipmentId())
+                    .orElseThrow(() -> new EntityNotFoundException("Equipment not found with id: " + request.getEquipmentId()));
+            if (equipment.getStatus() != EquipmentStatus.INSTALLED) {
+                throw new ValidationException(
+                        "Service tickets can only be raised for installed equipment. Equipment status is: " + equipment.getStatus());
+            }
         }
 
         ServiceTicket ticket = new ServiceTicket();
@@ -45,6 +65,17 @@ public class ServiceTicketService {
         ticket.setDescription(request.getDescription());
         ticket.setResolutionNotes(request.getResolutionNotes());
         ticket.setCost(request.getCost());
+        if (request.getPartsUsedIds() != null) {
+            ticket.setPartsUsedIds(request.getPartsUsedIds());
+        }
+
+        // WORKFLOW: Auto-lookup active warranty for equipment â†’ determine billable
+        if (request.getEquipmentId() != null) {
+            resolveWarrantyStatus(ticket, request.getEquipmentId());
+        } else {
+            ticket.setUnderWarranty(false);
+            ticket.setBillable(true);
+        }
 
         return toDto(Objects.requireNonNull(serviceTicketRepository.save(ticket), "Repository save returned null"));
     }
@@ -104,6 +135,7 @@ public class ServiceTicketService {
         if (request.getDescription() != null) ticket.setDescription(request.getDescription());
         if (request.getResolutionNotes() != null) ticket.setResolutionNotes(request.getResolutionNotes());
         if (request.getCost() != null) ticket.setCost(request.getCost());
+        if (request.getPartsUsedIds() != null) ticket.setPartsUsedIds(request.getPartsUsedIds());
 
         return toDto(Objects.requireNonNull(serviceTicketRepository.save(ticket)));
     }
@@ -118,8 +150,8 @@ public class ServiceTicketService {
 
     /**
      * WORKFLOW TRIGGER: Resolve service ticket
-     * If ticket is billable (not under warranty), automatically creates an invoice
-     * Parts used are decremented from inventory (future enhancement)
+     * 1. Deducts spare parts stock for all partsUsedIds
+     * 2. If billable (not under warranty), automatically creates an invoice
      */
     @Transactional
     public ServiceTicketDto resolveServiceTicket(UUID id, String resolutionNotes) {
@@ -133,19 +165,30 @@ public class ServiceTicketService {
             ticket.setResolutionNotes(resolutionNotes);
         }
 
+        // WORKFLOW: Auto-deduct spare parts stock for parts consumed during repair
+        if (ticket.getPartsUsedIds() != null && ticket.getPartsUsedIds().length > 0) {
+            for (UUID partId : ticket.getPartsUsedIds()) {
+                sparePartRepository.findByIdAndNotDeleted(partId).ifPresent(part -> {
+                    int newQty = Math.max(0, part.getStockQty() - 1);
+                    part.setStockQty(newQty);
+                    sparePartRepository.save(part);
+                });
+            }
+        }
+
         // TRIGGER: If billable, create invoice automatically
-        if (ticket.getBillable() != null && ticket.getBillable()) {
+        if (ticket.getBillable() != null && ticket.getBillable() && ticket.getCost() != null) {
             try {
                 CreateInvoiceRequest invoiceRequest = CreateInvoiceRequest.builder()
                         .invoiceNumber(generateInvoiceNumberForServiceTicket(ticket))
                         .accountId(ticket.getAccountId())
                         .type(Invoice.InvoiceType.TAX_INVOICE)
-                        .entity(Invoice.InvoiceEntity.AUSTRALIA) // Default to AU; should be configurable
+                        .entity(Invoice.InvoiceEntity.AUSTRALIA)
                         .issueDate(LocalDate.now())
                         .dueDate(LocalDate.now().plusDays(30))
                         .currency("AUD")
                         .subtotal(ticket.getCost())
-                        .taxAmount(ticket.getCost().multiply(new java.math.BigDecimal("0.10"))) // 10% GST
+                        .taxAmount(ticket.getCost().multiply(new java.math.BigDecimal("0.10")))
                         .totalAmount(ticket.getCost().multiply(new java.math.BigDecimal("1.10")))
                         .notes("Service ticket repair invoice - Ticket: " + ticket.getTicketNumber())
                         .build();
@@ -153,7 +196,6 @@ public class ServiceTicketService {
                 var invoiceResponse = invoiceService.createInvoice(invoiceRequest);
                 ticket.setLinkedInvoiceId(invoiceResponse.getId());
             } catch (Exception e) {
-                // Log error but don't fail ticket resolution
                 System.err.println("Failed to create invoice for service ticket " + ticket.getTicketNumber() + ": " + e.getMessage());
             }
         }
@@ -162,8 +204,32 @@ public class ServiceTicketService {
         return toDto(saved);
     }
 
+    /**
+     * WORKFLOW HELPER: Determine warranty status for this equipment at ticket creation time.
+     * Sets underWarranty, linkedWarrantyId, and billable on the ticket.
+     */
+    private void resolveWarrantyStatus(ServiceTicket ticket, UUID equipmentId) {
+        List<Warranty> warranties = warrantyRepository.findByEquipmentId(equipmentId);
+        Warranty activeWarranty = warranties.stream()
+                .filter(w -> "ACTIVE".equalsIgnoreCase(w.getStatus()))
+                .filter(w -> {
+                    LocalDate reportedDate = ticket.getReportedDate() != null ? ticket.getReportedDate() : LocalDate.now();
+                    return !reportedDate.isAfter(w.getEndDate());
+                })
+                .findFirst()
+                .orElse(null);
+
+        if (activeWarranty != null) {
+            ticket.setUnderWarranty(true);
+            ticket.setLinkedWarrantyId(activeWarranty.getId());
+            ticket.setBillable(false);
+        } else {
+            ticket.setUnderWarranty(false);
+            ticket.setBillable(true);
+        }
+    }
+
     private String generateInvoiceNumberForServiceTicket(ServiceTicket ticket) {
-        // Generate invoice number based on ticket: INV-TKT-{TICKET_NUMBER}
         return "INV-TKT-" + ticket.getTicketNumber();
     }
 
@@ -183,6 +249,11 @@ public class ServiceTicketService {
         dto.setDescription(ticket.getDescription());
         dto.setResolutionNotes(ticket.getResolutionNotes());
         dto.setCost(ticket.getCost());
+        dto.setBillable(ticket.getBillable());
+        dto.setUnderWarranty(ticket.getUnderWarranty());
+        dto.setLinkedWarrantyId(ticket.getLinkedWarrantyId());
+        dto.setLinkedInvoiceId(ticket.getLinkedInvoiceId());
+        dto.setPartsUsedIds(ticket.getPartsUsedIds());
         dto.setCreatedAt(ticket.getCreatedAt().toInstant());
         dto.setUpdatedAt(ticket.getUpdatedAt().toInstant());
         return dto;

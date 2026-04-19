@@ -63,6 +63,34 @@ export default function SalesOrderDetailPage() {
     }
   }
 
+  const handleConfirm = async () => {
+    if (!confirm(`Confirm SO ${so?.soNumber}? This will RESERVE all linked equipment and create a shipment + deposit invoice.`)) return
+    try {
+      const response = await salesOrderApi.confirm(id!)
+      if (response.data?.success) {
+        setSo(response.data.data)
+        setFormData(response.data.data)
+        alert('Sales order confirmed. Equipment reserved, shipment created.')
+      }
+    } catch (err: any) {
+      alert('Error: ' + (err?.response?.data?.message || err.message || 'Unknown error'))
+    }
+  }
+
+  const handleCancelOrder = async () => {
+    if (!confirm(`Cancel SO ${so?.soNumber}? This will release reserved equipment back to warehouse and cancel the shipment.`)) return
+    try {
+      const response = await salesOrderApi.cancel(id!)
+      if (response.data?.success) {
+        setSo(response.data.data)
+        setFormData(response.data.data)
+        alert('Sales order cancelled. Equipment released.')
+      }
+    } catch (err: any) {
+      alert('Error: ' + (err?.response?.data?.message || err.message || 'Unknown error'))
+    }
+  }
+
   if (loading) return <div className="p-6">Loading...</div>
   if (error) return <div className="p-6 bg-red-50 text-red-700 rounded">{error}</div>
   if (!so) return <div className="p-6 bg-yellow-50 text-yellow-700 rounded">Sales order not found</div>
@@ -82,6 +110,12 @@ export default function SalesOrderDetailPage() {
           ) : (
             <>
               <button onClick={() => setEditMode(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>
+              {so?.status === 'DRAFT' && (
+                <button onClick={handleConfirm} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm SO</button>
+              )}
+              {(so?.status === 'DRAFT' || so?.status === 'CONFIRMED') && (
+                <button onClick={handleCancelOrder} className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">Cancel SO</button>
+              )}
               <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
             </>
           )}

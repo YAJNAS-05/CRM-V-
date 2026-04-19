@@ -31,6 +31,13 @@ public class ShipmentService {
 
     @Transactional
     public ShipmentDto createShipment(CreateShipmentRequest request) {
+        // WORKFLOW RULE: No shipment without a confirmed Sales Order
+        if (request.getSoId() == null) {
+            throw new ValidationException("Shipment must be linked to a Sales Order. No shipment can be created without a confirmed Sales Order.");
+        }
+        salesOrderRepository.findByIdAndNotDeleted(request.getSoId())
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + request.getSoId()));
+
         Shipment shipment = new Shipment();
         shipment.setSoId(request.getSoId());
         shipment.setPoId(request.getPoId());
@@ -47,7 +54,9 @@ public class ShipmentService {
         shipment.setCustomsDeclarationUrl(request.getCustomsDeclarationUrl());
         shipment.setFreightCost(request.getFreightCost());
         shipment.setCurrency(request.getCurrency());
-        return toDto(shipmentRepository.save(shipment));
+        Shipment saved = shipmentRepository.save(shipment);
+        applyStatusCascade(saved, null, saved.getStatus(), request.getConditionOnDelivery());
+        return toDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +79,7 @@ public class ShipmentService {
     public ShipmentDto updateShipment(UUID id, CreateShipmentRequest request) {
         Shipment shipment = shipmentRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Shipment not found with id: " + id));
+        String oldStatus = shipment.getStatus();
         if (request.getSoId() != null) shipment.setSoId(request.getSoId());
         if (request.getPoId() != null) shipment.setPoId(request.getPoId());
         if (request.getTrackingNumber() != null) shipment.setTrackingNumber(request.getTrackingNumber());
@@ -85,7 +95,9 @@ public class ShipmentService {
         if (request.getCustomsDeclarationUrl() != null) shipment.setCustomsDeclarationUrl(request.getCustomsDeclarationUrl());
         if (request.getFreightCost() != null) shipment.setFreightCost(request.getFreightCost());
         if (request.getCurrency() != null) shipment.setCurrency(request.getCurrency());
-        return toDto(shipmentRepository.save(shipment));
+        Shipment updated = shipmentRepository.save(shipment);
+        applyStatusCascade(updated, oldStatus, updated.getStatus(), request.getConditionOnDelivery());
+        return toDto(updated);
     }
 
     @Transactional
@@ -133,7 +145,6 @@ public class ShipmentService {
 
         if ("GOOD".equalsIgnoreCase(conditionOnDelivery)) {
             updateEquipmentByShipmentSalesOrder(saved, EquipmentStatus.INSTALLED);
-
             if (saved.getSoId() != null) {
                 SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(saved.getSoId())
                         .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + saved.getSoId()));
@@ -141,9 +152,66 @@ public class ShipmentService {
                 salesOrderRepository.save(so);
                 createWarrantiesForSalesOrder(so, saved.getActualArrival());
             }
+        } else if ("DAMAGED".equalsIgnoreCase(conditionOnDelivery)) {
+            updateEquipmentByShipmentSalesOrder(saved, EquipmentStatus.UNDER_MAINTENANCE);
         }
 
         return toDto(saved);
+    }
+
+    /**
+     * Central status cascade: fires whenever shipment status changes.
+     * Ensures equipment status, SO status, and warranties stay in sync.
+     */
+    private void applyStatusCascade(Shipment shipment, String oldStatus, String newStatus, String conditionOnDelivery) {
+        if (newStatus == null) return;
+        if (oldStatus != null && oldStatus.equalsIgnoreCase(newStatus)) return;
+
+        if ("IN_TRANSIT".equalsIgnoreCase(newStatus)) {
+            updateEquipmentByShipmentSalesOrder(shipment, EquipmentStatus.IN_TRANSIT);
+
+        } else if ("DELIVERED".equalsIgnoreCase(newStatus)) {
+            if (shipment.getActualArrival() == null) {
+                shipment.setActualArrival(LocalDate.now());
+                shipmentRepository.save(shipment);
+            }
+            boolean isDamaged = "DAMAGED".equalsIgnoreCase(conditionOnDelivery);
+            if (isDamaged) {
+                updateEquipmentByShipmentSalesOrder(shipment, EquipmentStatus.UNDER_MAINTENANCE);
+            } else {
+                updateEquipmentByShipmentSalesOrder(shipment, EquipmentStatus.INSTALLED);
+                if (shipment.getSoId() != null) {
+                    SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(shipment.getSoId()).orElse(null);
+                    if (so != null) {
+                        so.setStatus("INSTALLED");
+                        salesOrderRepository.save(so);
+                        createWarrantiesForSalesOrder(so, shipment.getActualArrival());
+                    }
+                }
+            }
+
+        } else if ("CANCELLED".equalsIgnoreCase(newStatus) || "RETURNED".equalsIgnoreCase(newStatus)) {
+            revertEquipmentToStock(shipment);
+        }
+    }
+
+    /**
+     * Reverts equipment linked via SO back to IN_WAREHOUSE when shipment is cancelled or returned.
+     */
+    private void revertEquipmentToStock(Shipment shipment) {
+        if (shipment.getSoId() == null) return;
+        SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(shipment.getSoId()).orElse(null);
+        if (so == null || so.getItems() == null) return;
+        for (SalesOrderItem item : so.getItems()) {
+            if (item.getEquipmentId() == null) continue;
+            Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId()).orElse(null);
+            if (equipment == null) continue;
+            if (equipment.getStatus() == EquipmentStatus.IN_TRANSIT
+                    || equipment.getStatus() == EquipmentStatus.RESERVED) {
+                equipment.setStatus(EquipmentStatus.IN_WAREHOUSE);
+                equipmentRepository.save(equipment);
+            }
+        }
     }
 
     private void updateEquipmentByShipmentSalesOrder(Shipment shipment, EquipmentStatus status) {

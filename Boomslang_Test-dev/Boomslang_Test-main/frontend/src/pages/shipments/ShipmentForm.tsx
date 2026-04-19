@@ -12,7 +12,7 @@ import { Equipment, PurchaseOrder, SalesOrder, Subcontractor, Supplier } from '.
 import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
 
-const SHIPMENT_STATUSES = ['PENDING', 'IN_TRANSIT', 'CUSTOMS_CLEARANCE', 'DELIVERED', 'RETURNED', 'CANCELLED']
+const SHIPMENT_STATUSES = ['PREPARING', 'BOOKED', 'IN_TRANSIT', 'CUSTOMS_CLEARANCE', 'DELIVERED', 'RETURNED', 'CANCELLED']
 const SHIPMENT_TYPES = ['SEA', 'AIR', 'ROAD']
 const CARRIERS = ['DHL', 'FEDEX', 'TNT', 'MAERSK', 'MSC', 'HAPAG_LLOYD', 'AIR_FREIGHT', 'ROAD', 'OTHER']
 const CURRENCIES = ['AUD', 'USD', 'JPY', 'EUR', 'GBP']
@@ -33,6 +33,7 @@ interface FormData {
   poId: string
   equipmentId: string
   subcontractorId: string
+  conditionOnDelivery: string
   notes: string
 }
 
@@ -52,6 +53,7 @@ const defaultForm: FormData = {
   poId: '',
   equipmentId: '',
   subcontractorId: '',
+  conditionOnDelivery: '',
   notes: '',
 }
 
@@ -123,7 +125,7 @@ export default function ShipmentForm() {
           shipmentType,
           originCountry: e.originCountry || '',
           destinationCountry: e.destinationCountry || '',
-          status: e.status || 'PENDING',
+          status: e.status || 'PREPARING',
           shippedDate: e.shippedDate || '',
           estimatedArrival: e.estimatedArrival || '',
           actualArrival: e.actualArrival || '',
@@ -133,6 +135,7 @@ export default function ShipmentForm() {
           poId: e.poId || '',
           equipmentId,
           subcontractorId,
+          conditionOnDelivery: '',
           notes: cleanedNotes,
         })
       }
@@ -264,6 +267,7 @@ export default function ShipmentForm() {
         currency: form.currency,
         soId: form.soId || null,
         poId: form.poId || null,
+        conditionOnDelivery: form.status === 'DELIVERED' ? (form.conditionOnDelivery || 'GOOD') : null,
         notes: notesWithWorkflowFields || null,
       }
 
@@ -313,6 +317,15 @@ export default function ShipmentForm() {
                   {SHIPMENT_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                 </select>
               </div>
+              {form.status === 'DELIVERED' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Condition on Delivery *</label>
+                  <select name="conditionOnDelivery" value={form.conditionOnDelivery} onChange={handleChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="GOOD">GOOD — equipment → Installed</option>
+                    <option value="DAMAGED">DAMAGED — equipment → Under Maintenance</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Shipment Type</label>
                 <select name="shipmentType" value={form.shipmentType} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">

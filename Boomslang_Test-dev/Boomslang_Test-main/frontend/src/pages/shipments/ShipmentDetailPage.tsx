@@ -79,9 +79,12 @@ export default function ShipmentDetailPage() {
               <label className="block text-sm font-medium">Status</label>
               <select name="status" value={displayData?.status || 'PREPARING'} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100">
                 <option value="PREPARING">Preparing</option>
+                <option value="BOOKED">Booked</option>
                 <option value="IN_TRANSIT">In Transit</option>
-                <option value="CUSTOMS">Customs</option>
+                <option value="CUSTOMS_CLEARANCE">Customs Clearance</option>
                 <option value="DELIVERED">Delivered</option>
+                <option value="RETURNED">Returned</option>
+                <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
             <div>

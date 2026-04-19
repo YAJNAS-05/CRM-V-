@@ -3,6 +3,7 @@ package com.everx.erp.purchaseorder;
 import com.everx.erp.equipment.Equipment;
 import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.EquipmentStatus;
+import com.everx.erp.suppliers.SupplierRepository;
 import com.everx.erp.purchaseorder.dto.*;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
@@ -23,12 +24,20 @@ public class PurchaseOrderService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final EquipmentRepository equipmentRepository;
+    private final SupplierRepository supplierRepository;
 
     @Transactional
     public PurchaseOrderDto createPurchaseOrder(CreatePurchaseOrderRequest request) {
         if (purchaseOrderRepository.findByPoNumber(request.getPoNumber()).isPresent()) {
             throw new ValidationException("Purchase order with PO number " + request.getPoNumber() + " already exists");
         }
+
+        // WORKFLOW RULE: Purchase orders must be linked to an existing supplier
+        if (request.getSupplierId() == null) {
+            throw new ValidationException("Purchase order must be linked to a Supplier.");
+        }
+        supplierRepository.findByIdAndNotDeleted(request.getSupplierId())
+                .orElseThrow(() -> new EntityNotFoundException("Supplier not found with id: " + request.getSupplierId()));
 
         PurchaseOrder po = new PurchaseOrder();
         po.setPoNumber(request.getPoNumber());

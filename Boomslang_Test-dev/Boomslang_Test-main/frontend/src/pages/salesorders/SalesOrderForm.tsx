@@ -10,7 +10,7 @@ import SearchableLookupSelect from '../../components/form/SearchableLookupSelect
 const SO_STATUSES = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'CANCELLED']
 const CURRENCIES = ['AUD', 'USD', 'JPY', 'EUR', 'GBP']
 const INCOTERMS = ['EXW', 'FOB', 'CIF', 'DAP', 'DDP', 'CFR', 'FCA']
-const AVAILABLE_EQUIPMENT_STATUSES = new Set(['IN_STOCK', 'IN_WAREHOUSE', 'AVAILABLE'])
+const SELLABLE_EQUIPMENT_STATUSES = new Set(['IN_STOCK', 'IN_WAREHOUSE', 'AVAILABLE', 'RESERVED'])
 
 interface FormData {
   soNumber: string
@@ -82,21 +82,23 @@ export default function SalesOrderForm() {
     try {
       setLookupLoading(true)
 
-      const [accountsResponse, dealsResponse, equipmentResponse] = await Promise.all([
-        accountApi.getAll(0, 200),
-        dealApi.getAll(0, 200),
-        equipmentApi.getAll(0, 200),
+      const [accountsResult, dealsResult, equipmentResult] = await Promise.allSettled([
+        accountApi.getAll(0, 500),
+        dealApi.getAll(0, 500),
+        equipmentApi.getAll(0, 500),
       ])
 
-      const accountRows = accountsResponse.data?.data?.content || []
-      const dealRows = dealsResponse.data?.data?.content || []
-      const equipmentRows = equipmentResponse.data?.content || []
-
-      setAccounts(accountRows)
-      setDeals(dealRows)
-      setEquipment(equipmentRows)
+      if (accountsResult.status === 'fulfilled') {
+        setAccounts(accountsResult.value.data?.data?.content || [])
+      }
+      if (dealsResult.status === 'fulfilled') {
+        setDeals(dealsResult.value.data?.data?.content || [])
+      }
+      if (equipmentResult.status === 'fulfilled') {
+        setEquipment(equipmentResult.value.data?.content || [])
+      }
     } catch {
-      toast.error('Some lookup lists could not be loaded')
+      // non-fatal
     } finally {
       setLookupLoading(false)
     }
@@ -200,7 +202,7 @@ export default function SalesOrderForm() {
       equipment
         .filter(
           (item) =>
-            AVAILABLE_EQUIPMENT_STATUSES.has(item.status) || item.id === form.equipmentId
+            SELLABLE_EQUIPMENT_STATUSES.has(item.status) || item.id === form.equipmentId
         )
         .map((item) => ({
           value: item.id,
@@ -214,8 +216,13 @@ export default function SalesOrderForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.soNumber || !form.accountId || !form.status || !form.equipmentId) {
-      toast.error('SO Number, Account, Equipment, and Status are required')
+    const missing: string[] = []
+    if (!form.soNumber) missing.push('SO Number')
+    if (!form.accountId) missing.push('Account (create one in CRM → Accounts first)')
+    if (!form.equipmentId) missing.push('Equipment')
+    if (!form.status) missing.push('Status')
+    if (missing.length > 0) {
+      toast.error(`Required: ${missing.join(', ')}`)
       return
     }
 
@@ -264,12 +271,22 @@ export default function SalesOrderForm() {
 
       if (isEdit) {
         const response = await salesOrderApi.update(id!, payload)
-        if (response.data.success) { toast.success('Sales order updated'); navigate('/erp/sales-orders') }
+        if (response.data.success) {
+          toast.success('Sales order updated')
+          navigate('/erp/sales-orders')
+        } else {
+          toast.error(response.data.message || 'Failed to update sales order')
+        }
       } else {
         const response = await salesOrderApi.create(payload)
-        if (response.data.success) { toast.success('Sales order created'); navigate('/erp/sales-orders') }
+        if (response.data.success) {
+          toast.success('Sales order created')
+          navigate('/erp/sales-orders')
+        } else {
+          toast.error(response.data.message || 'Failed to create sales order')
+        }
       }
-    } catch (error: any) { toast.error(error?.response?.data?.message || 'Failed to save sales order') }
+    } catch (error: any) { toast.error(error?.response?.data?.message || error?.message || 'Failed to save sales order') }
     finally { setSaving(false) }
   }
 
@@ -302,6 +319,7 @@ export default function SalesOrderForm() {
                 required
                 disabled={lookupLoading}
                 placeholder="Search account by company name"
+                helperText={accounts.length === 0 ? '⚠ No accounts found — create one in CRM → Accounts first' : undefined}
               />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>

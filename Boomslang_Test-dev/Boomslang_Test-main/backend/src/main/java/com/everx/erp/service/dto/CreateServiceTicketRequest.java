@@ -37,4 +37,5 @@ public class CreateServiceTicketRequest {
     private String description;
     private String resolutionNotes;
     private BigDecimal cost;
+    private UUID[] partsUsedIds;
 }

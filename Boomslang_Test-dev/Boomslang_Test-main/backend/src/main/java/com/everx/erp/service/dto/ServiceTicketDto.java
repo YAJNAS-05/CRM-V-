@@ -30,6 +30,11 @@ public class ServiceTicketDto {
     private String description;
     private String resolutionNotes;
     private BigDecimal cost;
+    private Boolean billable;
+    private Boolean underWarranty;
+    private UUID linkedWarrantyId;
+    private UUID linkedInvoiceId;
+    private UUID[] partsUsedIds;
     private Instant createdAt;
     private Instant updatedAt;
 }

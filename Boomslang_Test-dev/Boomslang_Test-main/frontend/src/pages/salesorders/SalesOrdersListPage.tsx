@@ -86,6 +86,7 @@ export default function SalesOrdersListPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destination</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -103,6 +104,14 @@ export default function SalesOrdersListPage() {
                 <td className="px-6 py-4 text-sm text-gray-500">{order.destinationCountry}</td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {order.totalAmount ? `${order.currency} ${order.totalAmount.toLocaleString()}` : 'N/A'}
+                </td>
+                <td className="px-6 py-4 text-sm">
+                  <button
+                    onClick={() => navigate(`/erp/sales-orders/${order.id}/edit`)}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Edit
+                  </button>
                 </td>
               </tr>
             ))}

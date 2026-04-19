@@ -187,6 +187,45 @@ public class SalesOrderService {
         return toDto(savedSo);
     }
 
+    @Transactional
+    public SalesOrderDto cancelSalesOrder(UUID id) {
+        SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + id));
+
+        if ("INSTALLED".equals(so.getStatus()) || "DELIVERED".equals(so.getStatus())) {
+            throw new ValidationException("Cannot cancel a sales order that has already been delivered or installed");
+        }
+        if ("CANCELLED".equals(so.getStatus())) {
+            throw new ValidationException("Sales order is already cancelled");
+        }
+
+        // Release reserved/in-transit equipment back to warehouse
+        if (so.getItems() != null) {
+            for (SalesOrderItem item : so.getItems()) {
+                if (item.getEquipmentId() == null) continue;
+                Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId()).orElse(null);
+                if (equipment == null) continue;
+                if (equipment.getStatus() == EquipmentStatus.RESERVED
+                        || equipment.getStatus() == EquipmentStatus.IN_TRANSIT) {
+                    equipment.setStatus(EquipmentStatus.IN_WAREHOUSE);
+                    equipmentRepository.save(equipment);
+                }
+            }
+        }
+
+        // Cancel any active shipments linked to this SO
+        shipmentRepository.findBySoId(so.getId(), PageRequest.of(0, 100)).getContent().forEach(shipment -> {
+            if (!"DELIVERED".equalsIgnoreCase(shipment.getStatus())
+                    && !"CANCELLED".equalsIgnoreCase(shipment.getStatus())) {
+                shipment.setStatus("CANCELLED");
+                shipmentRepository.save(shipment);
+            }
+        });
+
+        so.setStatus("CANCELLED");
+        return toDto(salesOrderRepository.save(so));
+    }
+
     private void createDepositInvoice(SalesOrder so) {
         BigDecimal total = so.getTotalAmount() == null ? BigDecimal.ZERO : so.getTotalAmount();
         BigDecimal deposit = total.multiply(new BigDecimal("0.30"));

@@ -87,12 +87,17 @@ export default function PurchaseOrdersListPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Delivery</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{order.poNumber}</td>
+              <tr
+                key={order.id}
+                className="hover:bg-gray-50 cursor-pointer"
+                onClick={() => navigate(`/erp/purchase-orders/${order.id}`)}
+              >
+                <td className="px-6 py-4 text-sm font-medium text-blue-600 hover:underline">{order.poNumber}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(order.status)}`}>
                     {order.status}
@@ -106,6 +111,14 @@ export default function PurchaseOrdersListPage() {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {order.totalAmount ? `${order.currency} ${order.totalAmount.toLocaleString()}` : 'N/A'}
+                </td>
+                <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => navigate(`/erp/purchase-orders/${order.id}/edit`)}
+                    className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition"
+                  >
+                    Edit
+                  </button>
                 </td>
               </tr>
             ))}

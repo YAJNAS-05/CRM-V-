@@ -60,6 +60,11 @@ public class SalesOrderController {
         return ResponseEntity.ok(ApiResponse.ok(salesOrderService.confirmSalesOrder(id), "Sales order confirmed and downstream records generated"));
     }
 
+    @PatchMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<SalesOrderDto>> cancelSalesOrder(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(salesOrderService.cancelSalesOrder(id), "Sales order cancelled and equipment released back to warehouse"));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteSalesOrder(@PathVariable UUID id) {
         salesOrderService.deleteSalesOrder(id);
