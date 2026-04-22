@@ -18,6 +18,7 @@ public class InvoiceResponse {
     private UUID id;
     private String invoiceNumber;
     private UUID soId;
+    private UUID poId;
     private UUID accountId;
     private Invoice.InvoiceEntity entity;
     private Invoice.InvoiceType type;

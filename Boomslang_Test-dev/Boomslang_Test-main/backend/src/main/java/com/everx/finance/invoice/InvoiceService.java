@@ -3,6 +3,8 @@ package com.everx.finance.invoice;
 import com.everx.finance.invoice.dto.CreateInvoiceRequest;
 import com.everx.finance.invoice.dto.InvoiceResponse;
 import com.everx.finance.invoice.dto.UpdateInvoiceRequest;
+import com.everx.finance.fx.FxRateLockingService;
+import com.everx.finance.period.PostingPeriodEnforcer;
 import com.everx.finance.period.PostingPeriodService;
 import com.everx.shared.exception.AccountingImmutabilityException;
 import com.everx.shared.exception.EntityNotFoundException;
@@ -28,6 +30,8 @@ public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final PostingPeriodService postingPeriodService;
+    private final PostingPeriodEnforcer postingPeriodEnforcer;
+    private final FxRateLockingService fxRateLockingService;
 
     private static final Set<Invoice.InvoiceStatus> IMMUTABLE_STATUSES = new HashSet<>(List.of(
         Invoice.InvoiceStatus.SENT,
@@ -108,10 +112,12 @@ public class InvoiceService {
 
         // Enforce posting period is open before creating invoice
         postingPeriodService.assertPeriodOpen(request.getEntity().name(), request.getIssueDate());
+        postingPeriodEnforcer.enforceNoBackdating(request.getIssueDate());
 
         Invoice invoice = Invoice.builder()
                 .invoiceNumber(invoiceNumber)
                 .soId(request.getSoId())
+            .poId(request.getPoId())
                 .accountId(request.getAccountId())
                 .entity(request.getEntity())
                 .type(request.getType())
@@ -130,6 +136,14 @@ public class InvoiceService {
         invoice.setUpdatedAt(OffsetDateTime.now());
 
         Invoice saved = invoiceRepository.save(invoice);
+
+        fxRateLockingService.lockRatesForInvoice(
+            saved.getId(),
+            saved.getEntity(),
+            saved.getCurrency(),
+            saved.getIssueDate()
+        );
+
         return toResponse(saved);
     }
 
@@ -205,6 +219,7 @@ public class InvoiceService {
                 .id(invoice.getId())
                 .invoiceNumber(invoice.getInvoiceNumber())
                 .soId(invoice.getSoId())
+                .poId(invoice.getPoId())
                 .accountId(invoice.getAccountId())
                 .entity(invoice.getEntity())
                 .type(invoice.getType())

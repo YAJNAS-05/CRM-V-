@@ -34,4 +34,6 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
                         ORDER BY a.createdAt DESC
                         """)
         Page<Account> search(@Param("query") String query, Pageable pageable);
+    
+        long countByOwnerIdAndIsDeletedFalse(UUID ownerId);
 }

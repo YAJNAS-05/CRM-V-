@@ -2,11 +2,23 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Filter, Edit, Trash2, Package } from 'lucide-react'
 import { inventoryApi } from '../../../api/erpApi'
-import { InventoryItem } from '../../../types/erp'
+import { InventoryItem, ReorderSuggestion } from '../../../types/erp'
 import { ApiResponse } from '../../../types'
-import { useAuthStore } from '../../../store/authStore'
 import { toast } from 'react-hot-toast'
 import { exportToExcel, getExportDateStamp } from '../../../utils/exportToExcel'
+
+const INVENTORY_CATEGORIES = [
+  'EQUIPMENT',
+  'EQUIPMENT_ACCESSORY',
+  'SPARE_PARTS',
+  'CONSUMABLE',
+  'CONSUMABLES',
+  'RAW_MATERIALS',
+  'PACKING_MATERIAL',
+  'SAFETY',
+  'TOOL',
+  'OTHER',
+]
 
 const InventoryList: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -16,13 +28,18 @@ const InventoryList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
-  const { user } = useAuthStore()
+  const [reorderSuggestions, setReorderSuggestions] = useState<ReorderSuggestion[]>([])
+  const [reorderLoading, setReorderLoading] = useState(false)
 
   const pageSize = 20
 
   useEffect(() => {
     fetchInventory()
   }, [currentPage, categoryFilter, statusFilter])
+
+  useEffect(() => {
+    fetchReorderSuggestions()
+  }, [])
 
   const fetchInventory = async () => {
     try {
@@ -46,6 +63,20 @@ const InventoryList: React.FC = () => {
       toast.error('Failed to load inventory items')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchReorderSuggestions = async () => {
+    try {
+      setReorderLoading(true)
+      const response = await inventoryApi.getReorderSuggestions()
+      if (response.success) {
+        setReorderSuggestions(response.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching reorder suggestions:', error)
+    } finally {
+      setReorderLoading(false)
     }
   }
 
@@ -79,7 +110,7 @@ const InventoryList: React.FC = () => {
       Quantity: item.quantity,
       UnitOfMeasure: item.unitOfMeasure,
       MinStockLevel: item.minStockLevel,
-      UnitPrice: item.unitPrice,
+      UnitPrice: item.unitPrice || 0,
       Location: item.location || '',
       Status: item.status,
     }))
@@ -125,6 +156,18 @@ const InventoryList: React.FC = () => {
           <p className="text-gray-600">Manage your inventory items and stock levels</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to="/erp/inventory/ledger"
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Ledger
+          </Link>
+          <Link
+            to="/erp/inventory/transfers"
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Transfers
+          </Link>
           <button
             onClick={handleExport}
             disabled={filteredInventory.length === 0}
@@ -141,6 +184,47 @@ const InventoryList: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {reorderSuggestions.length > 0 && (
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Reorder Suggestions</h2>
+              <p className="text-sm text-gray-600">Items below reorder point with suggested quantities.</p>
+            </div>
+            {reorderLoading && (
+              <span className="text-xs text-gray-500">Refreshing...</span>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Suggested Qty</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reorderSuggestions.map((suggestion) => (
+                  <tr key={suggestion.itemId}>
+                    <td className="px-4 py-2 text-sm text-gray-900">
+                      <div className="font-medium">{suggestion.itemCode}</div>
+                      <div className="text-xs text-gray-500">{suggestion.name}</div>
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{suggestion.currentStock}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{suggestion.reorderPoint}</td>
+                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">{suggestion.suggestedQuantity}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600">{suggestion.location || 'MAIN'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow">
@@ -161,10 +245,11 @@ const InventoryList: React.FC = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Categories</option>
-            <option value="EQUIPMENT">Equipment</option>
-            <option value="SPARE_PARTS">Spare Parts</option>
-            <option value="CONSUMABLES">Consumables</option>
-            <option value="RAW_MATERIALS">Raw Materials</option>
+            {INVENTORY_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category.replace(/_/g, ' ')}
+              </option>
+            ))}
           </select>
           <select
             value={statusFilter}
@@ -222,7 +307,7 @@ const InventoryList: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredInventory.map((item) => {
-                const stockStatus = getStockStatus(item.quantity, item.minStockLevel)
+                const stockStatus = getStockStatus(item.quantity, item.minStockLevel || 0)
                 return (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -252,7 +337,7 @@ const InventoryList: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${item.unitPrice.toFixed(2)}
+                      ${Number(item.unitPrice || 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>

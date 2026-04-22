@@ -30,4 +30,6 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, UUID> {
 
     @Query("SELECT s FROM SalesOrder s WHERE s.isDeleted = false AND s.dealId = :dealId")
     Page<SalesOrder> findByDealId(@Param("dealId") UUID dealId, Pageable pageable);
+
+    long countByCreatedByAndIsDeletedFalse(UUID createdBy);
 }

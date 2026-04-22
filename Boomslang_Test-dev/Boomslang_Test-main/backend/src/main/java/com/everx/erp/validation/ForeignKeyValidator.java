@@ -8,7 +8,7 @@ import com.everx.erp.suppliers.SupplierRepository;
 import com.everx.erp.salesorder.SalesOrderRepository;
 import com.everx.erp.purchaseorder.PurchaseOrderRepository;
 import com.everx.erp.logistics.ShipmentRepository;
-import com.everx.erp.service.ServiceTicketRepository;
+import com.everx.erp.fieldwork.FieldJobRepository;
 import com.everx.erp.warranty.WarrantyRepository;
 import com.everx.erp.spareparts.SparePartRepository;
 import com.everx.erp.subcontractors.SubcontractorRepository;
@@ -32,7 +32,7 @@ public class ForeignKeyValidator {
     private final SalesOrderRepository salesOrderRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final ShipmentRepository shipmentRepository;
-    private final ServiceTicketRepository serviceTicketRepository;
+    private final FieldJobRepository fieldJobRepository;
     private final WarrantyRepository warrantyRepository;
     private final SparePartRepository sparePartRepository;
     private final SubcontractorRepository subcontractorRepository;
@@ -91,12 +91,12 @@ public class ForeignKeyValidator {
     }
 
     /**
-     * Validates that a referenced ServiceTicket exists
+     * Validates that a referenced FieldJob exists
      */
-    public void validateServiceTicketExists(UUID ticketId) {
-        if (ticketId == null) return;
-        if (!serviceTicketRepository.existsById(ticketId)) {
-            throw new ValidationException("Service Ticket not found: " + ticketId);
+    public void validateFieldJobExists(UUID jobId) {
+        if (jobId == null) return;
+        if (!fieldJobRepository.existsById(jobId)) {
+            throw new ValidationException("Field job not found: " + jobId);
         }
     }
 

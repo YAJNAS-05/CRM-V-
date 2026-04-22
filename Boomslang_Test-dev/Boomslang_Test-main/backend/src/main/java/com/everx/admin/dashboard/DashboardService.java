@@ -5,9 +5,9 @@ import com.everx.crm.deal.Deal;
 import com.everx.crm.deal.DealRepository;
 import com.everx.erp.equipment.Equipment;
 import com.everx.erp.equipment.EquipmentRepository;
-import com.everx.erp.service.ServiceStatus;
-import com.everx.erp.service.ServiceTicket;
-import com.everx.erp.service.ServiceTicketRepository;
+import com.everx.erp.fieldwork.FieldJob;
+import com.everx.erp.fieldwork.FieldJobRepository;
+import com.everx.erp.fieldwork.FieldJobStatus;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class DashboardService {
 
     private final DealRepository dealRepository;
     private final EquipmentRepository equipmentRepository;
-    private final ServiceTicketRepository serviceTicketRepository;
+        private final FieldJobRepository fieldJobRepository;
     private final InvoiceRepository invoiceRepository;
 
     @Transactional(readOnly = true)
@@ -74,21 +74,21 @@ public class DashboardService {
             equipmentByStatus.merge(status, 1L, (oldVal, newVal) -> oldVal + newVal);
         }
 
-        List<ServiceTicket> tickets = serviceTicketRepository.findAll().stream()
-                .filter(t -> t != null && !Boolean.TRUE.equals(t.getIsDeleted()) && t.getStatus() != ServiceStatus.CLOSED)
+        List<FieldJob> jobs = fieldJobRepository.findAll().stream()
+                .filter(j -> j != null && !Boolean.TRUE.equals(j.getIsDeleted()) && j.getJobStatus() != FieldJobStatus.COMPLETED)
                 .collect(Collectors.toList());
 
-        Map<String, Long> ticketsByPriority = new HashMap<>();
-        for (ServiceTicket t : tickets) {
-            String priority = t.getPriority() != null ? t.getPriority().name() : "UNKNOWN";
-            ticketsByPriority.merge(priority, 1L, (oldVal, newVal) -> oldVal + newVal);
+        Map<String, Long> jobsByPriority = new HashMap<>();
+        for (FieldJob job : jobs) {
+            String priority = job.getPriority() != null ? job.getPriority().name() : "UNKNOWN";
+            jobsByPriority.merge(priority, 1L, (oldVal, newVal) -> oldVal + newVal);
         }
 
         return DashboardResponse.ERPStats.builder()
                 .totalEquipment(equipment.size())
                 .equipmentByStatus(equipmentByStatus)
-                .openServiceTickets(tickets.size())
-                .ticketsByPriority(ticketsByPriority)
+                .openFieldJobs(jobs.size())
+                .jobsByPriority(jobsByPriority)
                 .build();
     }
 

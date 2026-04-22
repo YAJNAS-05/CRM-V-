@@ -40,4 +40,6 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
                         ORDER BY l.createdAt DESC
                         """)
         Page<Lead> search(@Param("query") String query, @Param("status") String status, @Param("source") String source, Pageable pageable);
+
+    long countByOwnerIdAndIsDeletedFalse(UUID ownerId);
 }

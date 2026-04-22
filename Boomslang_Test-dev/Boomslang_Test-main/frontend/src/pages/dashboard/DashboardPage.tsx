@@ -198,7 +198,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
                 <div className="mt-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                   {canViewUserDashboard && (
                     <Link
-                      to="/crm/dashboard/user"
+                      to="/dashboard/crm/user"
                       className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedDashboardMode === 'SELF' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                     >
                       User Dashboard
@@ -206,7 +206,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
                   )}
                   {canViewTeamDashboard && (
                     <Link
-                      to="/crm/dashboard/team"
+                      to="/dashboard/crm/team"
                       className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedDashboardMode === 'TEAM' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                     >
                       Team Dashboard

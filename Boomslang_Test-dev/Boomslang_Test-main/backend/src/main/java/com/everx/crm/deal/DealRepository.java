@@ -37,4 +37,6 @@ public interface DealRepository extends JpaRepository<Deal, UUID> {
                         ORDER BY d.createdAt DESC
                         """)
         Page<Deal> search(@Param("query") String query, @Param("stage") DealStage stage, Pageable pageable);
+
+    long countByOwnerIdAndIsDeletedFalse(UUID ownerId);
 }

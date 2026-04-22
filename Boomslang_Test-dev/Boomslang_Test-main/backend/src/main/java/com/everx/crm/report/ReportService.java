@@ -12,10 +12,10 @@ import com.everx.crm.deal.DealRepository;
 import com.everx.crm.contact.ContactRepository;
 import com.everx.crm.lead.Lead;
 import com.everx.crm.lead.LeadRepository;
+import com.everx.shared.service.DataScopeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,9 +37,6 @@ import java.util.stream.Collectors;
 @Service("crmReportService")
 @RequiredArgsConstructor
 public class ReportService {
-
-        private static final String TEAM_SCOPE_PERMISSION = "DASHBOARD_TEAM_VIEW";
-
         private enum ForcedScope {
                 AUTO,
                 SELF,
@@ -52,6 +49,7 @@ public class ReportService {
     private final DealRepository dealRepository;
     private final ActivityRepository activityRepository;
     private final UserRepository userRepository;
+        private final DataScopeService dataScopeService;
 
     @Transactional(readOnly = true)
     public ReportResponse.DashboardKPIs getDashboardKPIs() {
@@ -277,21 +275,17 @@ public class ReportService {
 
                 UUID viewerUserId = extractViewerUserId(authentication);
 
+                DataScopeService.DataScope forcedDataScope = null;
                 if (forcedScope == ForcedScope.SELF) {
-                        return new ReportScope(false, viewerUserId);
+                        forcedDataScope = DataScopeService.DataScope.OWN;
+                } else if (forcedScope == ForcedScope.TEAM) {
+                        forcedDataScope = DataScopeService.DataScope.TEAM;
                 }
 
-                if (forcedScope == ForcedScope.TEAM) {
-                        return new ReportScope(true, viewerUserId);
-                }
+                DataScopeService.DataScope resolvedScope = dataScopeService.resolveScope(authentication, forcedDataScope);
+                boolean teamScope = resolvedScope == DataScopeService.DataScope.TEAM
+                                || resolvedScope == DataScopeService.DataScope.ORG;
 
-                Set<String> permissionNames = authentication.getAuthorities().stream()
-                                .map(GrantedAuthority::getAuthority)
-                                .filter(authority -> authority != null && !authority.startsWith("ROLE_"))
-                                .map(String::toUpperCase)
-                                .collect(Collectors.toSet());
-
-                boolean teamScope = permissionNames.contains(TEAM_SCOPE_PERMISSION);
                 return new ReportScope(teamScope, viewerUserId);
         }
 

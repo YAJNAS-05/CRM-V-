@@ -5,6 +5,7 @@ import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.shared.service.MailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,7 @@ public class FinanceScheduler {
      * Every Monday at 9 AM: Check for overdue invoices and alert finance team.
      */
     @Scheduled(cron = "0 0 9 * * MON")
+    @SchedulerLock(name = "alertOverdueInvoices", lockAtMostFor = "30m", lockAtLeastFor = "2m")
     public void alertOverdueInvoices() {
         log.info("Running scheduled job: alertOverdueInvoices");
         List<Invoice> overdueInvoices = invoiceRepository.findOverdueInvoices(LocalDate.now());

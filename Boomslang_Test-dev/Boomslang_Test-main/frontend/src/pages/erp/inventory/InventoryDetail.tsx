@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Edit, Trash2, Package, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
 import { inventoryApi } from '../../../api/erpApi'
-import { InventoryItem } from '../../../types/erp'
-import { ApiResponse } from '../../../types'
-import { useAuthStore } from '../../../store/authStore'
+import { InventoryItem, InventoryBin, InventoryLedgerEntry, StockAdjustmentType } from '../../../types/erp'
 import { toast } from 'react-hot-toast'
 
 const InventoryDetail: React.FC = () => {
@@ -12,13 +10,42 @@ const InventoryDetail: React.FC = () => {
   const navigate = useNavigate()
   const [inventoryItem, setInventoryItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState(true)
-  const { user } = useAuthStore()
+  const [bins, setBins] = useState<InventoryBin[]>([])
+  const [ledgerEntries, setLedgerEntries] = useState<InventoryLedgerEntry[]>([])
+  const [ledgerPage, setLedgerPage] = useState(0)
+  const [ledgerTotalPages, setLedgerTotalPages] = useState(0)
+  const [adjustmentType, setAdjustmentType] = useState<StockAdjustmentType>('INCREASE')
+  const [adjustmentLocation, setAdjustmentLocation] = useState('')
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState('')
+  const [adjustmentUnitCost, setAdjustmentUnitCost] = useState('')
+  const [adjustmentNotes, setAdjustmentNotes] = useState('')
+  const [adjusting, setAdjusting] = useState(false)
 
   useEffect(() => {
     if (id) {
       fetchInventoryItem(id)
     }
   }, [id])
+
+  useEffect(() => {
+    if (id) {
+      fetchBins(id)
+      fetchLedger(id, ledgerPage)
+    }
+  }, [id, ledgerPage])
+
+  useEffect(() => {
+    if (!inventoryItem) {
+      return
+    }
+
+    if (!adjustmentLocation) {
+      setAdjustmentLocation(inventoryItem.location || 'MAIN')
+    }
+    if (!adjustmentUnitCost && inventoryItem.unitPrice) {
+      setAdjustmentUnitCost(inventoryItem.unitPrice.toString())
+    }
+  }, [inventoryItem, adjustmentLocation, adjustmentUnitCost])
 
   const fetchInventoryItem = async (itemId: string) => {
     try {
@@ -33,6 +60,29 @@ const InventoryDetail: React.FC = () => {
       navigate('/erp/inventory')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchBins = async (itemId: string) => {
+    try {
+      const response = await inventoryApi.getBins(itemId)
+      if (response.success) {
+        setBins(response.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching inventory bins:', error)
+    }
+  }
+
+  const fetchLedger = async (itemId: string, page: number) => {
+    try {
+      const response = await inventoryApi.getLedger({ itemId, page, size: 10 })
+      if (response.success) {
+        setLedgerEntries(response.data?.content || [])
+        setLedgerTotalPages(response.data?.totalPages || 0)
+      }
+    } catch (error) {
+      console.error('Error fetching inventory ledger:', error)
     }
   }
 
@@ -51,6 +101,53 @@ const InventoryDetail: React.FC = () => {
     }
   }
 
+  const handleAdjustStock = async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    if (!id) {
+      return
+    }
+
+    const quantityValue = Number(adjustmentQuantity)
+    if (!quantityValue || quantityValue <= 0) {
+      toast.error('Quantity must be greater than zero')
+      return
+    }
+
+    const unitCostValue = adjustmentUnitCost.trim() === '' ? undefined : Number(adjustmentUnitCost)
+    if (unitCostValue !== undefined && Number.isNaN(unitCostValue)) {
+      toast.error('Unit cost must be a valid number')
+      return
+    }
+
+    try {
+      setAdjusting(true)
+      const locationValue = adjustmentLocation.trim() || inventoryItem?.location || 'MAIN'
+      const response = await inventoryApi.createStockAdjustment({
+        itemId: id,
+        location: locationValue,
+        quantity: quantityValue,
+        unitCost: unitCostValue,
+        notes: adjustmentNotes.trim() || undefined,
+        adjustmentType,
+      })
+
+      if (response.success) {
+        toast.success('Stock adjustment posted')
+        setAdjustmentQuantity('')
+        setAdjustmentNotes('')
+        fetchInventoryItem(id)
+        fetchBins(id)
+        fetchLedger(id, ledgerPage)
+      }
+    } catch (error) {
+      console.error('Error adjusting stock:', error)
+      toast.error('Failed to adjust stock')
+    } finally {
+      setAdjusting(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'bg-green-100 text-green-800'
@@ -65,6 +162,12 @@ const InventoryDetail: React.FC = () => {
     if (quantity <= minStockLevel) return { color: 'bg-yellow-100 text-yellow-800', text: 'Low Stock', icon: TrendingDown }
     return { color: 'bg-green-100 text-green-800', text: 'In Stock', icon: TrendingUp }
   }
+
+  const formatLedgerType = (entryType: string) =>
+    entryType
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase())
 
   if (loading) {
     return (
@@ -95,8 +198,9 @@ const InventoryDetail: React.FC = () => {
     )
   }
 
-  const stockStatus = getStockStatus(inventoryItem.quantity, inventoryItem.minStockLevel)
+  const stockStatus = getStockStatus(inventoryItem.quantity, inventoryItem.minStockLevel || 0)
   const StockIcon = stockStatus.icon
+  const unitPrice = Number(inventoryItem.unitPrice || 0)
 
   return (
     <div className="space-y-6">
@@ -117,7 +221,19 @@ const InventoryDetail: React.FC = () => {
             <p className="text-gray-600">Item Code: {inventoryItem.itemCode}</p>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to={`/erp/inventory/ledger?itemId=${id}`}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Ledger
+          </Link>
+          <Link
+            to={`/erp/inventory/transfers?itemId=${id}`}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Transfers
+          </Link>
           <Link
             to={`/erp/inventory/${id}/edit`}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
@@ -185,7 +301,7 @@ const InventoryDetail: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Unit Price</p>
               <p className="text-lg font-semibold text-gray-900">
-                ${inventoryItem.unitPrice.toFixed(2)}
+                ${unitPrice.toFixed(2)}
               </p>
             </div>
           </div>
@@ -237,7 +353,7 @@ const InventoryDetail: React.FC = () => {
           <dl className="space-y-4">
             <div>
               <dt className="text-sm font-medium text-gray-500">Unit Price</dt>
-              <dd className="mt-1 text-sm text-gray-900">${inventoryItem.unitPrice.toFixed(2)}</dd>
+              <dd className="mt-1 text-sm text-gray-900">${unitPrice.toFixed(2)}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Current Quantity</dt>
@@ -266,7 +382,7 @@ const InventoryDetail: React.FC = () => {
             <div>
               <dt className="text-sm font-medium text-gray-500">Total Value</dt>
               <dd className="mt-1 text-sm text-gray-900 font-semibold">
-                ${(inventoryItem.quantity * inventoryItem.unitPrice).toFixed(2)}
+                ${(inventoryItem.quantity * unitPrice).toFixed(2)}
               </dd>
             </div>
           </dl>
@@ -304,32 +420,196 @@ const InventoryDetail: React.FC = () => {
         </dl>
       </div>
 
+      {/* Storage Bins */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Storage Bins</h3>
+          <span className="text-sm text-gray-500">{bins.length} locations</span>
+        </div>
+        {bins.length === 0 ? (
+          <p className="text-sm text-gray-500">No bins yet. Adjust stock to create the first bin.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">On Hand</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reserved</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {bins.map((bin) => (
+                  <tr key={bin.id}>
+                    <td className="px-4 py-2 text-sm text-gray-900">{bin.location}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{bin.onHand}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{bin.reserved}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{bin.available}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{bin.reorderPoint ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Stock Adjustment */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Stock Adjustment</h3>
+        <form onSubmit={handleAdjustStock} className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Adjustment Type</label>
+            <select
+              value={adjustmentType}
+              onChange={(event) => setAdjustmentType(event.target.value as StockAdjustmentType)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="INCREASE">Increase</option>
+              <option value="DECREASE">Decrease</option>
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Location</label>
+            <input
+              type="text"
+              value={adjustmentLocation}
+              onChange={(event) => setAdjustmentLocation(event.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="MAIN"
+              required
+            />
+          </div>
+          <div className="md:col-span-1">
+            <label className="block text-sm font-medium text-gray-700">Quantity</label>
+            <input
+              type="number"
+              min="1"
+              value={adjustmentQuantity}
+              onChange={(event) => setAdjustmentQuantity(event.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="0"
+              required
+            />
+          </div>
+          <div className="md:col-span-1">
+            <label className="block text-sm font-medium text-gray-700">Unit Cost</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={adjustmentUnitCost}
+              onChange={(event) => setAdjustmentUnitCost(event.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="0.00"
+            />
+          </div>
+          <div className="md:col-span-6">
+            <label className="block text-sm font-medium text-gray-700">Notes</label>
+            <input
+              type="text"
+              value={adjustmentNotes}
+              onChange={(event) => setAdjustmentNotes(event.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Optional notes"
+            />
+          </div>
+          <div className="md:col-span-6 flex justify-end">
+            <button
+              type="submit"
+              disabled={adjusting}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {adjusting ? 'Posting...' : 'Post Adjustment'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Ledger Entries */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Recent Ledger Entries</h3>
+          <Link
+            to={`/erp/inventory/ledger?itemId=${id}`}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            View full ledger
+          </Link>
+        </div>
+        {ledgerEntries.length === 0 ? (
+          <p className="text-sm text-gray-500">No ledger activity yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {ledgerEntries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {entry.transactionAt ? new Date(entry.transactionAt).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{entry.location || 'MAIN'}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{formatLedgerType(entry.entryType)}</td>
+                    <td className={`px-4 py-2 text-sm font-semibold ${entry.quantityChange >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                      {entry.quantityChange}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">{entry.balanceAfter}</td>
+                    <td className="px-4 py-2 text-sm text-gray-500">{entry.notes || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {ledgerTotalPages > 1 && (
+          <div className="mt-4 flex justify-center space-x-2">
+            <button
+              onClick={() => setLedgerPage(Math.max(0, ledgerPage - 1))}
+              disabled={ledgerPage === 0}
+              className="px-3 py-2 rounded-md bg-white border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-2 text-sm text-gray-700">
+              Page {ledgerPage + 1} of {ledgerTotalPages}
+            </span>
+            <button
+              onClick={() => setLedgerPage(Math.min(ledgerTotalPages - 1, ledgerPage + 1))}
+              disabled={ledgerPage >= ledgerTotalPages - 1}
+              className="px-3 py-2 rounded-md bg-white border border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Audit Information */}
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Audit Information</h3>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <dt className="text-sm font-medium text-gray-500">Created By</dt>
+            <dt className="text-sm font-medium text-gray-500">Created At</dt>
             <dd className="mt-1 text-sm text-gray-900">
-              {inventoryItem.createdBy || 'System'}
+              {inventoryItem.createdAt ? new Date(inventoryItem.createdAt).toLocaleString() : 'Unknown'}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Created Date</dt>
+            <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
             <dd className="mt-1 text-sm text-gray-900">
-              {inventoryItem.createdDate ? new Date(inventoryItem.createdDate).toLocaleString() : 'Unknown'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500">Last Modified By</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              {inventoryItem.lastModifiedBy || 'System'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500">Last Modified Date</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              {inventoryItem.lastModifiedDate ? new Date(inventoryItem.lastModifiedDate).toLocaleString() : 'Unknown'}
+              {inventoryItem.updatedAt ? new Date(inventoryItem.updatedAt).toLocaleString() : 'Unknown'}
             </dd>
           </div>
         </dl>

@@ -34,8 +34,8 @@ public class DashboardResponse {
     public static class ERPStats {
         private long totalEquipment;
         private Map<String, Long> equipmentByStatus;
-        private long openServiceTickets;
-        private Map<String, Long> ticketsByPriority;
+        private long openFieldJobs;
+        private Map<String, Long> jobsByPriority;
     }
 
     @Data

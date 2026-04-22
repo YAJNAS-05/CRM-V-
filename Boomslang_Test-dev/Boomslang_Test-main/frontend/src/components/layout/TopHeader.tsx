@@ -1,8 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { useNotificationStore } from '../../store/notificationStore'
 
 const getPageContext = (pathname: string) => {
+  if (pathname === '/home') return { title: 'Home', subtitle: 'Your role-based workspace' }
+  if (pathname.startsWith('/notifications')) return { title: 'Notifications', subtitle: 'Updates and reminders' }
+  if (pathname === '/dashboard') return { title: 'Dashboards', subtitle: 'Role-based views and priorities' }
+  if (pathname.startsWith('/dashboard/crm')) return { title: 'CRM Dashboard', subtitle: 'Pipeline and activity performance' }
+  if (pathname.startsWith('/dashboard/operations')) return { title: 'Operations Dashboard', subtitle: 'Cross-team execution and risk' }
+  if (pathname.startsWith('/dashboard/finance')) return { title: 'Finance Dashboard', subtitle: 'Cash flow, invoices, and collections' }
+  if (pathname.startsWith('/dashboard/hr')) return { title: 'HR Dashboard', subtitle: 'People health, leave, and payroll' }
+  if (pathname.startsWith('/dashboard/technician')) return { title: 'Technician Dashboard', subtitle: 'Assigned work orders and schedule' }
+  if (pathname.startsWith('/dashboard/fieldwork')) return { title: 'Field Work Dashboard', subtitle: 'Execution status and schedules' }
+  if (pathname.startsWith('/dashboard/employee')) return { title: 'Employee Dashboard', subtitle: 'Leave, reimbursements, and attendance' }
+  if (pathname.startsWith('/crm/dashboard')) return { title: 'CRM Dashboard', subtitle: 'Pipeline and activity performance' }
   if (pathname.startsWith('/crm/leads')) return { title: 'Leads', subtitle: 'Capture and qualify demand' }
   if (pathname.startsWith('/crm/contacts')) return { title: 'Contacts', subtitle: 'Customer and prospect network' }
   if (pathname.startsWith('/crm/deals')) return { title: 'Deals', subtitle: 'Move opportunities to close' }
@@ -21,6 +33,7 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
+  const { notifications, removeNotification, clearNotifications } = useNotificationStore()
   const canCreate = user?.permissions?.includes('CRM_CREATE') ?? false
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [showAvatar, setShowAvatar] = useState(false)
@@ -29,8 +42,20 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
   const avatarRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
   const pageContext = useMemo(() => getPageContext(location.pathname), [location.pathname])
+  const notificationCount = notifications.length
 
-  const isDashboard = location.pathname.startsWith('/crm/dashboard') || location.pathname === '/'
+  const isDashboard =
+    location.pathname.startsWith('/dashboard/crm') ||
+    location.pathname.startsWith('/dashboard/operations') ||
+    location.pathname.startsWith('/dashboard/finance') ||
+    location.pathname.startsWith('/dashboard/hr') ||
+    location.pathname.startsWith('/dashboard/technician') ||
+    location.pathname.startsWith('/dashboard/fieldwork') ||
+    location.pathname.startsWith('/dashboard/employee') ||
+    location.pathname === '/dashboard' ||
+    location.pathname.startsWith('/crm/dashboard') ||
+    location.pathname === '/' ||
+    location.pathname === '/home'
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -85,7 +110,7 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
 
         <button
           type="button"
-          onClick={() => navigate('/crm/dashboard')}
+          onClick={() => navigate('/dashboard')}
           className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 transition hover:bg-slate-50"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-extrabold text-white">E</span>
@@ -147,18 +172,83 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
+            {notificationCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </span>
+            )}
           </button>
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-[20rem] rounded-lg border border-slate-200 bg-white shadow-lg z-50">
-              <div className="border-b border-slate-100 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-900">Notifications</p>
-                <p className="text-xs text-slate-400">No new notifications</p>
+              <div className="border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Notifications</p>
+                  <p className="text-xs text-slate-400">
+                    {notificationCount === 0 ? 'No new notifications' : `${notificationCount} total`}
+                  </p>
+                </div>
+                {notificationCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearNotifications}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                  >
+                    Clear all
+                  </button>
+                )}
               </div>
               <div className="max-h-72 overflow-y-auto">
-                <div className="py-8 text-center">
-                  <p className="text-sm text-slate-400">No upcoming reminders</p>
-                </div>
+                {notificationCount === 0 ? (
+                  <div className="py-8 text-center">
+                    <p className="text-sm text-slate-400">No upcoming reminders</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {notifications.slice(0, 8).map((notification) => (
+                      <div key={notification.id} className="flex items-start gap-3 px-4 py-3">
+                        <span
+                          className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                            notification.type === 'success'
+                              ? 'bg-emerald-500'
+                              : notification.type === 'error'
+                              ? 'bg-rose-500'
+                              : notification.type === 'warning'
+                              ? 'bg-amber-500'
+                              : 'bg-sky-500'
+                          }`}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                          <p className="text-xs text-slate-500 mt-1">{notification.message}</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {new Date(notification.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeNotification(notification.id)}
+                          className="text-xs text-slate-400 hover:text-slate-600"
+                          aria-label="Dismiss notification"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              {notificationCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/notifications')
+                    setShowNotifications(false)
+                  }}
+                  className="w-full border-t border-slate-100 px-4 py-2 text-left text-xs font-semibold text-blue-600 hover:bg-slate-50"
+                >
+                  View all notifications
+                </button>
+              )}
             </div>
           )}
         </div>

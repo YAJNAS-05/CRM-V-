@@ -1,4 +1,5 @@
 import { useNotificationStore } from '../store/notificationStore'
+import { useSettingsStore } from '../store/settingsStore'
 
 /**
  * Hook for managing notifications
@@ -6,19 +7,26 @@ import { useNotificationStore } from '../store/notificationStore'
  */
 export const useNotification = () => {
   const { addNotification } = useNotificationStore()
+  const { notificationsEnabled, inAppNotifications } = useSettingsStore((state) => state.settings)
+
+  const canNotify = notificationsEnabled && inAppNotifications
 
   return {
-    success: (title: string, message: string, duration?: number) => {
-      addNotification({ type: 'success', title, message, duration })
+    success: (title: string, message: string, duration?: number, dedupeKey?: string) => {
+      if (!canNotify) return
+      addNotification({ type: 'success', title, message, duration, dedupeKey })
     },
-    error: (title: string, message: string, duration?: number) => {
-      addNotification({ type: 'error', title, message, duration })
+    error: (title: string, message: string, duration?: number, dedupeKey?: string) => {
+      if (!canNotify) return
+      addNotification({ type: 'error', title, message, duration, dedupeKey })
     },
-    warning: (title: string, message: string, duration?: number) => {
-      addNotification({ type: 'warning', title, message, duration })
+    warning: (title: string, message: string, duration?: number, dedupeKey?: string) => {
+      if (!canNotify) return
+      addNotification({ type: 'warning', title, message, duration, dedupeKey })
     },
-    info: (title: string, message: string, duration?: number) => {
-      addNotification({ type: 'info', title, message, duration })
+    info: (title: string, message: string, duration?: number, dedupeKey?: string) => {
+      if (!canNotify) return
+      addNotification({ type: 'info', title, message, duration, dedupeKey })
     },
   }
 }

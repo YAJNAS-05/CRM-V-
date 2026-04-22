@@ -76,3 +76,39 @@ export type { Equipment, SparePart, PurchaseInvoice, InvoiceItem } from './erp'
 
 // Export Finance types (selective to avoid conflicts)
 export type { Payment, CurrencyRate, Invoice, InvoiceEntity, InvoiceStatus, InvoiceType } from './finance'
+
+// Export HR types
+export type {
+  Employee,
+  CreateEmployeeRequest,
+  UpdateEmployeeRequest,
+  EmployeeStatus,
+  EmploymentType,
+  Department,
+  CreateDepartmentRequest,
+  UpdateDepartmentRequest,
+  Position,
+  CreatePositionRequest,
+  UpdatePositionRequest,
+  LeaveRequest,
+  CreateLeaveRequest,
+  UpdateLeaveRequest,
+  LeaveStatus,
+  LeaveType,
+  Timesheet,
+  CreateTimesheetRequest,
+  UpdateTimesheetRequest,
+  TimesheetStatus,
+  PayrollProfile,
+  UpdatePayrollProfileRequest,
+  PayrollRun,
+  CreatePayrollRunRequest,
+  PayrollRunStatus,
+  PayrollItem,
+  PayrollItemStatus,
+  PayFrequency,
+  PayType,
+} from './hr'
+
+// Export Insights types
+export type { InsightItem, InsightSection, MyInsightsResponse } from './insights'

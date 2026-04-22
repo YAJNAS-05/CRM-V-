@@ -167,4 +167,14 @@ export const dashboardApi = {
 
   updateWidgetPositions: (dashboardId: number, request: BatchUpdateWidgetsRequest) =>
     axiosInstance.post(`/v1/dashboards/${dashboardId}/widgets/batch-update-positions`, request),
+
+  // Specialized Role-Based Metrics
+  getFinanceMetrics: () =>
+    axiosInstance.get<{ data: any }>('/v1/dashboards/finance/metrics'),
+
+  getHRMetrics: () =>
+    axiosInstance.get<{ data: any }>('/v1/dashboards/hr/metrics'),
+
+  getOperationsMetrics: () =>
+    axiosInstance.get<{ data: any }>('/v1/dashboards/operations/metrics'),
 }

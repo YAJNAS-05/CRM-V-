@@ -2,6 +2,7 @@ package com.everx.finance.currency;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -28,6 +29,7 @@ public class CurrencyRateScheduler {
      * Daily at 1 AM: Fetch and store latest currency rates.
      */
     @Scheduled(cron = "0 0 1 * * *")
+    @SchedulerLock(name = "fetchLatestRates", lockAtMostFor = "30m", lockAtLeastFor = "2m")
     public void fetchLatestRates() {
         log.info("Running scheduled job: fetchLatestRates from {}", apiUrl);
         try {

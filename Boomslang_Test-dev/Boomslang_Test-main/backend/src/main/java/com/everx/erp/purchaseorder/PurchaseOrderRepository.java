@@ -27,4 +27,6 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
 
     @Query("SELECT p FROM PurchaseOrder p WHERE p.isDeleted = false AND p.supplierId = :supplierId")
     Page<PurchaseOrder> findBySupplierId(@Param("supplierId") UUID supplierId, Pageable pageable);
+
+    long countByCreatedByAndIsDeletedFalse(UUID createdBy);
 }

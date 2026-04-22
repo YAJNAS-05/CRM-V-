@@ -62,7 +62,7 @@ const FieldJobListPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Field Jobs</h1>
         <a 
-          href="/field-jobs/new" 
+          href="/erp/field-jobs/new" 
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
         >
           + New Field Job
@@ -120,13 +120,13 @@ const FieldJobListPage: React.FC = () => {
                 <td className="px-6 py-3">{job.assignedTechnicianId || '-'}</td>
                 <td className="px-6 py-3">
                   <a 
-                    href={`/field-jobs/${job.fieldJobId}`}
+                    href={`/erp/field-jobs/${job.fieldJobId}`}
                     className="text-blue-600 hover:text-blue-800 mr-4"
                   >
                     View
                   </a>
                   <a 
-                    href={`/field-jobs/${job.fieldJobId}/edit`}
+                    href={`/erp/field-jobs/${job.fieldJobId}`}
                     className="text-green-600 hover:text-green-800 mr-4"
                   >
                     Edit

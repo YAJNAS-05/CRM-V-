@@ -37,4 +37,6 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
 
     @Query("SELECT c FROM Contact c WHERE c.isDeleted = false AND lower(c.email) = lower(:email)")
     Contact findByEmailIgnoreCase(@Param("email") String email);
+
+    long countByOwnerIdAndIsDeletedFalse(UUID ownerId);
 }

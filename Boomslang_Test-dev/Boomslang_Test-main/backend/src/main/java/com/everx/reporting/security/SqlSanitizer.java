@@ -12,9 +12,13 @@ public class SqlSanitizer {
         "everx_crm.deals", "everx_crm.quotes", "everx_crm.activities",
         "everx_erp.equipment", "everx_erp.purchase_orders",
         "everx_erp.sales_orders", "everx_erp.shipments",
-        "everx_erp.service_tickets", "everx_erp.warranties",
+        "everx_erp.field_jobs", "everx_erp.warranties",
         "everx_erp.spare_parts", "everx_erp.suppliers",
         "everx_erp.subcontractors",
+        "everx_hr.employees", "everx_hr.departments",
+        "everx_hr.positions", "everx_hr.payroll_profiles",
+        "everx_hr.payroll_runs", "everx_hr.payroll_items",
+        "everx_hr.timesheets", "everx_hr.leave_requests",
         "everx_finance.invoices", "everx_finance.invoice_line_items",
         "everx_finance.payments", "everx_finance.fx_rate_history"
     );

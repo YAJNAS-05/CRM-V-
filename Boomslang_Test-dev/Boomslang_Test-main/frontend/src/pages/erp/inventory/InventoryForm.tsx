@@ -9,8 +9,12 @@ import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../../components/form/SearchableLookupSelect'
 
 const INVENTORY_CATEGORIES = [
+  'EQUIPMENT',
   'EQUIPMENT_ACCESSORY',
+  'SPARE_PARTS',
   'CONSUMABLE',
+  'CONSUMABLES',
+  'RAW_MATERIALS',
   'PACKING_MATERIAL',
   'SAFETY',
   'TOOL',
@@ -31,7 +35,7 @@ const InventoryForm: React.FC = () => {
     itemCode: '',
     name: '',
     description: '',
-    category: 'EQUIPMENT',
+    category: INVENTORY_CATEGORIES[0],
     unitOfMeasure: 'PIECE',
     quantity: 0,
     minStockLevel: 0,

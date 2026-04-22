@@ -29,7 +29,7 @@ public class ERPReportTemplatesInitializer implements CommandLineRunner {
         initializeWarrantyReports();
         initializeFinanceReports();
         initializeInventoryReports();
-        initializeServiceTicketReports();
+        initializeFieldJobReports();
     }
 
     private void initializeEquipmentReports() {
@@ -306,41 +306,41 @@ public class ERPReportTemplatesInitializer implements CommandLineRunner {
         );
     }
 
-    private void initializeServiceTicketReports() {
+    private void initializeFieldJobReports() {
         createReportIfNotExists(
-            "Service Tickets SLA Compliance",
+            "Field Job SLA Compliance",
             "ERP",
-            "Service",
-            "Open tickets and SLA breach status",
+            "Field Work",
+            "Open field jobs and schedule breach status",
             """
-            SELECT st.ticket_id, e.internal_code as "Equipment",
-                   st.priority, st.status,
-                   st.created_date as "Created",
-                   w.response_sla_hours as "SLA Hours",
-                   DATEDIFF(HOUR, st.created_date, CURRENT_DATE) as "Hours Elapsed",
-                   CASE WHEN DATEDIFF(HOUR, st.created_date, CURRENT_TIMESTAMP) > w.response_sla_hours 
-                        THEN 'BREACHED' ELSE 'ON TRACK' END as "SLA Status"
-            FROM everx_erp.service_tickets st
-            LEFT JOIN everx_erp.equipment e ON st.equipment_id = e.id
-            LEFT JOIN everx_erp.warranties w ON st.warranty_id = w.id
-            WHERE st.is_deleted = false AND st.status IN ('OPEN', 'IN_PROGRESS')
-            ORDER BY st.created_date ASC
+            SELECT fj.job_number as "Job #",
+                   fj.job_type as "Type",
+                   fj.priority as "Priority",
+                   fj.job_status as "Status",
+                   fj.scheduled_start_date as "Scheduled Start",
+                   fj.scheduled_end_date as "Scheduled End",
+                   DATEDIFF(HOUR, fj.scheduled_end_date, CURRENT_TIMESTAMP) as "Hours Overdue",
+                   CASE WHEN fj.scheduled_end_date < CURRENT_TIMESTAMP
+                        THEN 'BREACHED' ELSE 'ON TRACK' END as "Schedule Status"
+            FROM everx_erp.field_jobs fj
+            WHERE fj.is_deleted = false AND fj.job_status IN ('SCHEDULED', 'ENGINEER_ASSIGNED', 'IN_PROGRESS')
+            ORDER BY fj.scheduled_start_date ASC
             """
         );
 
         createReportIfNotExists(
-            "Service Revenue by Warranty Status",
+            "Field Job Revenue by Warranty Status",
             "ERP",
-            "Service",
-            "Service ticket billing analysis - warranty vs out-of-warranty",
+            "Field Work",
+            "Field job billing analysis - warranty vs out-of-warranty",
             """
-            SELECT COUNT(*) as "Ticket Count",
-                   SUM(CASE WHEN st.billable = true THEN 1 ELSE 0 END) as "Billable Tickets",
-                   SUM(CASE WHEN st.billable = true THEN CAST(i.total_amount AS DECIMAL) ELSE 0 END) as "Service Revenue",
+            SELECT COUNT(*) as "Job Count",
+                   SUM(CASE WHEN fj.billable = true THEN 1 ELSE 0 END) as "Billable Jobs",
+                   SUM(CASE WHEN fj.billable = true THEN CAST(i.total_amount AS DECIMAL) ELSE 0 END) as "Service Revenue",
                    AVG(CAST(i.total_amount AS DECIMAL)) as "Avg Service Charge"
-            FROM everx_erp.service_tickets st
-            LEFT JOIN everx_finance.invoices i ON st.id = i.id
-            WHERE st.is_deleted = false AND st.status = 'RESOLVED'
+            FROM everx_erp.field_jobs fj
+            LEFT JOIN everx_finance.invoices i ON fj.linked_invoice_id = i.id
+            WHERE fj.is_deleted = false AND fj.job_status = 'COMPLETED'
             """
         );
     }

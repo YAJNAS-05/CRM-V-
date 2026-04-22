@@ -2,6 +2,7 @@ package com.everx.erp.inventory;
 
 import com.everx.erp.inventory.dto.CreateInventoryItemRequest;
 import com.everx.erp.inventory.dto.InventoryItemDto;
+import com.everx.erp.inventory.dto.ReorderSuggestionDto;
 import com.everx.erp.inventory.dto.UpdateInventoryItemRequest;
 import com.everx.shared.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -32,9 +33,18 @@ public class InventoryItemController {
     @GetMapping
     @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<Page<InventoryItemDto>>> getAllInventoryItems(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String status,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/erp/inventory");
-        Page<InventoryItemDto> items = inventoryItemService.getAllInventoryItems(pageable);
+        Page<InventoryItemDto> items;
+        if (category != null && !category.isBlank()) {
+            items = inventoryItemService.getInventoryItemsByCategory(category, pageable);
+        } else if (status != null && !status.isBlank()) {
+            items = inventoryItemService.getInventoryItemsByStatus(status, pageable);
+        } else {
+            items = inventoryItemService.getAllInventoryItems(pageable);
+        }
         return ResponseEntity.ok(ApiResponse.ok(items, "Inventory items retrieved successfully"));
     }
 
@@ -80,6 +90,14 @@ public class InventoryItemController {
         log.info("GET /api/v1/erp/inventory/low-stock");
         List<InventoryItemDto> items = inventoryItemService.getLowStockItems();
         return ResponseEntity.ok(ApiResponse.ok(items, "Low stock items retrieved successfully"));
+    }
+
+    @GetMapping("/reorder-suggestions")
+    @PreAuthorize("hasAuthority('ERP_VIEW')")
+    public ResponseEntity<ApiResponse<List<ReorderSuggestionDto>>> getReorderSuggestions() {
+        log.info("GET /api/v1/erp/inventory/reorder-suggestions");
+        List<ReorderSuggestionDto> suggestions = inventoryItemService.getReorderSuggestions();
+        return ResponseEntity.ok(ApiResponse.ok(suggestions, "Reorder suggestions retrieved successfully"));
     }
 
     @PostMapping

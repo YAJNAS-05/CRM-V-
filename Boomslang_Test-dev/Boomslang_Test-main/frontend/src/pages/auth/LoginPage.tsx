@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
       }
       login(response.user, response.accessToken, response.refreshToken)
       toast.success('Login successful')
-      navigate('/crm/dashboard')
+      navigate('/dashboard')
     } catch (error: any) {
       const message = error.response?.data?.message || 'Login failed'
       toast.error(message)

@@ -1,6 +1,17 @@
 import axiosInstance from './axiosInstance'
-import { InventoryItem, CreateInventoryItemRequest, UpdateInventoryItemRequest, Equipment } from '../types/erp'
-import { ApiResponse } from '../types'
+import {
+  InventoryItem,
+  CreateInventoryItemRequest,
+  UpdateInventoryItemRequest,
+  Equipment,
+  InventoryLedgerEntry,
+  InventoryBin,
+  InventoryTransfer,
+  CreateInventoryTransferRequest,
+  CreateStockAdjustmentRequest,
+  ReorderSuggestion,
+} from '../types/erp'
+import { ApiResponse, Page } from '../types'
 
 export const erpApi = {
   getInventoryItems: async (page?: number, size?: number): Promise<ApiResponse<{ content: InventoryItem[] }>> => {
@@ -73,6 +84,44 @@ export const inventoryApi = {
   update: erpApi.updateInventoryItem,
   create: erpApi.createInventoryItem,
   getAll: erpApi.getInventoryItems,
+  getLedger: async (filters?: {
+    itemId?: string
+    location?: string
+    page?: number
+    size?: number
+  }): Promise<ApiResponse<Page<InventoryLedgerEntry>>> => {
+    const params = new URLSearchParams()
+    if (filters?.itemId) params.append('itemId', filters.itemId)
+    if (filters?.location) params.append('location', filters.location)
+    if (filters?.page !== undefined) params.append('page', filters.page.toString())
+    if (filters?.size !== undefined) params.append('size', filters.size.toString())
+    const response = await axiosInstance.get<ApiResponse<Page<InventoryLedgerEntry>>>(
+      `/v1/erp/inventory/ledger?${params}`
+    )
+    return response.data
+  },
+  getBins: async (itemId: string): Promise<ApiResponse<InventoryBin[]>> => {
+    const response = await axiosInstance.get<ApiResponse<InventoryBin[]>>(`/v1/erp/inventory/bins?itemId=${itemId}`)
+    return response.data
+  },
+  getTransfers: async (page = 0, size = 20): Promise<ApiResponse<Page<InventoryTransfer>>> => {
+    const response = await axiosInstance.get<ApiResponse<Page<InventoryTransfer>>>(
+      `/v1/erp/inventory/transfers?page=${page}&size=${size}`
+    )
+    return response.data
+  },
+  createTransfer: async (payload: CreateInventoryTransferRequest): Promise<ApiResponse<InventoryTransfer>> => {
+    const response = await axiosInstance.post<ApiResponse<InventoryTransfer>>('/v1/erp/inventory/transfers', payload)
+    return response.data
+  },
+  createStockAdjustment: async (payload: CreateStockAdjustmentRequest): Promise<ApiResponse<InventoryLedgerEntry>> => {
+    const response = await axiosInstance.post<ApiResponse<InventoryLedgerEntry>>('/v1/erp/inventory/adjustments', payload)
+    return response.data
+  },
+  getReorderSuggestions: async (): Promise<ApiResponse<ReorderSuggestion[]>> => {
+    const response = await axiosInstance.get<ApiResponse<ReorderSuggestion[]>>('/v1/erp/inventory/reorder-suggestions')
+    return response.data
+  },
   // Add stubs for missing methods
   getByCategory: async (category: string, page: number, size: number): Promise<ApiResponse<{ content: InventoryItem[] }>> => {
     const response = await axiosInstance.get<ApiResponse<{ content: InventoryItem[] }>>(`/v1/erp/inventory?category=${category}&page=${page}&size=${size}`)
@@ -111,18 +160,6 @@ export const salesOrderApi = {
     axiosInstance.patch(`/v1/erp/sales-orders/${id}/cancel`),
   delete: async (id: string) =>
     axiosInstance.delete(`/v1/erp/sales-orders/${id}`),
-}
-export const serviceTicketApi = {
-  getAll: async (page = 0, size = 100) =>
-    axiosInstance.get(`/v1/erp/service-tickets?page=${page}&size=${size}`),
-  getById: async (id: string) =>
-    axiosInstance.get(`/v1/erp/service-tickets/${id}`),
-  create: async (data: any) =>
-    axiosInstance.post('/v1/erp/service-tickets', data),
-  update: async (id: string, data: any) =>
-    axiosInstance.put(`/v1/erp/service-tickets/${id}`, data),
-  delete: async (id: string) =>
-    axiosInstance.delete(`/v1/erp/service-tickets/${id}`),
 }
 export const shipmentApi = {
   getAll: async (page = 0, size = 100) =>
@@ -185,4 +222,17 @@ export const warrantyApi = {
     axiosInstance.put(`/v1/erp/warranties/${id}`, data),
   delete: async (id: string) =>
     axiosInstance.delete(`/v1/erp/warranties/${id}`),
+}
+
+export const serviceTicketApi = {
+  getAll: async (page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/service-tickets?page=${page}&size=${size}`),
+  getById: async (id: string) =>
+    axiosInstance.get(`/v1/erp/service-tickets/${id}`),
+  create: async (data: any) =>
+    axiosInstance.post('/v1/erp/service-tickets', data),
+  update: async (id: string, data: any) =>
+    axiosInstance.put(`/v1/erp/service-tickets/${id}`, data),
+  delete: async (id: string) =>
+    axiosInstance.delete(`/v1/erp/service-tickets/${id}`),
 }

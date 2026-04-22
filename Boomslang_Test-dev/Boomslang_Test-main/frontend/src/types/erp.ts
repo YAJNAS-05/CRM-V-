@@ -138,25 +138,6 @@ export interface SalesOrder {
   updatedAt: string
 }
 
-export interface ServiceTicket {
-  id: string
-  ticketNumber: string
-  equipmentId?: string
-  accountId: string
-  type: string
-  status: string
-  priority: string
-  reportedDate?: string
-  resolvedDate?: string
-  assignedTo?: string
-  subcontractorId?: string
-  description?: string
-  resolutionNotes?: string
-  cost?: number
-  createdAt: string
-  updatedAt: string
-}
-
 export interface Warranty {
   id: string
   warrantyId?: string
@@ -230,10 +211,8 @@ export interface InventoryItem {
   barcode?: string
   sku?: string
   status: string
-  createdBy?: string
-  createdDate?: string
-  lastModifiedBy?: string
-  lastModifiedDate?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface CreateInventoryItemRequest {
@@ -271,6 +250,86 @@ export interface UpdateInventoryItemRequest {
   barcode?: string
   sku?: string
   status?: string
+}
+
+export type LedgerEntryType =
+  | 'RECEIPT'
+  | 'ISSUE'
+  | 'ADJUSTMENT_IN'
+  | 'ADJUSTMENT_OUT'
+  | 'TRANSFER_IN'
+  | 'TRANSFER_OUT'
+
+export interface InventoryLedgerEntry {
+  id: string
+  itemId: string
+  location?: string
+  quantityChange: number
+  balanceAfter: number
+  entryType: LedgerEntryType
+  referenceType?: string
+  referenceId?: string
+  unitCost?: number
+  totalCost?: number
+  notes?: string
+  transactionAt: string
+}
+
+export interface InventoryBin {
+  id: string
+  itemId: string
+  location: string
+  onHand: number
+  reserved: number
+  available: number
+  reorderPoint?: number
+  minStock?: number
+  maxStock?: number
+}
+
+export type InventoryTransferStatus = 'DRAFT' | 'POSTED' | 'CANCELLED'
+
+export interface InventoryTransfer {
+  id: string
+  transferNumber: string
+  itemId: string
+  fromLocation: string
+  toLocation: string
+  quantity: number
+  status: InventoryTransferStatus
+  notes?: string
+  postedAt?: string
+  createdAt?: string
+}
+
+export interface CreateInventoryTransferRequest {
+  itemId: string
+  fromLocation: string
+  toLocation: string
+  quantity: number
+  notes?: string
+}
+
+export type StockAdjustmentType = 'INCREASE' | 'DECREASE'
+
+export interface CreateStockAdjustmentRequest {
+  itemId: string
+  location: string
+  quantity: number
+  unitCost?: number
+  notes?: string
+  adjustmentType: StockAdjustmentType
+}
+
+export interface ReorderSuggestion {
+  itemId: string
+  itemCode: string
+  name: string
+  currentStock: number
+  reorderPoint: number
+  maxStockLevel: number
+  suggestedQuantity: number
+  location?: string
 }
 
 export interface Order {
@@ -375,4 +434,24 @@ export interface SupplierExtended extends Supplier {
   currency?: string
   paymentMethod?: string
   active?: boolean
+}
+
+export interface ServiceTicket {
+  id: string
+  ticketNumber: string
+  title: string
+  description?: string
+  status: string
+  priority: string
+  type?: string
+  equipmentId?: string
+  assignedTo?: string
+  customerId: string
+  accountId?: string
+  subcontractorId?: string
+  resolutionNotes?: string
+  cost?: number
+  reportedDate?: string
+  createdAt: string
+  updatedAt: string
 }

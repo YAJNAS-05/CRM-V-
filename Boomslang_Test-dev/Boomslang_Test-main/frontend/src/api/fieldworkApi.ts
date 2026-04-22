@@ -313,7 +313,7 @@ export const fieldworkApi = {
     if (isFieldJobsNetworkBlocked()) {
       const localJob = {
         ...fieldJob,
-        fieldJobId: fieldJob.fieldJobId ?? (id as unknown as number),
+        fieldJobId: fieldJob.fieldJobId ?? id,
         updatedAt: new Date().toISOString(),
       };
       upsertLocalFieldJob(localJob);
@@ -328,7 +328,7 @@ export const fieldworkApi = {
       markFieldJobsNetworkUnavailable();
       const localJob = {
         ...fieldJob,
-        fieldJobId: fieldJob.fieldJobId ?? (id as unknown as number),
+        fieldJobId: fieldJob.fieldJobId ?? id,
         updatedAt: new Date().toISOString(),
       };
       upsertLocalFieldJob(localJob);
@@ -377,7 +377,7 @@ export const fieldworkApi = {
    * Assign engineer to job (checks availability)
    * PATCH /api/field-jobs/{id}/assign?engineerId={engineerId}
    */
-  assignEngineer: async (jobId: number, engineerId: number): Promise<FieldJobDto> => {
+  assignEngineer: async (jobId: string | number, engineerId: string): Promise<FieldJobDto> => {
     try {
       const response = await api.patch<FieldJobDto>(
         `/field-jobs/${jobId}/assign`,
@@ -395,7 +395,7 @@ export const fieldworkApi = {
    * Start job (transition to IN_PROGRESS)
    * PATCH /api/field-jobs/{id}/start
    */
-  startJob: async (id: number): Promise<FieldJobDto> => {
+  startJob: async (id: string | number): Promise<FieldJobDto> => {
     try {
       const response = await api.patch<FieldJobDto>(`/field-jobs/${id}/start`, {});
       return response.data;
@@ -409,7 +409,7 @@ export const fieldworkApi = {
    * Complete job (transition to PENDING_SIGN_OFF, auto-generate report)
    * PATCH /api/field-jobs/{id}/complete
    */
-  completeJob: async (id: number): Promise<FieldJobDto> => {
+  completeJob: async (id: string | number): Promise<FieldJobDto> => {
     try {
       const response = await api.patch<FieldJobDto>(`/field-jobs/${id}/complete`, {});
       return response.data;
@@ -424,7 +424,7 @@ export const fieldworkApi = {
    * POST /api/field-jobs/{id}/sign-off
    * @Transactional(isolation=REPEATABLE_READ)
    */
-  processSignOff: async (id: number, signOff: FieldJobSignOffDto): Promise<FieldJobDto> => {
+  processSignOff: async (id: string | number, signOff: FieldJobSignOffDto): Promise<FieldJobDto> => {
     try {
       const response = await api.post<FieldJobDto>(`/field-jobs/${id}/sign-off`, signOff);
       return response.data;
@@ -442,7 +442,7 @@ export const fieldworkApi = {
    * Add cost line to job
    * POST /api/field-jobs/{id}/costs
    */
-  addCost: async (jobId: number, cost: FieldJobCostDto): Promise<FieldJobCostDto> => {
+  addCost: async (jobId: string | number, cost: FieldJobCostDto): Promise<FieldJobCostDto> => {
     try {
       const response = await api.post<FieldJobCostDto>(
         `/field-jobs/${jobId}/costs`,
@@ -459,7 +459,7 @@ export const fieldworkApi = {
    * Get all costs for a job
    * GET /api/field-jobs/{id}/costs
    */
-  getJobCosts: async (jobId: number): Promise<FieldJobCostDto[]> => {
+  getJobCosts: async (jobId: string | number): Promise<FieldJobCostDto[]> => {
     try {
       const response = await api.get<FieldJobCostDto[]>(`/field-jobs/${jobId}/costs`);
       return response.data;
@@ -473,7 +473,7 @@ export const fieldworkApi = {
    * UPDATE cost line (OCC locking enforced)
    * PUT /api/field-jobs/{jobId}/costs/{costId}
    */
-  updateCost: async (jobId: number, costId: number, cost: FieldJobCostDto): Promise<FieldJobCostDto> => {
+  updateCost: async (jobId: string | number, costId: number, cost: FieldJobCostDto): Promise<FieldJobCostDto> => {
     try {
       const response = await api.put<FieldJobCostDto>(
         `/field-jobs/${jobId}/costs/${costId}`,
@@ -494,7 +494,7 @@ export const fieldworkApi = {
    * Add travel leg
    * POST /api/field-jobs/{id}/travel
    */
-  addTravel: async (jobId: number, travel: FieldJobTravelDto): Promise<FieldJobTravelDto> => {
+  addTravel: async (jobId: string | number, travel: FieldJobTravelDto): Promise<FieldJobTravelDto> => {
     try {
       const response = await api.post<FieldJobTravelDto>(
         `/field-jobs/${jobId}/travel`,
@@ -511,7 +511,7 @@ export const fieldworkApi = {
    * Get all travel legs for job
    * GET /api/field-jobs/{id}/travel
    */
-  getJobTravel: async (jobId: number): Promise<FieldJobTravelDto[]> => {
+  getJobTravel: async (jobId: string | number): Promise<FieldJobTravelDto[]> => {
     try {
       const response = await api.get<FieldJobTravelDto[]>(`/field-jobs/${jobId}/travel`);
       return response.data;
@@ -529,7 +529,7 @@ export const fieldworkApi = {
    * Get checklist for job
    * GET /api/field-jobs/{id}/checklist
    */
-  getChecklist: async (jobId: number): Promise<FieldJobChecklistDto> => {
+  getChecklist: async (jobId: string | number): Promise<FieldJobChecklistDto> => {
     try {
       const response = await api.get<FieldJobChecklistDto>(`/field-jobs/${jobId}/checklist`);
       return response.data;
@@ -543,7 +543,7 @@ export const fieldworkApi = {
    * Submit completed checklist
    * POST /api/field-jobs/{id}/checklist/submit
    */
-  submitChecklist: async (jobId: number, checklist: FieldJobChecklistDto): Promise<FieldJobChecklistDto> => {
+  submitChecklist: async (jobId: string | number, checklist: FieldJobChecklistDto): Promise<FieldJobChecklistDto> => {
     try {
       const response = await api.post<FieldJobChecklistDto>(
         `/field-jobs/${jobId}/checklist/submit`,
@@ -564,7 +564,7 @@ export const fieldworkApi = {
    * Get job report
    * GET /api/field-jobs/{id}/report
    */
-  getReport: async (jobId: number): Promise<FieldJobReportDto> => {
+  getReport: async (jobId: string | number): Promise<FieldJobReportDto> => {
     try {
       const response = await api.get<FieldJobReportDto>(`/field-jobs/${jobId}/report`);
       return response.data;
@@ -578,7 +578,7 @@ export const fieldworkApi = {
    * Download report PDF
    * GET /api/field-jobs/{id}/report/pdf
    */
-  downloadReportPdf: async (jobId: number): Promise<Blob> => {
+  downloadReportPdf: async (jobId: string | number): Promise<Blob> => {
     try {
       const response = await api.get(`/field-jobs/${jobId}/report/pdf`, {
         responseType: 'blob'

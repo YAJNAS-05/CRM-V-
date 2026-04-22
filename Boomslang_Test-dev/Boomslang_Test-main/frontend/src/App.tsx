@@ -34,8 +34,6 @@ import PurchaseOrdersListPage from './pages/purchaseorders/PurchaseOrdersListPag
 import PurchaseOrderDetailPage from './pages/purchaseorders/PurchaseOrderDetailPage'
 import SalesOrdersListPage from './pages/salesorders/SalesOrdersListPage'
 import SalesOrderDetailPage from './pages/salesorders/SalesOrderDetailPage'
-import ServiceTicketsListPage from './pages/servicetickets/ServiceTicketsListPage'
-import ServiceTicketDetailPage from './pages/servicetickets/ServiceTicketDetailPage'
 import WarrantiesListPage from './pages/warranties/WarrantiesListPage'
 import WarrantyDetailPage from './pages/warranties/WarrantyDetailPage'
 import ShipmentsListPage from './pages/shipments/ShipmentsListPage'
@@ -47,7 +45,6 @@ import SupplierForm from './pages/suppliers/SupplierForm'
 import PurchaseOrderForm from './pages/purchaseorders/PurchaseOrderForm'
 import SalesOrderForm from './pages/salesorders/SalesOrderForm'
 import ShipmentForm from './pages/shipments/ShipmentForm'
-import ServiceTicketForm from './pages/servicetickets/ServiceTicketForm'
 import WarrantyForm from './pages/warranties/WarrantyForm'
 import SubcontractorForm from './pages/subcontractors/SubcontractorForm'
 
@@ -65,6 +62,11 @@ import { FieldWorkDetailPage } from './pages/fieldwork/FieldWorkDetailPage'
 
 // Dashboard, Reports & Admin
 import DashboardPage from './pages/dashboard/DashboardPage'
+import FinanceDashboardPage from './pages/dashboard/FinanceDashboardPage'
+import FieldworkDashboardPage from './pages/dashboard/FieldworkDashboardPage'
+import HRDashboardPage from './pages/dashboard/HRDashboardPage'
+import EmployeeDashboardPage from './pages/dashboard/EmployeeDashboardPage'
+import OperationsDashboardPage from './pages/dashboard/OperationsDashboardPage'
 import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage'
 import { ReportListPage } from './pages/reports/ReportListPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
@@ -75,6 +77,33 @@ import RoleManagementPage from './pages/admin/RoleManagementPage'
 import InventoryList from './pages/erp/inventory/InventoryList'
 import InventoryDetail from './pages/erp/inventory/InventoryDetail'
 import InventoryForm from './pages/erp/inventory/InventoryForm'
+import InventoryLedger from './pages/erp/inventory/InventoryLedger'
+import InventoryTransfers from './pages/erp/inventory/InventoryTransfers'
+
+// HR Pages
+import EmployeeListPage from './pages/hr/EmployeeListPage'
+import EmployeeDetailPage from './pages/hr/EmployeeDetailPage'
+import EmployeeFormPage from './pages/hr/EmployeeFormPage'
+import DepartmentListPage from './pages/hr/DepartmentListPage'
+import DepartmentDetailPage from './pages/hr/DepartmentDetailPage'
+import DepartmentFormPage from './pages/hr/DepartmentFormPage'
+import PositionListPage from './pages/hr/PositionListPage'
+import PositionDetailPage from './pages/hr/PositionDetailPage'
+import PositionFormPage from './pages/hr/PositionFormPage'
+import LeaveRequestListPage from './pages/hr/LeaveRequestListPage'
+import LeaveRequestDetailPage from './pages/hr/LeaveRequestDetailPage'
+import LeaveRequestFormPage from './pages/hr/LeaveRequestFormPage'
+import TimesheetListPage from './pages/hr/TimesheetListPage'
+import TimesheetDetailPage from './pages/hr/TimesheetDetailPage'
+import TimesheetFormPage from './pages/hr/TimesheetFormPage'
+import PayrollRunListPage from './pages/hr/PayrollRunListPage'
+import PayrollRunDetailPage from './pages/hr/PayrollRunDetailPage'
+import PayrollRunFormPage from './pages/hr/PayrollRunFormPage'
+import PayrollProfilePage from './pages/hr/PayrollProfilePage'
+import ReimbursementRequestPage from './pages/hr/ReimbursementRequestPage'
+import { MyInsightsPage } from './pages/insights/MyInsightsPage'
+import WorkspaceHomePage from './pages/workspace/WorkspaceHomePage'
+import NotificationsPage from './pages/notifications/NotificationsPage'
 
 // Components
 import Layout from './components/layout/Layout'
@@ -85,47 +114,109 @@ interface ProtectedRouteProps {
 }
 
 const inferRoutePermissions = (pathname: string): string[] => {
+  if (pathname === '/dashboard') return [
+    'DASHBOARD_SELF_VIEW',
+    'DASHBOARD_TEAM_VIEW',
+    'DASHBOARD_FINANCE_VIEW',
+    'DASHBOARD_HR_VIEW',
+    'DASHBOARD_TECH_VIEW',
+    'DASHBOARD_OPERATIONS_VIEW',
+    'FIELDWORK_VIEW',
+    'HR_VIEW'
+  ]
+  if (pathname === '/dashboard/crm/team') return ['DASHBOARD_TEAM_VIEW']
+  if (pathname === '/dashboard/crm/user') return ['DASHBOARD_SELF_VIEW']
+  if (pathname === '/dashboard/crm') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
+  if (pathname === '/dashboard/operations') return ['DASHBOARD_OPERATIONS_VIEW']
+  if (pathname === '/dashboard/finance') return ['DASHBOARD_FINANCE_VIEW']
+  if (pathname === '/dashboard/hr') return ['DASHBOARD_HR_VIEW']
+  if (pathname === '/dashboard/technician') return ['DASHBOARD_TECH_VIEW']
+  if (pathname === '/dashboard/fieldwork') return ['FIELDWORK_VIEW']
+  if (pathname === '/dashboard/employee') return ['HR_VIEW']
+  if (pathname === '/home') return ['INSIGHTS_VIEW']
+  if (pathname.startsWith('/notifications')) return ['INSIGHTS_VIEW']
   if (pathname === '/crm/dashboard/team') return ['DASHBOARD_TEAM_VIEW']
   if (pathname === '/crm/dashboard/user') return ['DASHBOARD_SELF_VIEW']
   if (pathname === '/crm/dashboard') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
+  if (pathname.startsWith('/me/')) return ['INSIGHTS_VIEW']
   if (pathname.startsWith('/crm/')) return ['CRM_VIEW']
   if (pathname.startsWith('/erp/')) return ['ERP_VIEW']
+  if (pathname.startsWith('/hr/')) return ['HR_VIEW']
   if (pathname.startsWith('/finance/')) return ['FINANCE_VIEW']
   if (pathname.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
   if (pathname.startsWith('/reports')) return ['REPORT_VIEW']
   return []
 }
 
+const getFirstDashboardPath = (permissions: string[]): string => {
+  if (permissions.includes('DASHBOARD_OPERATIONS_VIEW')) return '/dashboard/operations'
+  if (permissions.includes('DASHBOARD_FINANCE_VIEW')) return '/dashboard/finance'
+  if (permissions.includes('DASHBOARD_HR_VIEW')) return '/dashboard/hr'
+  if (permissions.includes('DASHBOARD_TECH_VIEW')) return '/dashboard/technician'
+  if (permissions.includes('DASHBOARD_TEAM_VIEW') || permissions.includes('DASHBOARD_SELF_VIEW')) return '/dashboard/crm'
+  if (permissions.includes('FIELDWORK_VIEW')) return '/dashboard/fieldwork'
+  if (permissions.includes('HR_VIEW')) return '/dashboard/employee'
+  return '/profile'
+}
+
 const getFirstAuthorizedPath = (permissions: string[]): string => {
-  if (permissions.includes('DASHBOARD_TEAM_VIEW')) return '/crm/dashboard/team'
-  if (permissions.includes('DASHBOARD_SELF_VIEW')) return '/crm/dashboard/user'
+  if (permissions.includes('INSIGHTS_VIEW')) return '/home'
+  if (
+    permissions.some((permission) =>
+      [
+        'DASHBOARD_TEAM_VIEW',
+        'DASHBOARD_SELF_VIEW',
+        'DASHBOARD_FINANCE_VIEW',
+        'DASHBOARD_HR_VIEW',
+        'DASHBOARD_TECH_VIEW',
+        'DASHBOARD_OPERATIONS_VIEW',
+        'FIELDWORK_VIEW',
+        'HR_VIEW'
+      ].includes(permission)
+    )
+  ) {
+    return getFirstDashboardPath(permissions)
+  }
   if (permissions.includes('CRM_VIEW')) return '/crm/accounts'
   if (permissions.includes('ERP_VIEW')) return '/erp/equipment'
+  if (permissions.includes('HR_VIEW')) return '/hr/employees'
   if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
   if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
   if (permissions.includes('REPORT_VIEW')) return '/reports'
   return '/profile'
 }
 
-const DashboardRouteResolver: React.FC = () => {
+interface DashboardRouteResolverProps {
+  basePath?: string
+}
+
+const DashboardRouteResolver: React.FC<DashboardRouteResolverProps> = ({ basePath = '/dashboard/crm' }) => {
   const user = useAuthStore((state) => state.user)
   const permissions = user?.permissions || []
 
   if (permissions.includes('DASHBOARD_TEAM_VIEW')) {
-    return <Navigate to="/crm/dashboard/team" replace />
+    return <Navigate to={`${basePath}/team`} replace />
   }
 
   if (permissions.includes('DASHBOARD_SELF_VIEW') || permissions.includes('DASHBOARD_VIEW')) {
-    return <Navigate to="/crm/dashboard/user" replace />
+    return <Navigate to={`${basePath}/user`} replace />
   }
 
   return <Navigate to={getFirstAuthorizedPath(permissions)} replace />
 }
 
+const DashboardLandingRoute: React.FC = () => {
+  const user = useAuthStore((state) => state.user)
+  const permissions = user?.permissions || []
+  return <Navigate to={getFirstDashboardPath(permissions)} replace />
+}
+
 const AuthSessionSync: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const accessToken = useAuthStore((state) => state.accessToken)
+  const refreshToken = useAuthStore((state) => state.refreshToken)
   const setUser = useAuthStore((state) => state.setUser)
+  const login = useAuthStore((state) => state.login)
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) {
@@ -133,6 +224,25 @@ const AuthSessionSync: React.FC = () => {
     }
 
     let isMounted = true
+    let refreshIntervalId: number | undefined
+
+    const refreshSession = async () => {
+      if (!refreshToken) {
+        return false
+      }
+
+      try {
+        const refreshed = await authApi.refreshToken(refreshToken)
+        if (isMounted && refreshed?.user) {
+          login(refreshed.user, refreshed.accessToken, refreshed.refreshToken)
+          return true
+        }
+      } catch {
+        // Ignore token refresh failures; the interceptor handles auth errors.
+      }
+
+      return false
+    }
 
     const syncCurrentUser = async () => {
       try {
@@ -145,12 +255,32 @@ const AuthSessionSync: React.FC = () => {
       }
     }
 
-    syncCurrentUser()
+    const initializeSession = async () => {
+      const refreshed = await refreshSession()
+      if (!refreshed) {
+        await syncCurrentUser()
+      }
+    }
+
+    const handleFocus = () => {
+      void refreshSession()
+    }
+
+    void initializeSession()
+
+    window.addEventListener('focus', handleFocus)
+    refreshIntervalId = window.setInterval(() => {
+      void refreshSession()
+    }, 5 * 60 * 1000)
 
     return () => {
       isMounted = false
+      if (refreshIntervalId) {
+        window.clearInterval(refreshIntervalId)
+      }
+      window.removeEventListener('focus', handleFocus)
     }
-  }, [isAuthenticated, accessToken, setUser])
+  }, [isAuthenticated, accessToken, refreshToken, setUser, login])
 
   return null
 }
@@ -198,7 +328,7 @@ const NotFoundPage: React.FC = () => {
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <Link
-          to="/crm/dashboard"
+          to="/dashboard"
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
         >
           Go to dashboard
@@ -225,6 +355,24 @@ function App() {
         <Toaster richColors position="top-right" />
         <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute requiredPermissions={['INSIGHTS_VIEW']}>
+              <WorkspaceHomePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute requiredPermissions={['INSIGHTS_VIEW']}>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/profile"
           element={
@@ -233,19 +381,79 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/me/insights"
+          element={
+            <ProtectedRoute requiredPermissions={['INSIGHTS_VIEW']}>
+              <MyInsightsPage />
+            </ProtectedRoute>
+          }
+        />
         
 
         
         <Route
-          path="/crm/dashboard"
+          path="/dashboard"
           element={
-            <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']}>
-              <DashboardRouteResolver />
+            <ProtectedRoute
+              requiredPermissions={[
+                'DASHBOARD_SELF_VIEW',
+                'DASHBOARD_TEAM_VIEW',
+                'DASHBOARD_FINANCE_VIEW',
+                'DASHBOARD_HR_VIEW',
+                'DASHBOARD_TECH_VIEW',
+                'DASHBOARD_OPERATIONS_VIEW',
+                'FIELDWORK_VIEW',
+                'HR_VIEW'
+              ]}
+            >
+              <DashboardLandingRoute />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/crm/dashboard/user"
+          path="/dashboard/operations"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_OPERATIONS_VIEW']}>
+              <OperationsDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/finance"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_FINANCE_VIEW']}>
+              <FinanceDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/hr"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_HR_VIEW']}>
+              <HRDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/technician"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_TECH_VIEW']}>
+              <FieldworkDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/crm"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']}>
+              <DashboardRouteResolver basePath="/dashboard/crm" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/crm/user"
           element={
             <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW']}>
               <DashboardPage mode="SELF" />
@@ -253,10 +461,50 @@ function App() {
           }
         />
         <Route
-          path="/crm/dashboard/team"
+          path="/dashboard/crm/team"
           element={
             <ProtectedRoute requiredPermissions={['DASHBOARD_TEAM_VIEW']}>
               <DashboardPage mode="TEAM" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/fieldwork"
+          element={
+            <ProtectedRoute requiredPermissions={['FIELDWORK_VIEW']}>
+              <FieldworkDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/employee"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
+              <EmployeeDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/crm/dashboard"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']}>
+              <Navigate to="/dashboard/crm" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/crm/dashboard/user"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW']}>
+              <Navigate to="/dashboard/crm/user" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/crm/dashboard/team"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_TEAM_VIEW']}>
+              <Navigate to="/dashboard/crm/team" replace />
             </ProtectedRoute>
           }
         />
@@ -589,36 +837,28 @@ function App() {
           }
         />
 
-        {/* ERP Service Tickets Routes */}
+        {/* ERP Field Jobs Routes */}
         <Route
-          path="/erp/service-tickets"
+          path="/erp/field-jobs"
           element={
             <ProtectedRoute>
-              <ServiceTicketsListPage />
+              <FieldWorkListPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/erp/service-tickets/new"
+          path="/erp/field-jobs/new"
           element={
             <ProtectedRoute>
-              <ServiceTicketForm />
+              <FieldWorkDetailPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/erp/service-tickets/:id/edit"
+          path="/erp/field-jobs/:id"
           element={
             <ProtectedRoute>
-              <ServiceTicketForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/erp/service-tickets/:id"
-          element={
-            <ProtectedRoute>
-              <ServiceTicketDetailPage />
+              <FieldWorkDetailPage />
             </ProtectedRoute>
           }
         />
@@ -735,6 +975,22 @@ function App() {
           }
         />
         <Route
+          path="/erp/inventory/ledger"
+          element={
+            <ProtectedRoute>
+              <InventoryLedger />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/inventory/transfers"
+          element={
+            <ProtectedRoute>
+              <InventoryTransfers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/erp/inventory/new"
           element={
             <ProtectedRoute>
@@ -755,6 +1011,215 @@ function App() {
           element={
             <ProtectedRoute>
               <InventoryForm />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* HR Routes */}
+        <Route
+          path="/hr/employees"
+          element={
+            <ProtectedRoute>
+              <EmployeeListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/employees/new"
+          element={
+            <ProtectedRoute>
+              <EmployeeFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/employees/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EmployeeFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/employees/:id"
+          element={
+            <ProtectedRoute>
+              <EmployeeDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/departments"
+          element={
+            <ProtectedRoute>
+              <DepartmentListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/departments/new"
+          element={
+            <ProtectedRoute>
+              <DepartmentFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/departments/:id/edit"
+          element={
+            <ProtectedRoute>
+              <DepartmentFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/departments/:id"
+          element={
+            <ProtectedRoute>
+              <DepartmentDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/positions"
+          element={
+            <ProtectedRoute>
+              <PositionListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/positions/new"
+          element={
+            <ProtectedRoute>
+              <PositionFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/positions/:id/edit"
+          element={
+            <ProtectedRoute>
+              <PositionFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/positions/:id"
+          element={
+            <ProtectedRoute>
+              <PositionDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/leave-requests"
+          element={
+            <ProtectedRoute>
+              <LeaveRequestListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/leave-requests/new"
+          element={
+            <ProtectedRoute>
+              <LeaveRequestFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/leave-requests/:id/edit"
+          element={
+            <ProtectedRoute>
+              <LeaveRequestFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/leave-requests/:id"
+          element={
+            <ProtectedRoute>
+              <LeaveRequestDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/timesheets"
+          element={
+            <ProtectedRoute>
+              <TimesheetListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/timesheets/new"
+          element={
+            <ProtectedRoute>
+              <TimesheetFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/timesheets/:id/edit"
+          element={
+            <ProtectedRoute>
+              <TimesheetFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/timesheets/:id"
+          element={
+            <ProtectedRoute>
+              <TimesheetDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/reimbursements/new"
+          element={
+            <ProtectedRoute>
+              <ReimbursementRequestPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/payroll-runs"
+          element={
+            <ProtectedRoute>
+              <PayrollRunListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/payroll-runs/new"
+          element={
+            <ProtectedRoute>
+              <PayrollRunFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/payroll-runs/:id"
+          element={
+            <ProtectedRoute>
+              <PayrollRunDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/payroll-profiles"
+          element={
+            <ProtectedRoute>
+              <PayrollProfilePage />
             </ProtectedRoute>
           }
         />
@@ -935,7 +1400,7 @@ function App() {
           }
         />
 
-        <Route path="/" element={<Navigate to="/crm/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
         <Route
           path="*"
           element={

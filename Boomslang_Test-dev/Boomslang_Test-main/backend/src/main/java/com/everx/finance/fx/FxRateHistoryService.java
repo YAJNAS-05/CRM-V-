@@ -50,7 +50,8 @@ public class FxRateHistoryService {
      */
     @Transactional(readOnly = true)
     public BigDecimal getRateAsOf(String fromCurrency, String toCurrency, LocalDate asOf) {
-        return fxRateRepository.getLatestRateAsOf(fromCurrency, toCurrency, asOf)
+        return fxRateRepository.findTopByFromCurrencyAndToCurrencyAndRateDateLessThanEqualOrderByRateDateDesc(
+                fromCurrency, toCurrency, asOf)
                 .map(FxRateHistory::getExchangeRate)
                 .orElseThrow(() -> new FxRateException(
                     "No FX rate found for " + fromCurrency + "/" + toCurrency + " as of " + asOf
@@ -62,7 +63,8 @@ public class FxRateHistoryService {
      */
     @Transactional(readOnly = true)
     public BigDecimal getCurrentRate(String fromCurrency, String toCurrency) {
-        return fxRateRepository.getCurrentRate(fromCurrency, toCurrency)
+        return fxRateRepository.findTopByFromCurrencyAndToCurrencyOrderByRateDateDesc(
+                fromCurrency, toCurrency)
                 .map(FxRateHistory::getExchangeRate)
                 .orElseThrow(() -> new FxRateException(
                     "No FX rate found for " + fromCurrency + "/" + toCurrency

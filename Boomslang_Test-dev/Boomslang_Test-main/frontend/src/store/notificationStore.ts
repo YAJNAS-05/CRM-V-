@@ -6,6 +6,7 @@ export interface Notification {
   title: string
   message: string
   duration?: number
+  dedupeKey?: string
   timestamp: number
 }
 
@@ -20,10 +21,17 @@ interface NotificationStore {
  * Notification store - manages app-wide notifications
  * Complements the toast notifications from Sonner
  */
-export const useNotificationStore = create<NotificationStore>((set) => ({
+export const useNotificationStore = create<NotificationStore>((set, get) => ({
   notifications: [],
 
   addNotification: (notification) => {
+    if (notification.dedupeKey) {
+      const exists = get().notifications.some((item) => item.dedupeKey === notification.dedupeKey)
+      if (exists) {
+        return
+      }
+    }
+
     const id = `notif-${Date.now()}-${Math.random()}`
     const newNotification: Notification = {
       ...notification,

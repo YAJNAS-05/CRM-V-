@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useLocation, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { fieldworkApi } from '../../api/fieldworkApi'
@@ -77,8 +77,10 @@ const formatEnumLabel = (value: string): string => value.replace(/_/g, ' ')
 
 export const FieldWorkDetailPage = () => {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const navigate = useNavigate()
   const isCreateMode = !id || id === 'new'
+  const basePath = location.pathname.startsWith('/erp/field-jobs') ? '/erp/field-jobs' : '/fieldwork'
 
   const today = new Date().toISOString().slice(0, 10)
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -179,10 +181,11 @@ export const FieldWorkDetailPage = () => {
       setIsCreating(true)
       const created = await fieldworkApi.createFieldJob(payload)
       toast.success('Work order created successfully')
-      if (typeof created.fieldJobId === 'number') {
-        navigate(`/fieldwork/${created.fieldJobId}`)
+      const createdId = created.fieldJobId ?? created.jobNumber
+      if (createdId) {
+        navigate(`${basePath}/${createdId}`)
       } else {
-        navigate('/fieldwork')
+        navigate(basePath)
       }
     } catch (error) {
       console.error('Error creating work order:', error)
@@ -196,7 +199,7 @@ export const FieldWorkDetailPage = () => {
     return (
       <div className="space-y-4">
         <button
-          onClick={() => navigate('/fieldwork')}
+          onClick={() => navigate(basePath)}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
           ← Back to Work Orders
@@ -354,7 +357,7 @@ export const FieldWorkDetailPage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/fieldwork')}
+                onClick={() => navigate(basePath)}
                 className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80"
               >
                 Cancel
@@ -375,7 +378,7 @@ export const FieldWorkDetailPage = () => {
       <div className="p-4 text-center">
         <p className="text-destructive">Work order not found</p>
         <button
-          onClick={() => navigate('/fieldwork')}
+          onClick={() => navigate(basePath)}
           className="mt-4 text-sm text-primary hover:underline"
         >
           Back to work orders
@@ -387,7 +390,7 @@ export const FieldWorkDetailPage = () => {
   return (
     <div className="space-y-4">
       <button
-        onClick={() => navigate('/fieldwork')}
+        onClick={() => navigate(basePath)}
         className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← Back to Work Orders
@@ -440,7 +443,7 @@ export const FieldWorkDetailPage = () => {
 
         <div className="mt-6 pt-6 border-t border-border flex gap-3">
           <button
-            onClick={() => navigate('/fieldwork')}
+            onClick={() => navigate(basePath)}
             className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80"
           >
             Back

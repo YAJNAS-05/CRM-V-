@@ -24,4 +24,7 @@ public interface SupplierRepository extends JpaRepository<Supplier, UUID> {
 
     @Query("SELECT s FROM Supplier s WHERE s.isDeleted = false AND s.supplierType = :type")
     Page<Supplier> findByType(@Param("type") String type, Pageable pageable);
+
+    @Query("SELECT s FROM Supplier s WHERE s.isDeleted = false AND lower(s.companyName) = lower(:companyName)")
+    Optional<Supplier> findByCompanyNameIgnoreCase(@Param("companyName") String companyName);
 }

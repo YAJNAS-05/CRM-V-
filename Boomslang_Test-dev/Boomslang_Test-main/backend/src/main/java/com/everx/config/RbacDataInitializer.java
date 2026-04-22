@@ -69,6 +69,11 @@ public class RbacDataInitializer implements ApplicationRunner {
                 new PermissionSeed("FINANCE_EDIT", "FINANCE", "EDIT", "Edit finance records"),
                 new PermissionSeed("FINANCE_DELETE", "FINANCE", "DELETE", "Delete finance records"),
 
+                new PermissionSeed("HR_VIEW", "HR", "VIEW", "View HR module"),
+                new PermissionSeed("HR_CREATE", "HR", "CREATE", "Create HR records"),
+                new PermissionSeed("HR_EDIT", "HR", "EDIT", "Edit HR records"),
+                new PermissionSeed("HR_DELETE", "HR", "DELETE", "Delete HR records"),
+
                 new PermissionSeed("FIELDWORK_VIEW", "FIELDWORK", "VIEW", "View field work"),
                 new PermissionSeed("FIELDWORK_CREATE", "FIELDWORK", "CREATE", "Create field work"),
                 new PermissionSeed("FIELDWORK_EDIT", "FIELDWORK", "EDIT", "Edit field work"),
@@ -76,9 +81,22 @@ public class RbacDataInitializer implements ApplicationRunner {
                 new PermissionSeed("REPORT_VIEW", "REPORT", "VIEW", "View reports"),
                 new PermissionSeed("REPORT_EXPORT", "REPORT", "EXPORT", "Export reports"),
 
+                new PermissionSeed("INSIGHTS_VIEW", "INSIGHTS", "VIEW", "View personal insights"),
+
                 new PermissionSeed("DASHBOARD_VIEW", "CRM", "VIEW", "View CRM dashboard"),
                 new PermissionSeed("DASHBOARD_SELF_VIEW", "CRM", "SELF_VIEW", "View CRM user dashboard"),
-                new PermissionSeed("DASHBOARD_TEAM_VIEW", "CRM", "TEAM_VIEW", "View CRM team dashboard")
+                new PermissionSeed("DASHBOARD_TEAM_VIEW", "CRM", "TEAM_VIEW", "View CRM team dashboard"),
+                new PermissionSeed("DASHBOARD_FINANCE_VIEW", "DASHBOARD", "FINANCE_VIEW", "View finance dashboard"),
+                new PermissionSeed("DASHBOARD_HR_VIEW", "DASHBOARD", "HR_VIEW", "View HR dashboard"),
+                new PermissionSeed("DASHBOARD_TECH_VIEW", "DASHBOARD", "TECH_VIEW", "View technician dashboard"),
+                new PermissionSeed("DASHBOARD_OPERATIONS_VIEW", "DASHBOARD", "OPS_VIEW", "View operations dashboard"),
+
+                new PermissionSeed("REPORT_TEAM_VIEW", "REPORT", "TEAM_VIEW", "View team reports"),
+                new PermissionSeed("REPORT_PERSONAL_VIEW", "REPORT", "PERSONAL_VIEW", "View personal reports"),
+
+                new PermissionSeed("DATA_SCOPE_OWN", "DATA", "SCOPE_OWN", "Access own data only"),
+                new PermissionSeed("DATA_SCOPE_TEAM", "DATA", "SCOPE_TEAM", "Access team data"),
+                new PermissionSeed("DATA_SCOPE_ORG", "DATA", "SCOPE_ORG", "Access org data")
         );
 
         for (PermissionSeed seed : seeds) {
@@ -206,26 +224,98 @@ public class RbacDataInitializer implements ApplicationRunner {
         }
 
         Set<String> viewerSet = Set.of(
-            "CRM_VIEW", "ERP_VIEW", "FINANCE_VIEW", "FIELDWORK_VIEW", "REPORT_VIEW", "DASHBOARD_SELF_VIEW"
+            "CRM_VIEW",
+            "ERP_VIEW",
+            "FINANCE_VIEW",
+            "FIELDWORK_VIEW",
+            "REPORT_VIEW",
+            "REPORT_PERSONAL_VIEW",
+            "DASHBOARD_SELF_VIEW",
+            "INSIGHTS_VIEW",
+            "DATA_SCOPE_OWN"
         );
 
         Map<String, Set<String>> matrix = new LinkedHashMap<>();
         matrix.put(User.UserRole.SUPER_ADMIN.name(), all);
         matrix.put(User.UserRole.ADMIN.name(), all);
         matrix.put(User.UserRole.MANAGER.name(), Set.of(
-            "CRM_VIEW", "CRM_EDIT", "ERP_VIEW", "FINANCE_VIEW", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_SELF_VIEW", "DASHBOARD_TEAM_VIEW"
+            "CRM_VIEW",
+            "CRM_EDIT",
+            "ERP_VIEW",
+            "FIELDWORK_VIEW",
+            "FINANCE_VIEW",
+            "HR_VIEW",
+            "HR_EDIT",
+            "REPORT_VIEW",
+            "REPORT_EXPORT",
+            "REPORT_TEAM_VIEW",
+            "DASHBOARD_SELF_VIEW",
+            "DASHBOARD_TEAM_VIEW",
+            "DASHBOARD_OPERATIONS_VIEW",
+            "INSIGHTS_VIEW",
+            "DATA_SCOPE_TEAM"
         ));
         matrix.put(User.UserRole.SALES_MANAGER.name(), Set.of(
-            "CRM_VIEW", "CRM_CREATE", "CRM_EDIT", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_SELF_VIEW", "DASHBOARD_TEAM_VIEW"
+            "CRM_VIEW",
+            "CRM_CREATE",
+            "CRM_EDIT",
+            "REPORT_VIEW",
+            "REPORT_EXPORT",
+            "REPORT_TEAM_VIEW",
+            "DASHBOARD_SELF_VIEW",
+            "DASHBOARD_TEAM_VIEW",
+            "INSIGHTS_VIEW",
+            "DATA_SCOPE_TEAM"
         ));
         matrix.put(User.UserRole.SALES_REP.name(), Set.of(
-            "CRM_VIEW", "CRM_CREATE", "CRM_EDIT", "DASHBOARD_SELF_VIEW"
+            "CRM_VIEW",
+            "CRM_CREATE",
+            "CRM_EDIT",
+            "DASHBOARD_SELF_VIEW",
+            "INSIGHTS_VIEW",
+            "REPORT_PERSONAL_VIEW",
+            "DATA_SCOPE_OWN"
         ));
         matrix.put(User.UserRole.FINANCE.name(), Set.of(
-            "FINANCE_VIEW", "FINANCE_CREATE", "FINANCE_EDIT", "REPORT_VIEW", "REPORT_EXPORT", "DASHBOARD_SELF_VIEW"
+            "FINANCE_VIEW",
+            "FINANCE_CREATE",
+            "FINANCE_EDIT",
+            "REPORT_VIEW",
+            "REPORT_EXPORT",
+            "REPORT_TEAM_VIEW",
+            "DASHBOARD_SELF_VIEW",
+            "DASHBOARD_FINANCE_VIEW",
+            "INSIGHTS_VIEW",
+            "DATA_SCOPE_ORG"
         ));
         matrix.put(User.UserRole.SERVICE_TECH.name(), Set.of(
-            "ERP_VIEW", "ERP_EDIT", "FIELDWORK_VIEW", "FIELDWORK_CREATE", "FIELDWORK_EDIT"
+            "ERP_VIEW",
+            "ERP_EDIT",
+            "FIELDWORK_VIEW",
+            "FIELDWORK_CREATE",
+            "FIELDWORK_EDIT",
+            "DASHBOARD_TECH_VIEW",
+            "INSIGHTS_VIEW",
+            "DATA_SCOPE_OWN"
+        ));
+        matrix.put(User.UserRole.HR.name(), Set.of(
+            "HR_VIEW",
+            "HR_CREATE",
+            "HR_EDIT",
+            "HR_DELETE",
+            "REPORT_VIEW",
+            "REPORT_EXPORT",
+            "REPORT_TEAM_VIEW",
+            "DASHBOARD_HR_VIEW",
+            "INSIGHTS_VIEW",
+            "DATA_SCOPE_ORG"
+        ));
+        matrix.put(User.UserRole.EMPLOYEE.name(), Set.of(
+            "HR_VIEW",
+            "HR_CREATE",
+            "INSIGHTS_VIEW",
+            "REPORT_PERSONAL_VIEW",
+            "DATA_SCOPE_OWN"
         ));
         matrix.put(User.UserRole.VIEWER.name(), viewerSet);
         matrix.put(User.UserRole.READ_ONLY.name(), viewerSet);
@@ -243,6 +333,8 @@ public class RbacDataInitializer implements ApplicationRunner {
         descriptions.put(User.UserRole.SERVICE_TECH.name(), "Service, ERP and field work access");
         descriptions.put(User.UserRole.VIEWER.name(), "Read-only operational access");
         descriptions.put(User.UserRole.READ_ONLY.name(), "Minimal read-only access");
+        descriptions.put(User.UserRole.HR.name(), "HR operations and payroll management");
+        descriptions.put(User.UserRole.EMPLOYEE.name(), "Employee self-service access");
         return descriptions;
     }
 

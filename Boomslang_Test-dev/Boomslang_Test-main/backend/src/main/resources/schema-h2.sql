@@ -2,6 +2,7 @@
 CREATE SCHEMA IF NOT EXISTS everx_auth;
 CREATE SCHEMA IF NOT EXISTS everx_crm;
 CREATE SCHEMA IF NOT EXISTS everx_erp;
+CREATE SCHEMA IF NOT EXISTS everx_hr;
 CREATE SCHEMA IF NOT EXISTS everx_reporting;
 
 -- Auth schema tables
@@ -287,15 +288,52 @@ CREATE TABLE IF NOT EXISTS everx_erp.warranties (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS everx_erp.service_tickets (
+CREATE TABLE IF NOT EXISTS everx_erp.field_jobs (
     id UUID PRIMARY KEY,
+    job_number VARCHAR(50) NOT NULL,
+    job_type VARCHAR(50) NOT NULL,
+    job_status VARCHAR(50) NOT NULL,
+    priority VARCHAR(50) NOT NULL,
+    linked_entity VARCHAR(100),
+    linked_equipment_sku VARCHAR(100),
+    linked_lead_id UUID,
+    linked_po_id UUID,
+    linked_sales_order_id UUID,
+    linked_shipment_id UUID,
+    linked_warranty_id UUID,
+    linked_invoice_id UUID,
+    account_id UUID,
     equipment_id UUID,
-    description TEXT,
-    status VARCHAR(50),
-    priority VARCHAR(50),
-    assigned_to UUID,
-    created_date TIMESTAMP WITH TIME ZONE,
-    completed_date TIMESTAMP WITH TIME ZONE,
+    client_or_seller_name VARCHAR(255),
+    site_contact_name VARCHAR(255),
+    site_contact_phone VARCHAR(20),
+    site_contact_email VARCHAR(255),
+    site_address_line1 VARCHAR(255),
+    site_address_line2 VARCHAR(255),
+    site_city VARCHAR(100),
+    site_country VARCHAR(100),
+    site_timezone VARCHAR(50),
+    scheduled_start_date TIMESTAMP WITH TIME ZONE,
+    scheduled_end_date TIMESTAMP WITH TIME ZONE,
+    estimated_duration_days INTEGER,
+    actual_start_date TIMESTAMP WITH TIME ZONE,
+    actual_end_date TIMESTAMP WITH TIME ZONE,
+    actual_duration_days INTEGER,
+    primary_engineer_type VARCHAR(50),
+    primary_engineer_id UUID,
+    primary_engineer_name VARCHAR(255),
+    secondary_engineer_id UUID,
+    secondary_engineer_name VARCHAR(255),
+    engineer_assigned_date TIMESTAMP WITH TIME ZONE,
+    engineer_accepted BOOLEAN,
+    engineer_accepted_date TIMESTAMP WITH TIME ZONE,
+    internal_notes TEXT,
+    client_brief_notes TEXT,
+    billable BOOLEAN NOT NULL DEFAULT TRUE,
+    under_warranty BOOLEAN NOT NULL DEFAULT FALSE,
+    cost_estimate NUMERIC(15,2),
+    cost_actual NUMERIC(15,2),
+    currency CHAR(3),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE,
     created_by VARCHAR(255),
@@ -500,6 +538,138 @@ CREATE TABLE IF NOT EXISTS everx_erp.intercompany_transactions (
     version BIGINT NOT NULL DEFAULT 0
 );
 
+-- HR schema tables
+CREATE TABLE IF NOT EXISTS everx_hr.departments (
+    id UUID PRIMARY KEY,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    parent_department_id UUID,
+    manager_employee_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.positions (
+    id UUID PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    grade VARCHAR(50),
+    min_salary NUMERIC(15,2),
+    max_salary NUMERIC(15,2),
+    currency CHAR(3),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.employees (
+    id UUID PRIMARY KEY,
+    user_id UUID,
+    employee_code VARCHAR(50) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    department_id UUID,
+    position_id UUID,
+    manager_id UUID,
+    employment_type VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    hire_date DATE,
+    termination_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.payroll_profiles (
+    id UUID PRIMARY KEY,
+    employee_id UUID NOT NULL,
+    pay_type VARCHAR(50) NOT NULL,
+    pay_frequency VARCHAR(50) NOT NULL,
+    salary_amount NUMERIC(15,2),
+    hourly_rate NUMERIC(15,2),
+    currency CHAR(3),
+    tax_id VARCHAR(100),
+    bank_account_masked VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.payroll_runs (
+    id UUID PRIMARY KEY,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    run_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.payroll_items (
+    id UUID PRIMARY KEY,
+    payroll_run_id UUID NOT NULL,
+    employee_id UUID NOT NULL,
+    gross_pay NUMERIC(15,2),
+    deductions NUMERIC(15,2),
+    net_pay NUMERIC(15,2),
+    currency CHAR(3),
+    status VARCHAR(50) NOT NULL,
+    paid_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.timesheets (
+    id UUID PRIMARY KEY,
+    employee_id UUID NOT NULL,
+    field_job_id UUID,
+    work_date DATE NOT NULL,
+    hours_worked NUMERIC(10,2),
+    status VARCHAR(50) NOT NULL,
+    approved_by UUID,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.leave_requests (
+    id UUID PRIMARY KEY,
+    employee_id UUID NOT NULL,
+    leave_type VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    approved_by UUID,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
 -- Reporting schema tables
 CREATE TABLE IF NOT EXISTS everx_reporting.report_definitions (
     id UUID PRIMARY KEY,
@@ -571,4 +741,73 @@ CREATE TABLE IF NOT EXISTS everx_reporting.scheduled_reports (
     created_by VARCHAR(255),
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     version BIGINT NOT NULL DEFAULT 0
+);
+
+-- FX rate locks
+CREATE TABLE IF NOT EXISTS everx_erp.fx_rate_locks (
+    id UUID PRIMARY KEY,
+    invoice_id UUID NOT NULL,
+    base_currency VARCHAR(3) NOT NULL,
+    quote_currency VARCHAR(3) NOT NULL,
+    locked_rate NUMERIC(12,6) NOT NULL,
+    rate_date DATE NOT NULL,
+    source VARCHAR(50),
+    locked_at DATE NOT NULL,
+    is_locked BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+-- Purchase receipts for 3-way match
+CREATE TABLE IF NOT EXISTS everx_erp.purchase_receipts (
+    id UUID PRIMARY KEY,
+    po_id UUID NOT NULL,
+    received_date DATE NOT NULL,
+    total_quantity INTEGER NOT NULL,
+    total_amount NUMERIC(15,2),
+    currency VARCHAR(3),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+-- Add PO linkage to invoices
+ALTER TABLE everx_erp.invoices ADD COLUMN IF NOT EXISTS po_id UUID;
+
+-- Saga orchestration state
+CREATE SCHEMA IF NOT EXISTS everx_shared;
+
+CREATE TABLE IF NOT EXISTS everx_shared.saga_states (
+    id UUID PRIMARY KEY,
+    saga_id VARCHAR(100) NOT NULL,
+    reference_id UUID NOT NULL,
+    reference_type VARCHAR(50) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    current_step VARCHAR(100) NOT NULL,
+    context_json TEXT,
+    failure_reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    retry_count INTEGER
+);
+
+-- Cryptographic audit logs
+CREATE TABLE IF NOT EXISTS everx_auth.cryptographic_audit_logs (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(100) NOT NULL,
+    entity_id UUID NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    ip_address VARCHAR(45) NOT NULL,
+    hash VARCHAR(500) NOT NULL,
+    previous_hash VARCHAR(500) NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_locked BOOLEAN NOT NULL DEFAULT TRUE
 );

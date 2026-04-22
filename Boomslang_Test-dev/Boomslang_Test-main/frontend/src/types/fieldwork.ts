@@ -63,6 +63,8 @@ export enum JobPriority {
   EMERGENCY = 'EMERGENCY'
 }
 
+export type FieldJobId = string | number;
+
 export enum SiteReadiness {
   READY = 'READY',
   PENDING_CIVIL = 'PENDING_CIVIL',
@@ -76,7 +78,7 @@ export enum SiteReadiness {
 // ============================================================================
 
 export interface FieldJobDto {
-  fieldJobId?: number;
+  fieldJobId?: FieldJobId;
   version?: number;
   jobNumber: string;
   jobType: FieldJobType;
@@ -86,12 +88,11 @@ export interface FieldJobDto {
   // Linked entities
   linkedEntity?: string;
   linkedEquipmentSku?: string;
-  linkedLeadId?: number;
-  linkedPoId?: number;
-  linkedSalesOrderId?: number;
-  linkedShipmentId?: number;
-  linkedWarrantyId?: number;
-  linkedServiceTicketId?: number;
+  linkedLeadId?: string;
+  linkedPoId?: string;
+  linkedSalesOrderId?: string;
+  linkedShipmentId?: string;
+  linkedWarrantyId?: string;
 
   // Site & Client Info
   clientOrSellerName: string;
@@ -114,9 +115,9 @@ export interface FieldJobDto {
 
   // Engineer Assignment
   primaryEngineerType?: EngineerType;
-  primaryEngineerId?: number;
+  primaryEngineerId?: string;
   primaryEngineerName?: string;
-  secondaryEngineerId?: number;
+  secondaryEngineerId?: string;
   secondaryEngineerName?: string;
   engineerAssignedDate?: string;
   engineerAccepted?: boolean;
@@ -153,7 +154,7 @@ export interface FieldJobDto {
 
 export interface SiteAssessmentDetailDto {
   saDetailId?: number;
-  fieldJobId: number;
+  fieldJobId: FieldJobId;
   modalityRequested?: string;
   roomWidthMm?: number;
   roomDepthMm?: number;
@@ -178,8 +179,8 @@ export interface SiteAssessmentDetailDto {
 
 export interface DeInstallDetailDto {
   deInstallId?: number;
-  fieldJobId: number;
-  linkedPoId: number;
+  fieldJobId: FieldJobId;
+  linkedPoId: string;
   equipmentMake?: string;
   equipmentModel?: string;
   serialNumber: string;
@@ -200,9 +201,9 @@ export interface DeInstallDetailDto {
 
 export interface InstallationDetailDto {
   installDetailId?: number;
-  fieldJobId: number;
-  linkedSalesOrderId: number;
-  linkedShipmentId: number;
+  fieldJobId: FieldJobId;
+  linkedSalesOrderId: string;
+  linkedShipmentId: string;
   linkedEquipmentSku: string;
   unpackingCompleteDate?: string;
   allComponentsPresent?: boolean;
@@ -230,8 +231,8 @@ export interface InstallationDetailDto {
 
 export interface PpmDetailDto {
   ppmDetailId?: number;
-  fieldJobId: number;
-  linkedWarrantyId: number;
+  fieldJobId: FieldJobId;
+  linkedWarrantyId: string;
   linkedEquipmentSku: string;
   ppmType?: string;
   ppmVisitNumber?: number;
@@ -258,10 +259,9 @@ export interface PpmDetailDto {
 
 export interface RepairDetailDto {
   repairDetailId?: number;
-  fieldJobId: number;
-  linkedServiceTicketId: number;
+  fieldJobId: FieldJobId;
   linkedEquipmentSku: string;
-  linkedWarrantyId?: number;
+  linkedWarrantyId?: string;
   isUnderWarranty?: boolean;
   faultFoundOnSite: string;
   rootCauseCategory?: string;
@@ -286,10 +286,10 @@ export interface RepairDetailDto {
 export interface FieldJobCostDto {
   costId?: number;
   version?: number;
-  fieldJobId: number;
+  fieldJobId: FieldJobId;
   costCategory: CostCategory;
   description: string;
-  linkedPartId?: number;
+  linkedPartId?: string;
   quantity: number;
   unit?: string;
   unitCostAmount: number;
@@ -310,7 +310,7 @@ export interface FieldJobCostDto {
 
 export interface FieldJobChecklistDto {
   checklistId?: number;
-  fieldJobId: number;
+  fieldJobId: FieldJobId;
   generatedFromTemplate?: number;
   overallResult?: ChecklistResult;
   completedBy?: string;
@@ -333,7 +333,7 @@ export interface ChecklistItemDto {
 export interface FieldJobReportDto {
   reportId?: number;
   version?: number;
-  fieldJobId: number;
+  fieldJobId: FieldJobId;
   reportNumber?: string;
   reportGeneratedAt?: string;
   reportGeneratedBy?: string;
@@ -358,7 +358,7 @@ export interface FieldJobReportDto {
 
 export interface FieldJobSignOffDto {
   signOffId?: number;
-  fieldJobId: number;
+  fieldJobId: FieldJobId;
   reportId: number;
   signOffStatus: SignOffStatus;
   clientRepresentative: string;
@@ -380,8 +380,8 @@ export interface FieldJobSignOffDto {
 
 export interface FieldJobTravelDto {
   travelId?: number;
-  fieldJobId: number;
-  engineerId: number;
+  fieldJobId: FieldJobId;
+  engineerId: string;
   legNumber?: number;
   travelMode: TravelMode;
   departureCity: string;

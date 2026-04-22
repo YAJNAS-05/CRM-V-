@@ -2,16 +2,17 @@ package com.everx.shared.scheduler;
 
 import com.everx.erp.equipment.Equipment;
 import com.everx.erp.equipment.EquipmentRepository;
-import com.everx.erp.service.ServiceTicket;
-import com.everx.erp.service.ServiceTicketRepository;
-import com.everx.erp.service.ServicePriority;
-import com.everx.erp.service.ServiceStatus;
-import com.everx.erp.service.ServiceType;
+import com.everx.erp.fieldwork.FieldJob;
+import com.everx.erp.fieldwork.FieldJobRepository;
+import com.everx.erp.fieldwork.FieldJobStatus;
+import com.everx.erp.fieldwork.FieldJobType;
+import com.everx.erp.fieldwork.JobPriority;
 import com.everx.erp.warranty.Warranty;
 import com.everx.erp.warranty.WarrantyRepository;
 import com.everx.shared.service.MailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +28,14 @@ public class AlertScheduler {
 
     private final WarrantyRepository warrantyRepository;
     private final EquipmentRepository equipmentRepository;
-    private final ServiceTicketRepository serviceTicketRepository;
+    private final FieldJobRepository fieldJobRepository;
     private final MailService mailService;
 
     /**
      * Daily at 8 AM: Check for warranty expiries.
      */
     @Scheduled(cron = "0 0 8 * * *")
+    @SchedulerLock(name = "alertWarrantyExpiries", lockAtMostFor = "55m", lockAtLeastFor = "5m")
     @Transactional
     public void checkWarrantyExpiries() {
         log.info("Checking for warranty expiries...");
@@ -62,6 +64,7 @@ public class AlertScheduler {
      * If due date is within 7 days, create a service ticket automatically.
      */
     @Scheduled(cron = "0 0 9 * * *")
+    @SchedulerLock(name = "alertSafetyChecks", lockAtMostFor = "55m", lockAtLeastFor = "5m")
     @Transactional
     public void checkSafetyChecks() {
         log.info("Checking for annual safety checks...");
@@ -80,33 +83,36 @@ public class AlertScheduler {
     }
 
     private void createSafetyCheckTicket(Equipment e) {
-        // Check if ticket already exists for this period
-        boolean exists = serviceTicketRepository.findAll().stream()
-                .anyMatch(t -> t.getEquipmentId().equals(e.getId()) 
-                               && t.getType() == ServiceType.OTHER // Standardize later or add ANNUAL_SAFETY_CHECK to Enum
-                               && t.getStatus() != ServiceStatus.CLOSED);
-        
+        boolean exists = fieldJobRepository.findOpenJobs().stream()
+                .anyMatch(job -> e.getId().equals(job.getEquipmentId())
+                        && job.getJobType() == FieldJobType.PPM);
+
         if (!exists) {
-            ServiceTicket ticket = new ServiceTicket();
-            ticket.setTicketNumber("SC-" + e.getInternalCode() + "-" + LocalDate.now().getYear());
-            ticket.setEquipmentId(e.getId());
-            
-            // Link to the account associated with the equipment's current warranty if possible
+            FieldJob job = new FieldJob();
+            job.setJobNumber("FJ-SAFE-" + e.getInternalCode() + "-" + LocalDate.now().getYear());
+            job.setJobType(FieldJobType.PPM);
+            job.setJobStatus(FieldJobStatus.SCHEDULED);
+            job.setPriority(JobPriority.ROUTINE);
+            job.setEquipmentId(e.getId());
+
             UUID accountId = warrantyRepository.findAll().stream()
-                .filter(w -> w.getEquipmentId().equals(e.getId()))
-                .map(Warranty::getAccountId)
-                .findFirst()
-                .orElse(e.getId()); // Fallback to satisfy not-null if no warranty found
-                
-            ticket.setAccountId(accountId);
-            ticket.setType(ServiceType.CORRECTIVE_MAINTENANCE); // Or add SAFETY_CHECK
-            ticket.setStatus(ServiceStatus.OPEN);
-            ticket.setPriority(ServicePriority.MEDIUM);
-            ticket.setReportedDate(LocalDate.now());
-            ticket.setDescription("Automated annual safety check reminder for " + e.getMake() + " " + e.getModel());
-            
-            serviceTicketRepository.save(ticket);
-            log.info("Created automated safety check ticket for: {}", e.getInternalCode());
+                    .filter(w -> w.getEquipmentId().equals(e.getId()))
+                    .map(Warranty::getAccountId)
+                    .findFirst()
+                    .orElse(null);
+            job.setAccountId(accountId);
+
+            job.setClientOrSellerName("Safety Check");
+            job.setSiteContactName("Service Desk");
+            job.setSiteContactEmail("service@everx.com");
+            job.setSiteAddressLine1(e.getWarehouseLocation() != null ? e.getWarehouseLocation() : "On Site");
+            job.setSiteCity(e.getLocationCountry() != null ? e.getLocationCountry() : "Unknown");
+            job.setScheduledStartDate(LocalDate.now().plusDays(7).atStartOfDay().atOffset(java.time.ZoneOffset.UTC));
+            job.setScheduledEndDate(LocalDate.now().plusDays(7).atTime(17, 0).atOffset(java.time.ZoneOffset.UTC));
+            job.setInternalNotes("Automated annual safety check reminder for " + e.getMake() + " " + e.getModel());
+
+            fieldJobRepository.save(job);
+            log.info("Created automated safety check field job for: {}", e.getInternalCode());
         }
     }
 }

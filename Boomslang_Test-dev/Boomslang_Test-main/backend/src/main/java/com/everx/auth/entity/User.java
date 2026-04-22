@@ -72,7 +72,17 @@ public class User extends BaseEntity implements UserDetails {
     private String avatarUrl;
 
     public enum UserRole {
-        SUPER_ADMIN, ADMIN, MANAGER, SALES_REP, VIEWER, SERVICE_TECH, FINANCE, SALES_MANAGER, READ_ONLY
+        SUPER_ADMIN,
+        ADMIN,
+        MANAGER,
+        SALES_REP,
+        VIEWER,
+        SERVICE_TECH,
+        FINANCE,
+        SALES_MANAGER,
+        READ_ONLY,
+        HR,
+        EMPLOYEE
     }
 
     public enum OfficeLocation {

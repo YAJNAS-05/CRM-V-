@@ -16,6 +16,7 @@ import java.util.UUID;
 public class CreateInvoiceRequest {
     private String invoiceNumber;
     private UUID soId;
+    private UUID poId;
     private UUID accountId;
     private Invoice.InvoiceEntity entity;
     private Invoice.InvoiceType type;

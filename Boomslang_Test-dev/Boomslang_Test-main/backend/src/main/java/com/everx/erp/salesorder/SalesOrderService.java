@@ -8,6 +8,7 @@ import com.everx.erp.logistics.ShipmentRepository;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.erp.salesorder.dto.*;
+import com.everx.shared.saga.SagaOrchestrator;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class SalesOrderService {
     private final EquipmentRepository equipmentRepository;
     private final ShipmentRepository shipmentRepository;
     private final InvoiceRepository invoiceRepository;
+    private final SagaOrchestrator sagaOrchestrator;
 
     @Transactional
     public SalesOrderDto createSalesOrder(CreateSalesOrderRequest request) {
@@ -156,35 +158,89 @@ public class SalesOrderService {
             throw new ValidationException("Cannot confirm a sales order without at least one item");
         }
 
-        for (SalesOrderItem item : so.getItems()) {
-            if (item.getEquipmentId() == null) {
-                throw new ValidationException("Sales order item missing equipment reference");
+        String sagaId = sagaOrchestrator.initiateSalesOrderSaga(
+            so.getId(),
+            "SALES_ORDER_CONFIRM",
+            java.util.Map.of("soId", so.getId().toString())
+        );
+
+        try {
+            for (SalesOrderItem item : so.getItems()) {
+                if (item.getEquipmentId() == null) {
+                    throw new ValidationException("Sales order item missing equipment reference");
+                }
+
+                Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId())
+                        .orElseThrow(() -> new ValidationException("Equipment not found: " + item.getEquipmentId()));
+
+                if (equipment.getStatus() == EquipmentStatus.SOLD) {
+                    throw new ValidationException("Equipment already sold: " + equipment.getInternalCode());
+                }
+
+                equipment.setStatus(EquipmentStatus.RESERVED);
+                equipmentRepository.save(equipment);
             }
 
-            Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId())
-                    .orElseThrow(() -> new ValidationException("Equipment not found: " + item.getEquipmentId()));
+            sagaOrchestrator.transitionStep(sagaId, "EQUIPMENT_RESERVED", java.util.Map.of("soId", so.getId().toString()));
 
-            if (equipment.getStatus() == EquipmentStatus.SOLD) {
-                throw new ValidationException("Equipment already sold: " + equipment.getInternalCode());
+            so.setStatus("CONFIRMED");
+            SalesOrder savedSo = salesOrderRepository.save(so);
+
+            if (!shipmentRepository.findBySoId(savedSo.getId(), PageRequest.of(0, 1)).hasContent()) {
+                Shipment shipment = new Shipment();
+                shipment.setSoId(savedSo.getId());
+                shipment.setStatus("PREPARING");
+                shipment.setDestinationCountry(savedSo.getDestinationCountry());
+                shipmentRepository.save(shipment);
             }
 
-            equipment.setStatus(EquipmentStatus.RESERVED);
-            equipmentRepository.save(equipment);
+            sagaOrchestrator.transitionStep(sagaId, "SHIPMENT_CREATED", java.util.Map.of("soId", so.getId().toString()));
+
+            createDepositInvoice(savedSo);
+
+            sagaOrchestrator.transitionStep(sagaId, "DEPOSIT_INVOICE_CREATED", java.util.Map.of("soId", so.getId().toString()));
+            sagaOrchestrator.markComplete(sagaId);
+
+            return toDto(savedSo);
+        } catch (RuntimeException ex) {
+            sagaOrchestrator.handleFailure(sagaId, "CONFIRM_SALES_ORDER", ex.getMessage());
+            rollbackSalesOrderConfirmation(so);
+            throw ex;
+        }
+    }
+
+    private void rollbackSalesOrderConfirmation(SalesOrder so) {
+        if (so.getItems() != null) {
+            for (SalesOrderItem item : so.getItems()) {
+                if (item.getEquipmentId() == null) continue;
+                Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId()).orElse(null);
+                if (equipment == null) continue;
+                if (equipment.getStatus() == EquipmentStatus.RESERVED || equipment.getStatus() == EquipmentStatus.IN_TRANSIT) {
+                    equipment.setStatus(EquipmentStatus.IN_WAREHOUSE);
+                    equipmentRepository.save(equipment);
+                }
+            }
         }
 
-        so.setStatus("CONFIRMED");
-        SalesOrder savedSo = salesOrderRepository.save(so);
+        shipmentRepository.findBySoId(so.getId(), PageRequest.of(0, 100)).getContent().forEach(shipment -> {
+            if (!"DELIVERED".equalsIgnoreCase(shipment.getStatus())
+                    && !"CANCELLED".equalsIgnoreCase(shipment.getStatus())) {
+                shipment.setStatus("CANCELLED");
+                shipmentRepository.save(shipment);
+            }
+        });
 
-        if (!shipmentRepository.findBySoId(savedSo.getId(), PageRequest.of(0, 1)).hasContent()) {
-            Shipment shipment = new Shipment();
-            shipment.setSoId(savedSo.getId());
-            shipment.setStatus("PREPARING");
-            shipment.setDestinationCountry(savedSo.getDestinationCountry());
-            shipmentRepository.save(shipment);
-        }
+        invoiceRepository.findBySoIdAndIsDeletedFalse(so.getId()).forEach(invoice -> {
+            if (invoice.getStatus() == Invoice.InvoiceStatus.DRAFT || invoice.getStatus() == Invoice.InvoiceStatus.SENT) {
+                invoice.setStatus(Invoice.InvoiceStatus.CANCELLED);
+                invoice.setIsDeleted(true);
+                invoice.setUpdatedAt(OffsetDateTime.now());
+                invoiceRepository.save(invoice);
+            }
+        });
 
-        createDepositInvoice(savedSo);
-        return toDto(savedSo);
+        so.setStatus("DRAFT");
+        salesOrderRepository.save(so);
     }
 
     @Transactional

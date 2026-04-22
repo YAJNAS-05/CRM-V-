@@ -677,18 +677,18 @@ export const CustomReportBuilderPage: React.FC = () => {
     }
 
     appendWidgets([
-      createWidget('table', 'SLA Breaches', {
-        dataSource: '/v1/erp/service-tickets',
-        columns: 'ticketNumber,priority,status',
+      createWidget('table', 'Field Job Backlog', {
+        dataSource: '/field-jobs',
+        columns: 'jobNumber,priority,jobStatus',
       }),
-      createWidget('chart', 'Workload Distribution', {
+      createWidget('chart', 'Field Job Status Mix', {
         chartType: 'pie',
-        dataSource: '/v1/erp/service-tickets',
-        xField: 'assignee',
-        yField: 'count',
+        dataSource: '/field-jobs',
+        xField: 'jobStatus',
+        aggregate: 'count',
       }),
       createWidget('text', 'Operations Notes', {
-        content: 'Add incident notes and action items for on-call review.',
+        content: 'Add field work notes and on-call action items for review.',
       }),
     ])
     toast.success('Operations template added')

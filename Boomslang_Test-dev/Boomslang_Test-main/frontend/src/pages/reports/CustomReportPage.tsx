@@ -38,7 +38,7 @@ const MODULE_TABLES = {
     { value: 'everx_erp.sales_orders', label: 'Sales Orders' },
     { value: 'everx_erp.shipments', label: 'Shipments' },
     { value: 'everx_erp.spare_parts', label: 'Spare Parts' },
-    { value: 'everx_erp.service_tickets', label: 'Service Tickets' },
+    { value: 'everx_erp.field_jobs', label: 'Field Jobs' },
     { value: 'everx_erp.warranties', label: 'Warranties' }
   ],
   FINANCE: [
@@ -204,18 +204,23 @@ export const CustomReportPage = () => {
           { dbField: 'equipment_type', label: 'Equipment Type', type: 'STRING' },
           { dbField: 'last_ordered', label: 'Last Ordered', type: 'DATE' }
         ],
-        'everx_erp.service_tickets': [
-          { dbField: 'ticket_id', label: 'Ticket ID', type: 'STRING' },
-          { dbField: 'ticket_number', label: 'Ticket Number', type: 'STRING' },
-          { dbField: 'equipment_id', label: 'Equipment', type: 'STRING' },
-          { dbField: 'customer_id', label: 'Customer', type: 'STRING' },
-          { dbField: 'issue_description', label: 'Issue Description', type: 'STRING' },
-          { dbField: 'ticket_status', label: 'Status', type: 'ENUM' },
+        'everx_erp.field_jobs': [
+          { dbField: 'job_number', label: 'Job Number', type: 'STRING' },
+          { dbField: 'job_type', label: 'Job Type', type: 'ENUM' },
+          { dbField: 'job_status', label: 'Status', type: 'ENUM' },
           { dbField: 'priority', label: 'Priority', type: 'ENUM' },
-          { dbField: 'created_date', label: 'Created Date', type: 'DATE' },
-          { dbField: 'assigned_to', label: 'Assigned To', type: 'STRING' },
-          { dbField: 'service_cost', label: 'Service Cost', type: 'CURRENCY' },
-          { dbField: 'completion_date', label: 'Completion Date', type: 'DATE' }
+          { dbField: 'account_id', label: 'Account', type: 'STRING' },
+          { dbField: 'equipment_id', label: 'Equipment', type: 'STRING' },
+          { dbField: 'primary_engineer_name', label: 'Primary Engineer', type: 'STRING' },
+          { dbField: 'scheduled_start_date', label: 'Scheduled Start', type: 'DATE' },
+          { dbField: 'scheduled_end_date', label: 'Scheduled End', type: 'DATE' },
+          { dbField: 'actual_start_date', label: 'Actual Start', type: 'DATE' },
+          { dbField: 'actual_end_date', label: 'Actual End', type: 'DATE' },
+          { dbField: 'cost_estimate', label: 'Cost Estimate', type: 'CURRENCY' },
+          { dbField: 'cost_actual', label: 'Cost Actual', type: 'CURRENCY' },
+          { dbField: 'billable', label: 'Billable', type: 'BOOLEAN' },
+          { dbField: 'under_warranty', label: 'Under Warranty', type: 'BOOLEAN' },
+          { dbField: 'created_at', label: 'Created Date', type: 'DATE' }
         ],
         'everx_erp.warranties': [
           { dbField: 'warranty_id', label: 'Warranty ID', type: 'STRING' },

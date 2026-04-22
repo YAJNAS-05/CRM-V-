@@ -46,12 +46,12 @@ public class InventoryItemDto {
                 .quantity(item.getCurrentStock())
                 .minStockLevel(item.getMinimumStock())
                 .maxStockLevel(item.getMaximumStock())
-                .reorderPoint(item.getMinimumStock()) // Using minimum stock as reorder point for now
-                .unitPrice(item.getSellingPrice())
-                .supplierName(null) // Will be populated from supplier service if needed
+                .reorderPoint(item.getReorderPoint())
+                .unitPrice(item.getSellingPrice() != null ? item.getSellingPrice() : item.getUnitCost())
+                .supplierName(item.getSupplierName())
                 .location(item.getLocation())
-                .barcode(null) // Not in entity yet
-                .sku(null) // Not in entity yet
+                .barcode(item.getBarcode())
+                .sku(item.getSku())
                 .status(item.getStatus())
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())

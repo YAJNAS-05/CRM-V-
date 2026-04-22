@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { fieldworkApi } from '../../api/fieldworkApi'
@@ -53,7 +53,9 @@ const mapJobPriority = (priority: FieldJobDto['priority']): FieldWorkOrder['prio
 }
 
 export const FieldWorkListPage = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const basePath = location.pathname.startsWith('/erp/field-jobs') ? '/erp/field-jobs' : '/fieldwork'
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
 
@@ -178,7 +180,7 @@ export const FieldWorkListPage = () => {
             Export
           </button>
           <button
-            onClick={() => navigate('/fieldwork/new')}
+            onClick={() => navigate(`${basePath}/new`)}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
           >
             + New Work Order
@@ -198,7 +200,7 @@ export const FieldWorkListPage = () => {
             {search || statusFilter ? 'No work orders found' : 'No work orders yet'}
           </p>
           <button
-            onClick={() => navigate('/fieldwork/new')}
+            onClick={() => navigate(`${basePath}/new`)}
             className="mt-4 text-sm text-primary hover:underline"
           >
             Create your first work order
@@ -210,7 +212,7 @@ export const FieldWorkListPage = () => {
             <div
               key={order.id}
               className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
-              onClick={() => navigate(`/fieldwork/${order.id}`)}
+              onClick={() => navigate(`${basePath}/${order.id}`)}
             >
               <div className="mb-3">
                 <div className="flex items-start justify-between gap-2 mb-1">

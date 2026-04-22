@@ -1,11 +1,15 @@
 package com.everx.finance.payment;
 
+import com.everx.finance.fx.FxRateLock;
+import com.everx.finance.fx.FxRateLockingService;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
+import com.everx.finance.period.PostingPeriodEnforcer;
 import com.everx.finance.payment.dto.CreatePaymentRequest;
 import com.everx.finance.payment.dto.PaymentResponse;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -19,10 +23,13 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
+    private final PostingPeriodEnforcer postingPeriodEnforcer;
+    private final FxRateLockingService fxRateLockingService;
 
     @Transactional(readOnly = true)
     public Page<PaymentResponse> getAllPayments(Pageable pageable) {
@@ -50,6 +57,9 @@ public class PaymentService {
         Invoice invoice = invoiceRepository.findByIdAndIsDeletedFalse(request.getInvoiceId())
                 .orElseThrow(() -> new EntityNotFoundException("Invoice not found with id: " + request.getInvoiceId()));
 
+        postingPeriodEnforcer.enforcePostingAllowed(invoice.getEntity().name(), request.getPaymentDate());
+        postingPeriodEnforcer.enforceNoBackdating(request.getPaymentDate());
+
         Payment payment = Payment.builder()
                 .invoiceId(request.getInvoiceId())
                 .amount(request.getAmount())
@@ -67,6 +77,26 @@ public class PaymentService {
 
         Payment saved = paymentRepository.save(payment);
 
+        fxRateLockingService.getLockForInvoice(invoice.getId()).ifPresent(lock -> {
+            BigDecimal actualBaseAmount = resolveActualBaseAmount(request, lock);
+            if (actualBaseAmount != null) {
+                BigDecimal fxGainLoss = fxRateLockingService.calculateFxGainLoss(
+                    invoice.getId(),
+                    request.getAmount(),
+                    lock,
+                    actualBaseAmount
+                );
+                fxRateLockingService.postFxGainLossToGL(
+                    invoice.getId(),
+                    fxGainLoss,
+                    lock.getBaseCurrency(),
+                    request.getPaymentDate()
+                );
+            } else {
+                log.warn("FX lock found for invoice {} but no base amount provided", invoice.getId());
+            }
+        });
+
         // Update invoice paid amount
         BigDecimal currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : BigDecimal.ZERO;
         BigDecimal newPaid = currentPaid.add(request.getAmount());
@@ -83,6 +113,16 @@ public class PaymentService {
         invoiceRepository.save(invoice);
 
         return toResponse(saved);
+    }
+
+    private BigDecimal resolveActualBaseAmount(CreatePaymentRequest request, FxRateLock lock) {
+        if (request.getExchangeRate() != null) {
+            return request.getAmount().multiply(request.getExchangeRate());
+        }
+        if (request.getAudEquivalent() != null && "AUD".equalsIgnoreCase(lock.getBaseCurrency())) {
+            return request.getAudEquivalent();
+        }
+        return null;
     }
 
     @Transactional

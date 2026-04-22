@@ -188,6 +188,15 @@ public class RoleService {
     private void ensureDashboardPermissions() {
         upsertPermission("DASHBOARD_SELF_VIEW", "CRM", "SELF_VIEW", "View CRM user dashboard");
         upsertPermission("DASHBOARD_TEAM_VIEW", "CRM", "TEAM_VIEW", "View CRM team dashboard");
+        upsertPermission("DASHBOARD_FINANCE_VIEW", "DASHBOARD", "FINANCE_VIEW", "View finance dashboard");
+        upsertPermission("DASHBOARD_HR_VIEW", "DASHBOARD", "HR_VIEW", "View HR dashboard");
+        upsertPermission("DASHBOARD_TECH_VIEW", "DASHBOARD", "TECH_VIEW", "View technician dashboard");
+        upsertPermission("DASHBOARD_OPERATIONS_VIEW", "DASHBOARD", "OPS_VIEW", "View operations dashboard");
+        upsertPermission("REPORT_TEAM_VIEW", "REPORT", "TEAM_VIEW", "View team reports");
+        upsertPermission("REPORT_PERSONAL_VIEW", "REPORT", "PERSONAL_VIEW", "View personal reports");
+        upsertPermission("DATA_SCOPE_OWN", "DATA", "SCOPE_OWN", "Access own data only");
+        upsertPermission("DATA_SCOPE_TEAM", "DATA", "SCOPE_TEAM", "Access team data");
+        upsertPermission("DATA_SCOPE_ORG", "DATA", "SCOPE_ORG", "Access org data");
     }
 
     private void upsertPermission(String key, String module, String action, String description) {

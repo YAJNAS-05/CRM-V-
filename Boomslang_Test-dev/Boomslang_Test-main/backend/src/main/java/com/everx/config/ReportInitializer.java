@@ -72,13 +72,13 @@ public class ReportInitializer implements ApplicationRunner {
                 buildInvoiceDefinition()
             );
 
-            // Create service tickets report
+            // Create field jobs report
             createReport(
-                "Service Tickets by Status",
+                "Field Jobs by Status",
                 "ERP",
-                "Service tickets grouped by current status and priority",
-                "SERVICE_TICKETS",
-                buildServiceTicketsDefinition()
+                "Field jobs grouped by current status and priority",
+                "FIELD_JOBS",
+                buildFieldJobsDefinition()
             );
 
             log.info("Template reports initialized successfully");
@@ -181,21 +181,21 @@ public class ReportInitializer implements ApplicationRunner {
         return def;
     }
 
-    private Map<String, Object> buildServiceTicketsDefinition() {
+    private Map<String, Object> buildFieldJobsDefinition() {
         Map<String, Object> def = new HashMap<>();
-        def.put("description", "Service tickets by status and priority");
-        def.put("jasperTemplate", "ServiceTicketsReport");
+        def.put("description", "Field jobs by status and priority");
+        def.put("jasperTemplate", "FieldJobsReport");
         def.put("columns", new Object[]{
-            createColumn("ticket_number", "Ticket #", "STRING"),
-            createColumn("equipment", "Equipment", "STRING"),
-            createColumn("type", "Type", "STRING"),
-            createColumn("status", "Status", "STRING"),
+            createColumn("job_number", "Job #", "STRING"),
+            createColumn("job_type", "Type", "STRING"),
+            createColumn("job_status", "Status", "STRING"),
             createColumn("priority", "Priority", "STRING"),
-            createColumn("reported_date", "Reported", "DATE"),
-            createColumn("cost", "Cost", "DECIMAL")
+            createColumn("scheduled_start_date", "Scheduled Start", "DATE"),
+            createColumn("scheduled_end_date", "Scheduled End", "DATE"),
+            createColumn("cost_actual", "Actual Cost", "DECIMAL")
         });
         def.put("chartType", "bar");
-        def.put("chartField", "cost");
+        def.put("chartField", "cost_actual");
         return def;
     }
 

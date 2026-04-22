@@ -36,7 +36,7 @@ const FieldJobDetailPage: React.FC = () => {
 
   const handleStatusChange = async (newStatus: FieldJobStatus) => {
     if (job) {
-      const targetJobId = job.fieldJobId ?? (jobId ? parseInt(jobId, 10) : undefined);
+      const targetJobId = job.fieldJobId ?? jobId;
       if (!targetJobId) {
         console.error('Cannot update status: field job id is missing');
         return;
@@ -60,7 +60,7 @@ const FieldJobDetailPage: React.FC = () => {
       <div className="p-8">
         <div className="text-red-600">{error || 'Field job not found'}</div>
         <button 
-          onClick={() => navigate('/field-jobs')}
+          onClick={() => navigate('/erp/field-jobs')}
           className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg"
         >
           Back to Field Jobs
@@ -74,7 +74,7 @@ const FieldJobDetailPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">{job.jobNumber || `Field Job ${job.fieldJobId ?? ''}`}</h1>
         <button
-          onClick={() => navigate('/field-jobs')}
+          onClick={() => navigate('/erp/field-jobs')}
           className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
         >
           ← Back
@@ -159,7 +159,7 @@ const FieldJobDetailPage: React.FC = () => {
 
             <div className="pt-4 border-t">
               <a 
-                href={`/field-jobs/${job.fieldJobId || jobId}/edit`}
+                href={`/erp/field-jobs/${job.fieldJobId || jobId}`}
                 className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-block text-center"
               >
                 Edit Job

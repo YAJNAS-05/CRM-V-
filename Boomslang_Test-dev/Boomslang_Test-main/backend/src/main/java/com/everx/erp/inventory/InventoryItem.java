@@ -43,6 +43,9 @@ public class InventoryItem extends BaseEntity {
     @Column(name = "maximum_stock")
     private Integer maximumStock;
 
+    @Column(name = "reorder_point")
+    private Integer reorderPoint;
+
     @Column(name = "unit_cost")
     private BigDecimal unitCost;
 
@@ -52,8 +55,17 @@ public class InventoryItem extends BaseEntity {
     @Column(name = "supplier_id")
     private java.util.UUID supplierId;
 
+    @Column(name = "supplier_name")
+    private String supplierName;
+
     @Column(name = "location")
     private String location;
+
+    @Column(name = "barcode")
+    private String barcode;
+
+    @Column(name = "sku")
+    private String sku;
 
     @Column(name = "status", nullable = false)
     private String status;

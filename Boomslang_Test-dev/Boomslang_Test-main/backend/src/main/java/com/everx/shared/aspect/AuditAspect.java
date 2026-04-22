@@ -1,6 +1,7 @@
 package com.everx.shared.aspect;
 
 import com.everx.admin.audit.service.AuditLogService;
+import com.everx.admin.audit.service.CryptographicAuditLogService;
 import com.everx.auth.entity.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class AuditAspect {
 
     private final AuditLogService auditLogService;
+    private final CryptographicAuditLogService cryptographicAuditLogService;
     private final ObjectMapper objectMapper;
 
     @Pointcut("(execution(* com.everx..service..create*(..)) || " +
@@ -56,14 +58,26 @@ public class AuditAspect {
             } catch (Exception ignored) {}
 
             auditLogService.log(
-                userId, 
-                action, 
-                entityType, 
-                entityId, 
+                userId,
+                action,
+                entityType,
+                entityId,
                 null, // Old value would require fetching prior state
-                newValueJson, 
+                newValueJson,
                 ipAddress
             );
+
+            if (userId != null && entityId != null) {
+                cryptographicAuditLogService.recordAuditEntry(
+                    userId,
+                    action,
+                    entityType,
+                    entityId,
+                    null,
+                    newValueJson,
+                    ipAddress
+                );
+            }
             
             log.debug("Audited mutation: {} on {} by user {}", action, entityType, userId);
         } catch (Exception e) {

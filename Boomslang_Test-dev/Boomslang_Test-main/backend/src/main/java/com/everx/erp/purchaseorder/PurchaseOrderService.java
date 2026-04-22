@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +26,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final EquipmentRepository equipmentRepository;
     private final SupplierRepository supplierRepository;
+    private final PurchaseReceiptRepository purchaseReceiptRepository;
 
     @Transactional
     public PurchaseOrderDto createPurchaseOrder(CreatePurchaseOrderRequest request) {
@@ -166,9 +168,20 @@ public class PurchaseOrderService {
             po.setActualDelivery(LocalDate.now());
         }
 
+        int totalQuantity = 0;
+        BigDecimal totalAmount = BigDecimal.ZERO;
         if (po.getItems() != null) {
             int autoSequence = 1;
             for (PurchaseOrderItem item : po.getItems()) {
+                if (item.getQuantity() != null) {
+                    totalQuantity += item.getQuantity();
+                }
+                if (item.getLineTotal() != null) {
+                    totalAmount = totalAmount.add(item.getLineTotal());
+                } else if (item.getUnitPrice() != null && item.getQuantity() != null) {
+                    totalAmount = totalAmount.add(item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+                }
+
                 if (item.getEquipmentId() != null) {
                     Equipment existing = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId())
                             .orElseThrow(() -> new ValidationException("Equipment not found for PO item: " + item.getEquipmentId()));
@@ -191,6 +204,15 @@ public class PurchaseOrderService {
                 item.setEquipmentId(savedEquipment.getId());
             }
         }
+
+            PurchaseReceipt receipt = PurchaseReceipt.builder()
+                .poId(po.getId())
+                .receivedDate(po.getActualDelivery() != null ? po.getActualDelivery() : LocalDate.now())
+                .totalQuantity(totalQuantity)
+                .totalAmount(totalAmount)
+                .currency(po.getCurrency())
+                .build();
+            purchaseReceiptRepository.save(receipt);
 
         return toDto(purchaseOrderRepository.save(po));
     }

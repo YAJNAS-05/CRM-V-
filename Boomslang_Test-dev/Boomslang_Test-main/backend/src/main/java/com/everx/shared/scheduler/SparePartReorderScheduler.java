@@ -4,6 +4,7 @@ import com.everx.erp.spareparts.SparePart;
 import com.everx.erp.spareparts.SparePartRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class SparePartReorderScheduler {
      * CRON: 0 0 7 * * * (Daily at 7 AM UTC)
      */
     @Scheduled(cron = "0 0 7 * * *")
+    @SchedulerLock(name = "sparePartReorder", lockAtMostFor = "55m", lockAtLeastFor = "5m")
     @Transactional
     public void checkLowStockSpareParts() {
         log.info("Starting spare parts low stock check");

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
+import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 
 // API Configuration
@@ -29,7 +30,7 @@ axiosInstance.interceptors.request.use(
 // Shared refresh promise to prevent concurrent token refresh requests
 let refreshPromise: Promise<string> | null = null
 
-// Response interceptor to handle token refresh on 401
+// Response interceptor to handle token refresh on 401 and global error toasts
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -77,13 +78,29 @@ axiosInstance.interceptors.response.use(
         } catch (refreshError) {
           refreshPromise = null
           logout()
+          toast.error('Session expired. Please log in again.')
           window.location.href = '/login'
           return Promise.reject(refreshError)
         }
       } else {
         logout()
+        toast.error('Session expired. Please log in again.')
         window.location.href = '/login'
       }
+    }
+
+    // Global Error Toasts for other errors
+    if (!originalRequest._silent) { // Allow components to silence errors if needed
+        const status = error.response?.status
+        const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred'
+        
+        if (status >= 500) {
+            toast.error(`Server Error: ${errorMessage}`)
+        } else if (status === 400 || status === 404) {
+            toast.error(errorMessage)
+        } else if (!error.response && error.code === 'ERR_NETWORK') {
+             toast.error('Network error. Please check your connection.')
+        }
     }
 
     return Promise.reject(error)

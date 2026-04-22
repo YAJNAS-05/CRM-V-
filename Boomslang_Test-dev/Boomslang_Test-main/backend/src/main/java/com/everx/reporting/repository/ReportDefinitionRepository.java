@@ -21,6 +21,8 @@ public interface ReportDefinitionRepository extends JpaRepository<ReportDefiniti
     Page<ReportDefinitionEntity> findByReportTypeAndIsActive(String reportType, Boolean isActive, Pageable pageable);
     
     Page<ReportDefinitionEntity> findByOwnedBy(String ownedBy, Pageable pageable);
+
+    long countByOwnedByIgnoreCase(String ownedBy);
     
     List<ReportDefinitionEntity> findByModuleAndIsSystemTrue(String module);
     

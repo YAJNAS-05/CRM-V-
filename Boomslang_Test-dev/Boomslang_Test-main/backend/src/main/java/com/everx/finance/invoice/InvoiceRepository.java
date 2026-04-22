@@ -20,8 +20,12 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     Optional<Invoice> findByInvoiceNumberAndIsDeletedFalse(String invoiceNumber);
 
+    List<Invoice> findBySoIdAndIsDeletedFalse(UUID soId);
+
     @Query("SELECT i FROM Invoice i WHERE i.isDeleted = false AND i.accountId = :accountId")
     Page<Invoice> findByAccountId(@Param("accountId") UUID accountId, Pageable pageable);
+
+    Optional<Invoice> findTopByPoIdAndIsDeletedFalseOrderByIssueDateDesc(UUID poId);
 
     @Query("SELECT i FROM Invoice i WHERE i.isDeleted = false AND i.status = :status")
     Page<Invoice> findByStatus(@Param("status") Invoice.InvoiceStatus status, Pageable pageable);
@@ -37,4 +41,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     @Query("SELECT COUNT(i) FROM Invoice i WHERE i.entity = :entity AND i.issueDate >= :yearStart")
     long countByEntityAndIssueDateAfter(@Param("entity") Invoice.InvoiceEntity entity, @Param("yearStart") LocalDate yearStart);
+
+    long countByCreatedByAndIsDeletedFalse(UUID createdBy);
 }

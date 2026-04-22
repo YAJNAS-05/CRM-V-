@@ -47,7 +47,7 @@ export const KNOWN_DATA_SOURCES = [
   { value: '/v1/crm/deals', label: 'CRM Deals' },
   { value: '/v1/crm/reports/pipeline', label: 'CRM Pipeline' },
   { value: '/v1/crm/reports/conversion', label: 'CRM Conversion' },
-  { value: '/v1/erp/service-tickets', label: 'Service Tickets' },
+  { value: '/field-jobs', label: 'Field Jobs' },
 ]
 
 const isEmptyValue = (value: any) =>
@@ -384,39 +384,35 @@ export const getFallbackRows = (dataSource: string): DataRow[] => {
     ]
   }
 
-  if (dataSource.includes('service-tickets')) {
+  if (dataSource.includes('field-jobs')) {
     return [
       {
-        ticketNumber: 'SR-101',
-        priority: 'HIGH',
-        status: 'OPEN',
-        assignee: 'Asha',
-        resolutionHours: 6,
-        createdAt: now.toISOString(),
+        jobNumber: 'JOB-101',
+        jobStatus: 'SCHEDULED',
+        priority: 'CRITICAL',
+        primaryEngineerName: 'Asha',
+        scheduledStartDate: now.toISOString(),
       },
       {
-        ticketNumber: 'SR-102',
-        priority: 'MEDIUM',
-        status: 'IN_PROGRESS',
-        assignee: 'Ravi',
-        resolutionHours: 10,
-        createdAt: now.toISOString(),
-      },
-      {
-        ticketNumber: 'SR-103',
-        priority: 'LOW',
-        status: 'OPEN',
-        assignee: 'Asha',
-        resolutionHours: 4,
-        createdAt: now.toISOString(),
-      },
-      {
-        ticketNumber: 'SR-104',
+        jobNumber: 'JOB-102',
+        jobStatus: 'IN_PROGRESS',
         priority: 'URGENT',
-        status: 'CLOSED',
-        assignee: 'Mina',
-        resolutionHours: 14,
-        createdAt: now.toISOString(),
+        primaryEngineerName: 'Ravi',
+        scheduledStartDate: now.toISOString(),
+      },
+      {
+        jobNumber: 'JOB-103',
+        jobStatus: 'SCHEDULED',
+        priority: 'ROUTINE',
+        primaryEngineerName: 'Asha',
+        scheduledStartDate: now.toISOString(),
+      },
+      {
+        jobNumber: 'JOB-104',
+        jobStatus: 'COMPLETED',
+        priority: 'EMERGENCY',
+        primaryEngineerName: 'Mina',
+        scheduledStartDate: now.toISOString(),
       },
     ]
   }
