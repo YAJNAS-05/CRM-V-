@@ -1,5 +1,6 @@
 package com.everx.erp.equipment;
 
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,8 @@ import java.util.UUID;
 public class EquipmentQCService {
 
     private final EquipmentRepository equipmentRepository;
+    private final EquipmentQCRecordRepository equipmentQCRecordRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     /**
      * WORKFLOW TRIGGER: Pass Equipment QC
@@ -44,6 +47,8 @@ public class EquipmentQCService {
         // WORKFLOW TRIGGER: Transition to AVAILABLE
         equipment.setPhysicalStatus(PhysicalStatus.AVAILABLE);
 
+        createQCRecord(equipmentId, "PASS", "PASS", qcNotes);
+
         return equipmentRepository.save(equipment);
     }
 
@@ -63,6 +68,8 @@ public class EquipmentQCService {
 
         // Equipment stays in IN_REFURBISHMENT or moves to UNDER_MAINTENANCE for repair
         equipment.setPhysicalStatus(PhysicalStatus.IN_MAINTENANCE);
+
+        createQCRecord(equipmentId, "FAIL", "FAIL", failureReason);
 
         return equipmentRepository.save(equipment);
     }
@@ -89,6 +96,26 @@ public class EquipmentQCService {
         equipment.setQcNotes("Conditional approval with conditions: " + conditions);
         equipment.setPhysicalStatus(PhysicalStatus.AVAILABLE);
 
+        createQCRecord(equipmentId, "PASS", "CONDITIONAL_PASS", "Conditional approval with conditions: " + conditions);
+
         return equipmentRepository.save(equipment);
+    }
+
+    private void createQCRecord(UUID equipmentId, String scanResult, String overallResult, String notes) {
+        EquipmentQCRecord record = new EquipmentQCRecord();
+        record.setQcNumber(generateQcNumber());
+        record.setEquipmentId(equipmentId);
+        record.setQcDate(LocalDate.now());
+        record.setPhantomScanResult(scanResult);
+        record.setOverallResult(overallResult);
+        record.setQcNotes(notes);
+        equipmentQCRecordRepository.save(record);
+    }
+
+    private String generateQcNumber() {
+        return documentNumberGenerator.generate(
+                "QC",
+                candidate -> equipmentQCRecordRepository.findByQcNumber(candidate).isPresent()
+        );
     }
 }

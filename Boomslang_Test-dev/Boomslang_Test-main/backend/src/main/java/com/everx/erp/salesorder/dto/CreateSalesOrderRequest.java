@@ -15,7 +15,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateSalesOrderRequest {
-    @NotBlank(message = "SO number is required")
     @Size(max = 50)
     private String soNumber;
     private UUID dealId;

@@ -43,7 +43,7 @@ const defaultForm: FormData = {
   shipmentType: 'SEA',
   originCountry: '',
   destinationCountry: '',
-  status: 'PENDING',
+  status: 'PREPARING',
   shippedDate: '',
   estimatedArrival: '',
   actualArrival: '',
@@ -155,6 +155,7 @@ export default function ShipmentForm() {
       setForm((prev) => ({
         ...prev,
         soId: value,
+        poId: value ? '' : prev.poId,
         destinationCountry: selectedSo?.destinationCountry || prev.destinationCountry,
         equipmentId: firstEquipmentId || prev.equipmentId,
       }))
@@ -169,6 +170,7 @@ export default function ShipmentForm() {
       setForm((prev) => ({
         ...prev,
         poId: value,
+        soId: value ? '' : prev.soId,
         originCountry: supplier?.country || prev.originCountry,
         equipmentId: firstEquipmentId || prev.equipmentId,
       }))

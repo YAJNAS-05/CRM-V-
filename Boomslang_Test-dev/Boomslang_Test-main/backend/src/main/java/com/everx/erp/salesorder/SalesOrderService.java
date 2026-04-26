@@ -5,6 +5,7 @@ import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.EquipmentStatus;
 import com.everx.erp.logistics.Shipment;
 import com.everx.erp.logistics.ShipmentRepository;
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.erp.salesorder.dto.*;
@@ -33,15 +34,12 @@ public class SalesOrderService {
     private final ShipmentRepository shipmentRepository;
     private final InvoiceRepository invoiceRepository;
     private final SagaOrchestrator sagaOrchestrator;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     @Transactional
     public SalesOrderDto createSalesOrder(CreateSalesOrderRequest request) {
-        if (salesOrderRepository.findBySoNumber(request.getSoNumber()).isPresent()) {
-            throw new ValidationException("Sales order with SO number " + request.getSoNumber() + " already exists");
-        }
-
         SalesOrder so = new SalesOrder();
-        so.setSoNumber(request.getSoNumber());
+        so.setSoNumber(generateSalesOrderNumber());
         so.setDealId(request.getDealId());
         so.setAccountId(request.getAccountId());
         so.setStatus(request.getStatus());
@@ -102,13 +100,6 @@ public class SalesOrderService {
     public SalesOrderDto updateSalesOrder(UUID id, CreateSalesOrderRequest request) {
         SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + id));
-
-        if (request.getSoNumber() != null && !request.getSoNumber().equals(so.getSoNumber())) {
-            if (salesOrderRepository.findBySoNumber(request.getSoNumber()).isPresent()) {
-                throw new ValidationException("Sales order with SO number " + request.getSoNumber() + " already exists");
-            }
-            so.setSoNumber(request.getSoNumber());
-        }
 
         if (request.getDealId() != null) so.setDealId(request.getDealId());
         if (request.getAccountId() != null) so.setAccountId(request.getAccountId());
@@ -314,6 +305,10 @@ public class SalesOrderService {
             seed = seed.substring(seed.length() - 8);
         }
         return "INV-WF-" + LocalDate.now().getYear() + "-" + seed + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+    }
+
+    private String generateSalesOrderNumber() {
+        return documentNumberGenerator.generate("SO", candidate -> salesOrderRepository.findBySoNumber(candidate).isPresent());
     }
 
     private SalesOrderDto toDto(SalesOrder so) {

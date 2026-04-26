@@ -3,8 +3,6 @@ package com.everx.erp.service.dto;
 import com.everx.erp.service.ServicePriority;
 import com.everx.erp.service.ServiceStatus;
 import com.everx.erp.service.ServiceType;
-import jakarta.validation.constraints.NotBlank;
-
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -18,7 +16,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateServiceTicketRequest {
-    @NotBlank(message = "Ticket number is required")
     @Size(max = 50)
     private String ticketNumber;
     private UUID equipmentId;

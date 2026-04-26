@@ -8,6 +8,7 @@ import com.everx.erp.salesorder.SalesOrderItem;
 import com.everx.erp.salesorder.SalesOrderRepository;
 import com.everx.erp.warranty.Warranty;
 import com.everx.erp.warranty.WarrantyRepository;
+import com.everx.erp.logistics.siteassessment.SiteAssessmentService;
 import com.everx.erp.logistics.dto.CreateShipmentRequest;
 import com.everx.erp.logistics.dto.ShipmentDto;
 import com.everx.shared.exception.EntityNotFoundException;
@@ -28,6 +29,7 @@ public class ShipmentService {
     private final SalesOrderRepository salesOrderRepository;
     private final EquipmentRepository equipmentRepository;
     private final WarrantyRepository warrantyRepository;
+    private final SiteAssessmentService siteAssessmentService;
 
     @Transactional
     public ShipmentDto createShipment(CreateShipmentRequest request) {
@@ -35,12 +37,21 @@ public class ShipmentService {
         if (request.getSoId() == null) {
             throw new ValidationException("Shipment must be linked to a Sales Order. No shipment can be created without a confirmed Sales Order.");
         }
+
+        if (request.getSiteAssessmentId() == null) {
+            throw new ValidationException("Shipment is blocked. Site assessment must be linked and READY before shipment creation.");
+        }
+
+        siteAssessmentService.requireReadyById(request.getSiteAssessmentId());
+
         salesOrderRepository.findByIdAndNotDeleted(request.getSoId())
                 .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + request.getSoId()));
 
         Shipment shipment = new Shipment();
         shipment.setSoId(request.getSoId());
         shipment.setPoId(request.getPoId());
+        shipment.setSiteAssessmentId(request.getSiteAssessmentId());
+        shipment.setSiteReadinessConfirmed(true);
         shipment.setTrackingNumber(request.getTrackingNumber());
         shipment.setCarrier(request.getCarrier());
         shipment.setOriginCountry(request.getOriginCountry());
@@ -82,6 +93,12 @@ public class ShipmentService {
         String oldStatus = shipment.getStatus();
         if (request.getSoId() != null) shipment.setSoId(request.getSoId());
         if (request.getPoId() != null) shipment.setPoId(request.getPoId());
+        if (request.getSiteAssessmentId() != null) {
+            siteAssessmentService.requireReadyById(request.getSiteAssessmentId());
+            shipment.setSiteAssessmentId(request.getSiteAssessmentId());
+            shipment.setSiteReadinessConfirmed(true);
+        }
+        if (request.getSiteReadinessConfirmed() != null) shipment.setSiteReadinessConfirmed(request.getSiteReadinessConfirmed());
         if (request.getTrackingNumber() != null) shipment.setTrackingNumber(request.getTrackingNumber());
         if (request.getCarrier() != null) shipment.setCarrier(request.getCarrier());
         if (request.getOriginCountry() != null) shipment.setOriginCountry(request.getOriginCountry());
@@ -271,6 +288,8 @@ public class ShipmentService {
         dto.setId(shipment.getId());
         dto.setSoId(shipment.getSoId());
         dto.setPoId(shipment.getPoId());
+        dto.setSiteAssessmentId(shipment.getSiteAssessmentId());
+        dto.setSiteReadinessConfirmed(shipment.getSiteReadinessConfirmed());
         dto.setTrackingNumber(shipment.getTrackingNumber());
         dto.setCarrier(shipment.getCarrier());
         dto.setOriginCountry(shipment.getOriginCountry());

@@ -304,8 +304,8 @@ export default function ServiceTicketForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.ticketNumber || !form.accountId || !form.type || !form.status || !form.priority) {
-      toast.error('Ticket Number, Account, Type, Status, and Priority are required')
+    if (!form.accountId || !form.type || !form.status || !form.priority) {
+      toast.error('Account, Type, Status, and Priority are required')
       return
     }
 
@@ -334,7 +334,6 @@ export default function ServiceTicketForm() {
         .join('\n')
 
       const payload = {
-        ticketNumber: form.ticketNumber,
         accountId: form.accountId,
         equipmentId: form.equipmentId || null,
         type: form.type,
@@ -395,17 +394,22 @@ export default function ServiceTicketForm() {
           <div>
             <h2 className="text-lg font-semibold mb-3 text-gray-700">Ticket Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Number *</label>
-                <input
-                  type="text"
-                  name="ticketNumber"
-                  value={form.ticketNumber}
-                  onChange={handleChange}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+              {isEdit ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Number</label>
+                  <input
+                    type="text"
+                    name="ticketNumber"
+                    value={form.ticketNumber}
+                    readOnly
+                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-gray-700"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                  Ticket Number will be auto-generated when you create this ticket.
+                </div>
+              )}
 
               <SearchableLookupSelect
                 label="Customer / Account"

@@ -47,6 +47,17 @@ import SalesOrderForm from './pages/salesorders/SalesOrderForm'
 import ShipmentForm from './pages/shipments/ShipmentForm'
 import WarrantyForm from './pages/warranties/WarrantyForm'
 import SubcontractorForm from './pages/subcontractors/SubcontractorForm'
+import AcquisitionsListPage from './pages/acquisitions/AcquisitionsListPage'
+import AcquisitionForm from './pages/acquisitions/AcquisitionForm'
+import EquipmentAssessmentsListPage from './pages/equipmentassessments/EquipmentAssessmentsListPage'
+import EquipmentAssessmentForm from './pages/equipmentassessments/EquipmentAssessmentForm'
+import SiteAssessmentsListPage from './pages/siteassessments/SiteAssessmentsListPage'
+import SiteAssessmentForm from './pages/siteassessments/SiteAssessmentForm'
+import EquipmentQCListPage from './pages/equipmentqc/EquipmentQCListPage'
+import EquipmentQCForm from './pages/equipmentqc/EquipmentQCForm'
+import ServiceTicketsListPage from './pages/servicetickets/ServiceTicketsListPage'
+import ServiceTicketForm from './pages/servicetickets/ServiceTicketForm'
+import ServiceTicketDetailPage from './pages/servicetickets/ServiceTicketDetailPage'
 
 // Finance Pages
 import InvoiceListPage from './pages/finance/InvoiceListPage'
@@ -769,6 +780,110 @@ function App() {
           }
         />
 
+        {/* ERP Acquisitions Routes */}
+        <Route
+          path="/erp/acquisitions"
+          element={
+            <ProtectedRoute>
+              <AcquisitionsListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/acquisitions/new"
+          element={
+            <ProtectedRoute>
+              <AcquisitionForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/acquisitions/:id/edit"
+          element={
+            <ProtectedRoute>
+              <AcquisitionForm />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ERP Equipment Assessments Routes */}
+        <Route
+          path="/erp/equipment-assessments"
+          element={
+            <ProtectedRoute>
+              <EquipmentAssessmentsListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/equipment-assessments/new"
+          element={
+            <ProtectedRoute>
+              <EquipmentAssessmentForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/equipment-assessments/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EquipmentAssessmentForm />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ERP Equipment QC Routes */}
+        <Route
+          path="/erp/equipment-qc"
+          element={
+            <ProtectedRoute>
+              <EquipmentQCListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/equipment-qc/new"
+          element={
+            <ProtectedRoute>
+              <EquipmentQCForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/equipment-qc/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EquipmentQCForm />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ERP Site Assessments Routes */}
+        <Route
+          path="/erp/site-assessments"
+          element={
+            <ProtectedRoute>
+              <SiteAssessmentsListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/site-assessments/new"
+          element={
+            <ProtectedRoute>
+              <SiteAssessmentForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/site-assessments/:id/edit"
+          element={
+            <ProtectedRoute>
+              <SiteAssessmentForm />
+            </ProtectedRoute>
+          }
+        />
+
         {/* ERP Purchase Orders Routes */}
         <Route
           path="/erp/purchase-orders"
@@ -1011,6 +1126,40 @@ function App() {
           element={
             <ProtectedRoute>
               <InventoryForm />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ERP Service Tickets Routes */}
+        <Route
+          path="/erp/service-tickets"
+          element={
+            <ProtectedRoute>
+              <ServiceTicketsListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/service-tickets/new"
+          element={
+            <ProtectedRoute>
+              <ServiceTicketForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/service-tickets/:id/edit"
+          element={
+            <ProtectedRoute>
+              <ServiceTicketForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/service-tickets/:id"
+          element={
+            <ProtectedRoute>
+              <ServiceTicketDetailPage />
             </ProtectedRoute>
           }
         />

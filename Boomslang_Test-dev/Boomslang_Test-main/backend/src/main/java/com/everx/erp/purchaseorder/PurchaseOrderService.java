@@ -3,6 +3,7 @@ package com.everx.erp.purchaseorder;
 import com.everx.erp.equipment.Equipment;
 import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.EquipmentStatus;
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.erp.suppliers.SupplierRepository;
 import com.everx.erp.purchaseorder.dto.*;
 import com.everx.shared.exception.EntityNotFoundException;
@@ -27,13 +28,10 @@ public class PurchaseOrderService {
     private final EquipmentRepository equipmentRepository;
     private final SupplierRepository supplierRepository;
     private final PurchaseReceiptRepository purchaseReceiptRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     @Transactional
     public PurchaseOrderDto createPurchaseOrder(CreatePurchaseOrderRequest request) {
-        if (purchaseOrderRepository.findByPoNumber(request.getPoNumber()).isPresent()) {
-            throw new ValidationException("Purchase order with PO number " + request.getPoNumber() + " already exists");
-        }
-
         // WORKFLOW RULE: Purchase orders must be linked to an existing supplier
         if (request.getSupplierId() == null) {
             throw new ValidationException("Purchase order must be linked to a Supplier.");
@@ -42,7 +40,7 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new EntityNotFoundException("Supplier not found with id: " + request.getSupplierId()));
 
         PurchaseOrder po = new PurchaseOrder();
-        po.setPoNumber(request.getPoNumber());
+        po.setPoNumber(generatePurchaseOrderNumber());
         po.setSupplierId(request.getSupplierId());
         po.setStatus(request.getStatus());
         po.setOrderDate(request.getOrderDate());
@@ -101,13 +99,6 @@ public class PurchaseOrderService {
     public PurchaseOrderDto updatePurchaseOrder(UUID id, CreatePurchaseOrderRequest request) {
         PurchaseOrder po = purchaseOrderRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Purchase order not found with id: " + id));
-
-        if (request.getPoNumber() != null && !request.getPoNumber().equals(po.getPoNumber())) {
-            if (purchaseOrderRepository.findByPoNumber(request.getPoNumber()).isPresent()) {
-                throw new ValidationException("Purchase order with PO number " + request.getPoNumber() + " already exists");
-            }
-            po.setPoNumber(request.getPoNumber());
-        }
 
         if (request.getSupplierId() != null) po.setSupplierId(request.getSupplierId());
         if (request.getStatus() != null) po.setStatus(request.getStatus());
@@ -222,6 +213,10 @@ public class PurchaseOrderService {
         String poSeed = po.getPoNumber() == null ? "PO" : po.getPoNumber().replaceAll("[^A-Za-z0-9]", "");
         String suffix = poSeed.length() > 6 ? poSeed.substring(poSeed.length() - 6) : poSeed;
         return String.format("EVX-AUTO-%d-%s-%03d", year, suffix, sequence);
+    }
+
+    private String generatePurchaseOrderNumber() {
+        return documentNumberGenerator.generate("PO", candidate -> purchaseOrderRepository.findByPoNumber(candidate).isPresent());
     }
 
     private PurchaseOrderDto toDto(PurchaseOrder po) {

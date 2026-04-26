@@ -15,6 +15,8 @@ import java.util.UUID;
 public class CreateShipmentRequest {
     private UUID soId;
     private UUID poId;
+    private UUID siteAssessmentId;
+    private Boolean siteReadinessConfirmed;
     @Size(max = 100)
     private String trackingNumber;
     @Size(max = 50)

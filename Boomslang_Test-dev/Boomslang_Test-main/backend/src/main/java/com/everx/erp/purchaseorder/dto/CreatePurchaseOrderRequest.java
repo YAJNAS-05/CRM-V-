@@ -17,7 +17,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreatePurchaseOrderRequest {
     
-    @NotBlank(message = "PO number is required")
     @Size(max = 50)
     private String poNumber;
 

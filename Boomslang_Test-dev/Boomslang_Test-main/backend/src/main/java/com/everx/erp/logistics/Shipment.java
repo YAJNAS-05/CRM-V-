@@ -21,6 +21,12 @@ public class Shipment extends BaseEntity {
     @Column(name = "po_id")
     private UUID poId;
 
+    @Column(name = "site_assessment_id")
+    private UUID siteAssessmentId;
+
+    @Column(name = "site_readiness_confirmed")
+    private Boolean siteReadinessConfirmed = false;
+
     @Column(name = "tracking_number", length = 100)
     private String trackingNumber;
 

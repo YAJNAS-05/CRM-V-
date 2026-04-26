@@ -15,6 +15,8 @@ public class ShipmentDto {
     private UUID id;
     private UUID soId;
     private UUID poId;
+    private UUID siteAssessmentId;
+    private Boolean siteReadinessConfirmed;
     private String trackingNumber;
     private String carrier;
     private String originCountry;

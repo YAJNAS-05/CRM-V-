@@ -3,6 +3,7 @@ package com.everx.erp.service;
 import com.everx.erp.equipment.Equipment;
 import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.EquipmentStatus;
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.erp.service.dto.CreateServiceTicketRequest;
 import com.everx.erp.service.dto.ServiceTicketDto;
 import com.everx.erp.spareparts.SparePart;
@@ -34,13 +35,10 @@ public class ServiceTicketService {
     private final EquipmentRepository equipmentRepository;
     private final WarrantyRepository warrantyRepository;
     private final SparePartRepository sparePartRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     @Transactional
     public ServiceTicketDto createServiceTicket(CreateServiceTicketRequest request) {
-        if (serviceTicketRepository.findByTicketNumber(request.getTicketNumber()).isPresent()) {
-            throw new ValidationException("Service ticket with ticket number " + request.getTicketNumber() + " already exists");
-        }
-
         // WORKFLOW RULE: Service ticket can only be raised against installed equipment
         if (request.getEquipmentId() != null) {
             Equipment equipment = equipmentRepository.findByIdAndNotDeleted(request.getEquipmentId())
@@ -52,7 +50,7 @@ public class ServiceTicketService {
         }
 
         ServiceTicket ticket = new ServiceTicket();
-        ticket.setTicketNumber(request.getTicketNumber());
+        ticket.setTicketNumber(generateServiceTicketNumber());
         ticket.setEquipmentId(request.getEquipmentId());
         ticket.setAccountId(request.getAccountId());
         ticket.setType(request.getType());
@@ -115,13 +113,6 @@ public class ServiceTicketService {
     public ServiceTicketDto updateServiceTicket(UUID id, CreateServiceTicketRequest request) {
         ServiceTicket ticket = serviceTicketRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Service ticket not found with id: " + id));
-
-        if (request.getTicketNumber() != null && !request.getTicketNumber().equals(ticket.getTicketNumber())) {
-            if (serviceTicketRepository.findByTicketNumber(request.getTicketNumber()).isPresent()) {
-                throw new ValidationException("Service ticket with ticket number " + request.getTicketNumber() + " already exists");
-            }
-            ticket.setTicketNumber(request.getTicketNumber());
-        }
 
         if (request.getEquipmentId() != null) ticket.setEquipmentId(request.getEquipmentId());
         if (request.getAccountId() != null) ticket.setAccountId(request.getAccountId());
@@ -231,6 +222,13 @@ public class ServiceTicketService {
 
     private String generateInvoiceNumberForServiceTicket(ServiceTicket ticket) {
         return "INV-TKT-" + ticket.getTicketNumber();
+    }
+
+    private String generateServiceTicketNumber() {
+        return documentNumberGenerator.generate(
+                "ST",
+                candidate -> serviceTicketRepository.findByTicketNumber(candidate).isPresent()
+        );
     }
 
     private ServiceTicketDto toDto(ServiceTicket ticket) {

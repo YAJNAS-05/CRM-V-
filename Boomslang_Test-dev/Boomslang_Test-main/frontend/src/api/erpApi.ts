@@ -4,6 +4,10 @@ import {
   CreateInventoryItemRequest,
   UpdateInventoryItemRequest,
   Equipment,
+  EquipmentAcquisition,
+  EquipmentAssessment,
+  SiteAssessment,
+  EquipmentQCRecord,
   InventoryLedgerEntry,
   InventoryBin,
   InventoryTransfer,
@@ -209,6 +213,71 @@ export const supplierApi = {
   delete: async (id: string) =>
     axiosInstance.delete(`/v1/erp/suppliers/${id}`),
 }
+
+export const acquisitionApi = {
+  getAll: async (page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/acquisitions?page=${page}&size=${size}`),
+  getById: async (id: string) =>
+    axiosInstance.get(`/v1/erp/acquisitions/${id}`),
+  getByStage: async (stage: string, page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/acquisitions/stage/${stage}?page=${page}&size=${size}`),
+  create: async (data: Partial<EquipmentAcquisition>) =>
+    axiosInstance.post(`/v1/erp/acquisitions`, data),
+  update: async (id: string, data: Partial<EquipmentAcquisition>) =>
+    axiosInstance.put(`/v1/erp/acquisitions/${id}`, data),
+  delete: async (id: string) =>
+    axiosInstance.delete(`/v1/erp/acquisitions/${id}`),
+}
+
+export const equipmentAssessmentApi = {
+  getAll: async (page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/equipment-assessments?page=${page}&size=${size}`),
+  getById: async (id: string) =>
+    axiosInstance.get(`/v1/erp/equipment-assessments/${id}`),
+  getByAcquisition: async (acquisitionId: string, page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/equipment-assessments/acquisition/${acquisitionId}?page=${page}&size=${size}`),
+  getByOutcome: async (outcome: string, page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/equipment-assessments/outcome/${outcome}?page=${page}&size=${size}`),
+  create: async (data: Partial<EquipmentAssessment>) =>
+    axiosInstance.post(`/v1/erp/equipment-assessments`, data),
+  update: async (id: string, data: Partial<EquipmentAssessment>) =>
+    axiosInstance.put(`/v1/erp/equipment-assessments/${id}`, data),
+  delete: async (id: string) =>
+    axiosInstance.delete(`/v1/erp/equipment-assessments/${id}`),
+}
+
+export const siteAssessmentApi = {
+  getAll: async (page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/site-assessments?page=${page}&size=${size}`),
+  getById: async (id: string) =>
+    axiosInstance.get(`/v1/erp/site-assessments/${id}`),
+  getBySalesOrder: async (salesOrderId: string) =>
+    axiosInstance.get(`/v1/erp/site-assessments/sales-order/${salesOrderId}`),
+  getByReadiness: async (readiness: string, page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/site-assessments/readiness/${readiness}?page=${page}&size=${size}`),
+  create: async (data: Partial<SiteAssessment>) =>
+    axiosInstance.post(`/v1/erp/site-assessments`, data),
+  update: async (id: string, data: Partial<SiteAssessment>) =>
+    axiosInstance.put(`/v1/erp/site-assessments/${id}`, data),
+  delete: async (id: string) =>
+    axiosInstance.delete(`/v1/erp/site-assessments/${id}`),
+}
+
+export const equipmentQcApi = {
+  getAll: async (page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/equipment-qc?page=${page}&size=${size}`),
+  getById: async (id: string) =>
+    axiosInstance.get(`/v1/erp/equipment-qc/${id}`),
+  getByEquipment: async (equipmentId: string, page = 0, size = 100) =>
+    axiosInstance.get(`/v1/erp/equipment-qc/equipment/${equipmentId}?page=${page}&size=${size}`),
+  create: async (data: Partial<EquipmentQCRecord>) =>
+    axiosInstance.post(`/v1/erp/equipment-qc`, data),
+  update: async (id: string, data: Partial<EquipmentQCRecord>) =>
+    axiosInstance.put(`/v1/erp/equipment-qc/${id}`, data),
+  delete: async (id: string) =>
+    axiosInstance.delete(`/v1/erp/equipment-qc/${id}`),
+}
+
 export const warrantyApi = {
   getAll: async (page = 0, size = 100) =>
     axiosInstance.get(`/v1/erp/warranties?page=${page}&size=${size}`),

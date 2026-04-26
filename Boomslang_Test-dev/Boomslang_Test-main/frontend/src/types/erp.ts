@@ -161,6 +161,8 @@ export interface Shipment {
   id: string
   soId?: string
   poId?: string
+  siteAssessmentId?: string
+  siteReadinessConfirmed?: boolean
   trackingNumber?: string
   carrier?: string
   originCountry?: string
@@ -174,6 +176,83 @@ export interface Shipment {
   customsDeclarationUrl?: string
   freightCost?: number
   currency?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EquipmentAcquisition {
+  id: string
+  acquisitionNumber: string
+  equipmentId?: string
+  supplierId?: string
+  purchaseOrderId?: string
+  equipmentSource: string
+  sellerName?: string
+  stage: string
+  warehouseLocation?: string
+  refurbCost?: number
+  shipmentTracking?: string
+  sourcedDate?: string
+  assessedDate?: string
+  poRaisedDate?: string
+  deinstalledDate?: string
+  arrivedWarehouseDate?: string
+  refurbishedDate?: string
+  qcPassedDate?: string
+  availableDate?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EquipmentAssessment {
+  id: string
+  assessmentNumber: string
+  acquisitionId?: string
+  equipmentId?: string
+  assessmentType: string
+  inspectionDate?: string
+  engineerAssigned?: string
+  tubeLifeRemaining?: number
+  imageQualityRating?: number
+  conditionGrade?: string
+  outcome: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SiteAssessment {
+  id: string
+  assessmentNumber: string
+  salesOrderId?: string
+  accountId: string
+  assessmentMethod?: string
+  roomDimensions?: string
+  powerCompliant?: boolean
+  shieldingType?: string
+  coolingCapacity?: string
+  networkReadiness?: string
+  overallReadiness: string
+  remediationRequired?: string
+  assessedDate?: string
+  roomSignOffDate?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EquipmentQCRecord {
+  id: string
+  qcNumber: string
+  equipmentId: string
+  acquisitionId?: string
+  qcDate: string
+  engineerAssigned?: string
+  phantomScanResult: string
+  imageQualityRating?: number
+  overallResult: string
+  qcNotes?: string
   createdAt: string
   updatedAt: string
 }
@@ -450,6 +529,7 @@ export interface ServiceTicket {
   accountId?: string
   subcontractorId?: string
   resolutionNotes?: string
+  resolvedDate?: string
   cost?: number
   reportedDate?: string
   createdAt: string
