@@ -3,15 +3,19 @@ package com.everx.hr.leave;
 import com.everx.hr.leave.dto.CreateLeaveRequest;
 import com.everx.hr.leave.dto.LeaveRequestDto;
 import com.everx.hr.leave.dto.UpdateLeaveRequest;
+import com.everx.hr.LeaveStatus;
+import com.everx.hr.LeaveType;
 import com.everx.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,8 +38,16 @@ public class LeaveController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<LeaveRequestDto>>> getLeaveRequests(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(leaveService.getLeaveRequests(pageable)));
+    public ResponseEntity<ApiResponse<Page<LeaveRequestDto>>> getLeaveRequests(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) LeaveStatus status,
+            @RequestParam(required = false) LeaveType leaveType,
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                leaveService.getLeaveRequests(pageable, search, status, leaveType, employeeId, startDate, endDate)));
     }
 
     @GetMapping("/employee/{employeeId}")
@@ -55,5 +67,10 @@ public class LeaveController {
             @PathVariable UUID id,
             @RequestParam UUID approvedBy) {
         return ResponseEntity.ok(ApiResponse.ok(leaveService.approveLeaveRequest(id, approvedBy), "Leave request approved"));
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<LeaveRequestDto>> cancelLeaveRequest(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(leaveService.cancelLeaveRequest(id), "Leave request cancelled"));
     }
 }

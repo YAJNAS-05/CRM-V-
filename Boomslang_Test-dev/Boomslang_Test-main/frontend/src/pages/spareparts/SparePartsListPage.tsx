@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { sparePartApi } from '../../api/erpApi'
 import { SparePart } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function SparePartsListPage() {
   const [spareParts, setSpareParts] = useState<SparePart[]>([])
@@ -61,9 +62,11 @@ export default function SparePartsListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/spareparts/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-            Add Spare Part
-          </button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/spareparts/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Add Spare Part
+            </button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -81,8 +84,10 @@ export default function SparePartsListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {spareParts.map((part) => (
-              <tr key={part.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{part.partNumber}</td>
+              <tr key={part.id} onClick={() => navigate(`/erp/spareparts/${part.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:underline">
+                  {part.partNumber}
+                </td>
                 <td className="px-6 py-4 text-sm text-gray-900">{part.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.category}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">

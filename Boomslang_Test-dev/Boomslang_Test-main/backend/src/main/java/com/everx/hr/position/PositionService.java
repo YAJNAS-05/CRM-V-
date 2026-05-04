@@ -30,19 +30,19 @@ public class PositionService {
 
     @Transactional(readOnly = true)
     public PositionDto getPositionById(java.util.UUID id) {
-        Position position = positionRepository.findById(id)
+        Position position = positionRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Position not found with id: " + id));
         return toDto(position);
     }
 
     @Transactional(readOnly = true)
-    public Page<PositionDto> getPositions(Pageable pageable) {
-        return positionRepository.findAll(pageable).map(this::toDto);
+    public Page<PositionDto> getPositions(Pageable pageable, String search) {
+        return positionRepository.findAllFiltered(search, pageable).map(this::toDto);
     }
 
     @Transactional
     public PositionDto updatePosition(java.util.UUID id, UpdatePositionRequest request) {
-        Position position = positionRepository.findById(id)
+        Position position = positionRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Position not found with id: " + id));
 
         if (request.getTitle() != null) position.setTitle(request.getTitle());
@@ -56,7 +56,7 @@ public class PositionService {
 
     @Transactional
     public void deletePosition(java.util.UUID id) {
-        Position position = positionRepository.findById(id)
+        Position position = positionRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Position not found with id: " + id));
         position.softDelete();
         positionRepository.save(position);

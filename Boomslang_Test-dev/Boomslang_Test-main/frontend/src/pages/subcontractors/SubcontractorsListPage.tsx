@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { subcontractorApi } from '../../api/erpApi'
 import { Subcontractor } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function SubcontractorsListPage() {
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
@@ -61,7 +62,9 @@ export default function SubcontractorsListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/subcontractors/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Subcontractor</button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/subcontractors/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Subcontractor</button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -78,8 +81,8 @@ export default function SubcontractorsListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {subcontractors.map((subcontractor) => (
-              <tr key={subcontractor.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{subcontractor.companyName}</td>
+              <tr key={subcontractor.id} onClick={() => navigate(`/erp/subcontractors/${subcontractor.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                <td className="px-6 py-4 text-sm font-medium text-blue-600 hover:underline">{subcontractor.companyName}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{subcontractor.country}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   <div>{subcontractor.contactName}</div>

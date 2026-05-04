@@ -31,6 +31,15 @@ public class Deal extends BaseEntity {
     @Column(name = "probability")
     private Integer probability;
 
+    @Column(name = "days_in_stage")
+    private Integer daysInStage;
+
+    @Column(name = "days_in_pipeline")
+    private Integer daysInPipeline;
+
+    @Column(name = "expected_revenue_weighted", precision = 15, scale = 2)
+    private BigDecimal expectedRevenueWeighted;
+
     @Column(name = "expected_close_date")
     private LocalDate expectedCloseDate;
 

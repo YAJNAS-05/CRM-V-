@@ -1,8 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import { employeeApi, leaveRequestApi } from '../../api/hrApi'
-import { Employee, LeaveRequest } from '../../types/hr'
+import { Employee, LeaveRequest, LeaveStatus, LeaveType } from '../../types/hr'
+
+const STATUS_OPTIONS: LeaveStatus[] = ['REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED']
+const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'SICK', 'UNPAID', 'MATERNITY', 'PATERNITY', 'BEREAVEMENT']
+const SORT_OPTIONS = [
+  { label: 'Newest start date', value: 'startDate,desc' },
+  { label: 'Oldest start date', value: 'startDate,asc' },
+  { label: 'Status (A-Z)', value: 'status,asc' },
+]
 
 const LeaveRequestListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -13,10 +22,27 @@ const LeaveRequestListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<LeaveStatus | ''>('')
+  const [typeFilter, setTypeFilter] = useState<LeaveType | ''>('')
+  const [employeeFilter, setEmployeeFilter] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [sort, setSort] = useState('startDate,desc')
 
   useEffect(() => {
     fetchLeaveRequests()
-  }, [page, pageSize])
+  }, [page, pageSize, search, statusFilter, typeFilter, employeeFilter, startDate, endDate, sort])
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+
+    return () => clearTimeout(handler)
+  }, [searchInput])
 
   useEffect(() => {
     loadEmployees()
@@ -25,7 +51,15 @@ const LeaveRequestListPage: React.FC = () => {
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true)
-      const response = await leaveRequestApi.getAll(page, pageSize)
+      const response = await leaveRequestApi.getAll(page, pageSize, {
+        search,
+        status: statusFilter || undefined,
+        leaveType: typeFilter || undefined,
+        employeeId: employeeFilter || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        sort: sort || undefined,
+      })
       const data = response.data.data
       if (data?.content) {
         setLeaveRequests(data.content)
@@ -71,12 +105,117 @@ const LeaveRequestListPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Leave Requests</h1>
           <p className="text-sm text-gray-500 mt-1">{totalItems} total records</p>
         </div>
-        <Link
-          to="/hr/leave-requests/new"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        <FeatureGate requiredPermission="HR_CREATE">
+          <Link
+            to="/hr/leave-requests/new"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          >
+            New Leave Request
+          </Link>
+        </FeatureGate>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="min-w-[200px] flex-1">
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search notes"
+            className="w-full rounded border border-gray-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <select
+          value={employeeFilter}
+          onChange={(event) => {
+            setEmployeeFilter(event.target.value)
+            setPage(0)
+          }}
+          className="min-w-[200px] rounded border border-gray-200 px-3 py-2 text-sm"
         >
-          New Leave Request
-        </Link>
+          <option value="">All employees</option>
+          {employees.map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {employee.firstName} {employee.lastName}
+            </option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as LeaveStatus | '')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+        <select
+          value={typeFilter}
+          onChange={(event) => {
+            setTypeFilter(event.target.value as LeaveType | '')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          <option value="">All types</option>
+          {LEAVE_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(event) => {
+            setStartDate(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={endDate}
+          onChange={(event) => {
+            setEndDate(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        />
+        <select
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              Sort: {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setSearchInput('')
+            setEmployeeFilter('')
+            setStatusFilter('')
+            setTypeFilter('')
+            setStartDate('')
+            setEndDate('')
+            setSort('startDate,desc')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

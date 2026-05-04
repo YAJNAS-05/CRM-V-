@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { salesOrderApi } from '../../api/erpApi'
+import { FeatureGate } from '../../components/rbac'
 
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -104,19 +105,29 @@ export default function SalesOrderDetailPage() {
         <div className="flex gap-2">
           {editMode ? (
             <>
-              <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save</button>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save</button>
+              </FeatureGate>
               <button onClick={() => { setEditMode(false); setFormData(so) }} className="px-4 py-2 bg-gray-600 text-white rounded">Cancel</button>
             </>
           ) : (
             <>
-              <button onClick={() => setEditMode(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>
-              {so?.status === 'DRAFT' && (
-                <button onClick={handleConfirm} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm SO</button>
-              )}
-              {(so?.status === 'DRAFT' || so?.status === 'CONFIRMED') && (
-                <button onClick={handleCancelOrder} className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">Cancel SO</button>
-              )}
-              <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                <button onClick={() => setEditMode(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>
+              </FeatureGate>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                {so?.status === 'DRAFT' && (
+                  <button onClick={handleConfirm} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm SO</button>
+                )}
+              </FeatureGate>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                {(so?.status === 'DRAFT' || so?.status === 'CONFIRMED') && (
+                  <button onClick={handleCancelOrder} className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">Cancel SO</button>
+                )}
+              </FeatureGate>
+              <FeatureGate requiredPermission="ERP_DELETE">
+                <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+              </FeatureGate>
             </>
           )}
           <button onClick={() => navigate('/erp/salesorders')} className="px-4 py-2 bg-gray-600 text-white rounded">Back</button>

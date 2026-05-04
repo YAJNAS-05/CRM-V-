@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,4 +24,8 @@ public class HRDashboardMetrics {
     private long openPositions;
     private int trainingCompleted;
     private int pendingReimbursements;
+    private BigDecimal nextPayrollAmount;
+    private int daysToNextPayRun;
+    private long visasExpiring;
+    private long onboardingInProgress;
 }

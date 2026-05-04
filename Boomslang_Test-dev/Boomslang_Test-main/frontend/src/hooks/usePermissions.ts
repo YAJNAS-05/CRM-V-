@@ -43,6 +43,35 @@ export const PERMISSIONS = {
   HR_CREATE: 'HR_CREATE',
   HR_EDIT: 'HR_EDIT',
   HR_DELETE: 'HR_DELETE',
+  HR_EMPLOYEE_VIEW: 'HR_EMPLOYEE_VIEW',
+  HR_EMPLOYEE_CREATE: 'HR_EMPLOYEE_CREATE',
+  HR_EMPLOYEE_EDIT: 'HR_EMPLOYEE_EDIT',
+  HR_EMPLOYEE_DELETE: 'HR_EMPLOYEE_DELETE',
+  HR_DEPARTMENT_VIEW: 'HR_DEPARTMENT_VIEW',
+  HR_DEPARTMENT_CREATE: 'HR_DEPARTMENT_CREATE',
+  HR_DEPARTMENT_EDIT: 'HR_DEPARTMENT_EDIT',
+  HR_DEPARTMENT_DELETE: 'HR_DEPARTMENT_DELETE',
+  HR_POSITION_VIEW: 'HR_POSITION_VIEW',
+  HR_POSITION_CREATE: 'HR_POSITION_CREATE',
+  HR_POSITION_EDIT: 'HR_POSITION_EDIT',
+  HR_POSITION_DELETE: 'HR_POSITION_DELETE',
+  HR_LEAVE_REQUEST_VIEW: 'HR_LEAVE_REQUEST_VIEW',
+  HR_LEAVE_REQUEST_CREATE: 'HR_LEAVE_REQUEST_CREATE',
+  HR_LEAVE_REQUEST_APPROVE: 'HR_LEAVE_REQUEST_APPROVE',
+  HR_TIMESHEET_VIEW: 'HR_TIMESHEET_VIEW',
+  HR_TIMESHEET_CREATE: 'HR_TIMESHEET_CREATE',
+  HR_TIMESHEET_APPROVE: 'HR_TIMESHEET_APPROVE',
+  HR_REIMBURSEMENT_VIEW: 'HR_REIMBURSEMENT_VIEW',
+  HR_REIMBURSEMENT_CREATE: 'HR_REIMBURSEMENT_CREATE',
+  HR_REIMBURSEMENT_APPROVE: 'HR_REIMBURSEMENT_APPROVE',
+  HR_PAYROLL_RUN_VIEW: 'HR_PAYROLL_RUN_VIEW',
+  HR_PAYROLL_RUN_CREATE: 'HR_PAYROLL_RUN_CREATE',
+  HR_PAYROLL_RUN_EDIT: 'HR_PAYROLL_RUN_EDIT',
+  HR_PAYROLL_RUN_DELETE: 'HR_PAYROLL_RUN_DELETE',
+  HR_PAYROLL_PROFILE_VIEW: 'HR_PAYROLL_PROFILE_VIEW',
+  HR_PAYROLL_PROFILE_CREATE: 'HR_PAYROLL_PROFILE_CREATE',
+  HR_PAYROLL_PROFILE_EDIT: 'HR_PAYROLL_PROFILE_EDIT',
+  HR_PAYROLL_PROFILE_DELETE: 'HR_PAYROLL_PROFILE_DELETE',
 
   // Fieldwork
   FIELDWORK_VIEW: 'FIELDWORK_VIEW',
@@ -92,33 +121,21 @@ export type DataScope = 'OWN' | 'TEAM' | 'ORG'
 
 // ─── Dashboard routing map per role ────────────────────────────────────────────
 export const ROLE_DASHBOARD_MAP: Record<RoleName, string> = {
-  SUPER_ADMIN: '/dashboard/crm/team',
-  ADMIN: '/dashboard/crm/team',
-  MANAGER: '/dashboard/operations',
-  SALES_MANAGER: '/dashboard/crm/team',
-  SALES_REP: '/dashboard/crm/user',
+  SUPER_ADMIN: '/dashboard/admin',
+  ADMIN: '/dashboard/admin',
+  MANAGER: '/dashboard/manager',
+  SALES_MANAGER: '/dashboard/sales',
+  SALES_REP: '/dashboard/my-work',
   FINANCE: '/dashboard/finance',
   SERVICE_TECH: '/dashboard/fieldwork',
   HR: '/dashboard/hr',
   EMPLOYEE: '/dashboard/employee',
-  VIEWER: '/dashboard/crm/user',
-  READ_ONLY: '/dashboard/crm/user',
+  VIEWER: '/dashboard',
+  READ_ONLY: '/dashboard',
 }
 
 // ─── Role landing page map (first page after login based on role) ──────────────
-export const ROLE_LANDING_MAP: Record<RoleName, string> = {
-  SUPER_ADMIN: '/home',
-  ADMIN: '/home',
-  MANAGER: '/home',
-  SALES_MANAGER: '/home',
-  SALES_REP: '/home',
-  FINANCE: '/home',
-  SERVICE_TECH: '/home',
-  HR: '/home',
-  EMPLOYEE: '/home',
-  VIEWER: '/home',
-  READ_ONLY: '/home',
-}
+export const ROLE_LANDING_MAP: Record<RoleName, string> = ROLE_DASHBOARD_MAP
 
 // ─── Hook: usePermissions ──────────────────────────────────────────────────────
 export function usePermissions() {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { leadApi } from '../../api/crmApi'
 import { Lead, CreateLeadRequest } from '../../types/crm'
-import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -21,9 +21,6 @@ interface LeadDetailPageProps { isNew?: boolean }
 const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const permissions = useAuthStore((state) => state.user?.permissions)
-  const canEdit = permissions?.includes('CRM_EDIT') ?? false
-  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(!isNew)
   const [tab, setTab] = useState<'details' | 'notes'>('details')
@@ -113,10 +110,6 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
   }
 
   const handleDelete = async () => {
-    if (!canDelete) {
-      toast.error('You do not have permission to delete leads')
-      return
-    }
     if (!confirm('Delete this lead?')) return
     try {
       await leadApi.delete(id!)
@@ -281,32 +274,34 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canEdit && lead.status !== 'CONVERTED' && (
-              <button
-                onClick={() => {
-                  setConvertForm({
-                    createAccount: true,
-                    accountName: lead.company || '',
-                    createDeal: true,
-                    dealName: `${lead.firstName} ${lead.lastName} - Deal`,
-                  })
-                  setShowConvertModal(true)
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-              >
-                Convert
-              </button>
+            {lead.status !== 'CONVERTED' && (
+              <FeatureGate requiredPermission="CRM_EDIT">
+                <button
+                  onClick={() => {
+                    setConvertForm({
+                      createAccount: true,
+                      accountName: lead.company || '',
+                      createDeal: true,
+                      dealName: `${lead.firstName} ${lead.lastName} - Deal`,
+                    })
+                    setShowConvertModal(true)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+                >
+                  Convert
+                </button>
+              </FeatureGate>
             )}
-            {canEdit && (
+            <FeatureGate requiredPermission="CRM_EDIT">
               <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                 Edit
               </button>
-            )}
-            {canDelete && (
+            </FeatureGate>
+            <FeatureGate requiredPermission="CRM_DELETE">
               <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">
                 Delete
               </button>
-            )}
+            </FeatureGate>
           </div>
         </div>
       </div>

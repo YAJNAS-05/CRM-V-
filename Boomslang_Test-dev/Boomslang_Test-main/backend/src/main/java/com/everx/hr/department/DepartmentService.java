@@ -19,7 +19,7 @@ public class DepartmentService {
 
     @Transactional
     public DepartmentDto createDepartment(CreateDepartmentRequest request) {
-        if (departmentRepository.findByCode(request.getCode()).isPresent()) {
+        if (departmentRepository.findByCodeAndIsDeletedFalse(request.getCode()).isPresent()) {
             throw new ValidationException("Department code already exists: " + request.getCode());
         }
 
@@ -34,23 +34,23 @@ public class DepartmentService {
 
     @Transactional(readOnly = true)
     public DepartmentDto getDepartmentById(java.util.UUID id) {
-        Department department = departmentRepository.findById(id)
+        Department department = departmentRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Department not found with id: " + id));
         return toDto(department);
     }
 
     @Transactional(readOnly = true)
-    public Page<DepartmentDto> getDepartments(Pageable pageable) {
-        return departmentRepository.findAll(pageable).map(this::toDto);
+    public Page<DepartmentDto> getDepartments(Pageable pageable, String search) {
+        return departmentRepository.findAllFiltered(search, pageable).map(this::toDto);
     }
 
     @Transactional
     public DepartmentDto updateDepartment(java.util.UUID id, UpdateDepartmentRequest request) {
-        Department department = departmentRepository.findById(id)
+        Department department = departmentRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Department not found with id: " + id));
 
         if (request.getCode() != null && !request.getCode().equals(department.getCode())) {
-            if (departmentRepository.findByCode(request.getCode()).isPresent()) {
+            if (departmentRepository.findByCodeAndIsDeletedFalse(request.getCode()).isPresent()) {
                 throw new ValidationException("Department code already exists: " + request.getCode());
             }
             department.setCode(request.getCode());
@@ -65,7 +65,7 @@ public class DepartmentService {
 
     @Transactional
     public void deleteDepartment(java.util.UUID id) {
-        Department department = departmentRepository.findById(id)
+        Department department = departmentRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Department not found with id: " + id));
         department.softDelete();
         departmentRepository.save(department);

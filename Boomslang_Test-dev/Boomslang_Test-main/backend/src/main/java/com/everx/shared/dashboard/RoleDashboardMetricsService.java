@@ -5,8 +5,16 @@ import com.everx.erp.fieldwork.FieldJobRepository;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.hr.EmployeeStatus;
+import com.everx.hr.LeaveStatus;
+import com.everx.hr.ReimbursementStatus;
+import com.everx.hr.TimesheetStatus;
 import com.everx.hr.employee.EmployeeRepository;
 import com.everx.hr.leave.LeaveRequestRepository;
+import com.everx.hr.payroll.PayrollItemRepository;
+import com.everx.hr.payroll.PayrollRun;
+import com.everx.hr.payroll.PayrollRunRepository;
+import com.everx.hr.position.PositionRepository;
+import com.everx.hr.reimbursement.ReimbursementRepository;
 import com.everx.hr.timesheet.TimesheetRepository;
 import com.everx.shared.dashboard.dto.FinanceDashboardMetrics;
 import com.everx.shared.dashboard.dto.HRDashboardMetrics;
@@ -16,8 +24,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +39,10 @@ public class RoleDashboardMetricsService {
     private final FieldJobRepository fieldworkRepository;
     private final LeaveRequestRepository leaveRequestRepository;
     private final TimesheetRepository timesheetRepository;
+        private final PositionRepository positionRepository;
+        private final PayrollRunRepository payrollRunRepository;
+        private final PayrollItemRepository payrollItemRepository;
+        private final ReimbursementRepository reimbursementRepository;
 
     public FinanceDashboardMetrics getFinanceMetrics() {
         long total = invoiceRepository.count();
@@ -73,25 +87,70 @@ public class RoleDashboardMetricsService {
     }
 
     public HRDashboardMetrics getHRMetrics() {
-        long total = employeeRepository.count();
-        long active = employeeRepository.findAll().stream()
-                .filter(e -> e.getStatus() == EmployeeStatus.ACTIVE)
-                .count();
-        long pendingLeaves = leaveRequestRepository.count(); // Simplified count for mock
-        
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+        LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
+
+        long total = employeeRepository.countByIsDeletedFalse();
+        long active = employeeRepository.countByStatusAndIsDeletedFalse(EmployeeStatus.ACTIVE);
+        long newHiresThisMonth = employeeRepository.countByHireDateBetweenAndIsDeletedFalse(monthStart, monthEnd);
+        long terminationsThisMonth = employeeRepository.countByTerminationDateBetweenAndIsDeletedFalse(monthStart, monthEnd);
+
+        long pendingLeaves = leaveRequestRepository.countByStatusAndIsDeletedFalse(LeaveStatus.REQUESTED);
+        long approvedLeaves = leaveRequestRepository.countByStatusAndIsDeletedFalse(LeaveStatus.APPROVED);
+        long upcomingLeaves = leaveRequestRepository.countByStatusAndStartDateBetweenAndIsDeletedFalse(
+                LeaveStatus.APPROVED, today, today.plusDays(30)
+        );
+        long pendingTimesheets = timesheetRepository.countByStatusAndIsDeletedFalse(TimesheetStatus.SUBMITTED);
+
+        long openPositions = positionRepository.countByIsDeletedFalse();
+        long pendingReimbursements = reimbursementRepository.countByStatusAndIsDeletedFalse(ReimbursementStatus.SUBMITTED);
+
+        double attritionRate = total > 0
+                ? Math.min(100, (double) terminationsThisMonth / total * 100)
+                : 0;
+        double complianceRate = total > 0
+                ? Math.max(0, 100 - ((pendingLeaves + pendingTimesheets) * 100.0 / total))
+                : 0;
+        int trainingCompleted = total > 0
+                ? (int) Math.round(Math.max(0, Math.min(100, (double) (total - Math.min(total, pendingTimesheets)) / total * 100)))
+                : 0;
+
+        BigDecimal nextPayrollAmount = BigDecimal.ZERO;
+        int daysToNextPayRun = 0;
+
+        Optional<PayrollRun> nextRun = payrollRunRepository
+                .findTopByIsDeletedFalseAndPeriodEndGreaterThanEqualOrderByPeriodEndAsc(today);
+        if (nextRun.isPresent()) {
+            PayrollRun run = nextRun.get();
+            nextPayrollAmount = payrollItemRepository.sumGrossPayByPayrollRunId(run.getId());
+            daysToNextPayRun = (int) ChronoUnit.DAYS.between(today, run.getPeriodEnd());
+        } else {
+            Optional<PayrollRun> latestRun = payrollRunRepository.findTopByIsDeletedFalseOrderByPeriodEndDesc();
+            if (latestRun.isPresent()) {
+                nextPayrollAmount = payrollItemRepository.sumGrossPayByPayrollRunId(latestRun.get().getId());
+            }
+        }
+
+        long onboardingInProgress = employeeRepository.countByHireDateAfterAndIsDeletedFalse(today.minusDays(90));
+
         return HRDashboardMetrics.builder()
                 .totalEmployees(total)
                 .activeEmployees(active)
-                .newHiresThisMonth(2)
-                .attritionRate(3.5)
+                .newHiresThisMonth(newHiresThisMonth)
+                .attritionRate(attritionRate)
                 .pendingLeaves(pendingLeaves)
-                .approvedLeaves(12)
-                .upcomingLeaves(5)
-                .pendingTimesheets(8)
-                .complianceRate(98.2)
-                .openPositions(4)
-                .trainingCompleted(75)
-                .pendingReimbursements(3)
+                .approvedLeaves(approvedLeaves)
+                .upcomingLeaves(upcomingLeaves)
+                .pendingTimesheets(pendingTimesheets)
+                .complianceRate(complianceRate)
+                .openPositions(openPositions)
+                .trainingCompleted(trainingCompleted)
+                .pendingReimbursements((int) pendingReimbursements)
+                .nextPayrollAmount(nextPayrollAmount)
+                .daysToNextPayRun(daysToNextPayRun)
+                .visasExpiring(0)
+                .onboardingInProgress(onboardingInProgress)
                 .build();
     }
 

@@ -1,8 +1,10 @@
 package com.everx.crm.quote;
 
+import com.everx.crm.quote.dto.ConvertQuoteRequest;
 import com.everx.crm.quote.dto.CreateQuoteRequest;
 import com.everx.crm.quote.dto.QuoteDto;
 import com.everx.crm.quote.dto.UpdateQuoteRequest;
+import com.everx.erp.salesorder.dto.SalesOrderDto;
 import com.everx.shared.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,6 +85,17 @@ public class QuoteController {
         log.info("DELETE /api/v1/crm/quotes/{}", quoteId);
         quoteService.deleteQuote(quoteId);
         return ResponseEntity.ok(ApiResponse.okMessage("Quote deleted successfully"));
+    }
+
+    @PostMapping("/{quoteId}/convert-to-order")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
+    public ResponseEntity<ApiResponse<SalesOrderDto>> convertToSalesOrder(
+            @PathVariable UUID quoteId,
+            @RequestBody(required = false) ConvertQuoteRequest request) {
+        log.info("POST /api/v1/crm/quotes/{}/convert-to-order", quoteId);
+        SalesOrderDto salesOrder = quoteService.convertQuoteToSalesOrder(quoteId, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(salesOrder, "Quote converted to sales order"));
     }
 
     @GetMapping("/{quoteId}/pdf")

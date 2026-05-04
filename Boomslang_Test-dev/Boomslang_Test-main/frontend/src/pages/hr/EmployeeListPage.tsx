@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { FeatureGate } from '../../components/rbac'
 import { employeeApi } from '../../api/hrApi'
-import { Employee } from '../../types/hr'
+import { Employee, EmployeeStatus, EmploymentType } from '../../types/hr'
 import { toast } from 'sonner'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+const STATUS_OPTIONS: EmployeeStatus[] = ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'TERMINATED']
+const EMPLOYMENT_TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'CONTRACTOR', 'TEMPORARY']
+const SORT_OPTIONS = [
+  { label: 'Newest', value: 'createdAt,desc' },
+  { label: 'Last name (A-Z)', value: 'lastName,asc' },
+  { label: 'Last name (Z-A)', value: 'lastName,desc' },
+  { label: 'Hire date (newest)', value: 'hireDate,desc' },
+  { label: 'Hire date (oldest)', value: 'hireDate,asc' },
+]
 
 const EmployeeListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -14,15 +24,34 @@ const EmployeeListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<EmployeeStatus | ''>('')
+  const [employmentTypeFilter, setEmploymentTypeFilter] = useState<EmploymentType | ''>('')
+  const [sort, setSort] = useState('createdAt,desc')
 
   useEffect(() => {
     fetchEmployees()
-  }, [page, pageSize])
+  }, [page, pageSize, search, statusFilter, employmentTypeFilter, sort])
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+
+    return () => clearTimeout(handler)
+  }, [searchInput])
 
   const fetchEmployees = async () => {
     try {
       setLoading(true)
-      const response = await employeeApi.getAll(page, pageSize)
+      const response = await employeeApi.getAll(page, pageSize, {
+        search,
+        status: statusFilter || undefined,
+        employmentType: employmentTypeFilter || undefined,
+        sort: sort || undefined,
+      })
       const data = response.data.data
       if (data?.content) {
         setEmployees(data.content)
@@ -48,12 +77,81 @@ const EmployeeListPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
           <p className="text-sm text-gray-500 mt-1">{totalItems} total records</p>
         </div>
-        <Link
-          to="/hr/employees/new"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        <FeatureGate requiredPermission="HR_CREATE">
+          <Link
+            to="/hr/employees/new"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          >
+            New Employee
+          </Link>
+        </FeatureGate>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="min-w-[220px] flex-1">
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search name, code, or email"
+            className="w-full rounded border border-gray-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as EmployeeStatus | '')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
         >
-          New Employee
-        </Link>
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+        <select
+          value={employmentTypeFilter}
+          onChange={(event) => {
+            setEmploymentTypeFilter(event.target.value as EmploymentType | '')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          <option value="">All employment types</option>
+          {EMPLOYMENT_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+        <select
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              Sort: {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setSearchInput('')
+            setStatusFilter('')
+            setEmploymentTypeFilter('')
+            setSort('createdAt,desc')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

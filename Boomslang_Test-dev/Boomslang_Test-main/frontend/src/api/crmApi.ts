@@ -14,11 +14,16 @@ import {
   CreateQuoteRequest,
   CreateActivityRequest,
   LeadConvertRequest,
+  UpdateDealStageRequest,
+  RecordLeadScoreRequest,
+  LeadScore,
+  ConvertQuoteRequest,
   ReportDashboardKPIs,
   ReportPipeline,
   ReportConversion,
   ReportActivity,
 } from '../types/crm'
+import { SalesOrder } from '../types/erp'
 
 // Account APIs
 export const accountApi = {
@@ -118,6 +123,8 @@ export const leadApi = {
 
   convert: (id: string, data: LeadConvertRequest) =>
     axiosInstance.post<ApiResponse<Contact>>(`/v1/crm/leads/${id}/convert`, data),
+  recordScore: (leadId: string, data: RecordLeadScoreRequest) =>
+    axiosInstance.post<ApiResponse<LeadScore>>(`/v1/crm/leads/${leadId}/scores`, data),
 }
 
 // Deal APIs
@@ -153,6 +160,12 @@ export const dealApi = {
   
   update: (id: string, data: Partial<CreateDealRequest>) =>
     axiosInstance.put<ApiResponse<Deal>>(`/v1/crm/deals/${id}`, data),
+
+  updateStage: (id: string, data: UpdateDealStageRequest) =>
+    axiosInstance.patch<ApiResponse<Deal>>(`/v1/crm/deals/${id}/stage`, data),
+
+  getWeightedRevenue: (id: string) =>
+    axiosInstance.get<ApiResponse<number>>(`/v1/crm/deals/${id}/weighted-revenue`),
   
   delete: (id: string) =>
     axiosInstance.delete<ApiResponse<void>>(`/v1/crm/deals/${id}`),
@@ -177,6 +190,9 @@ export const quoteApi = {
   
   delete: (id: string) =>
     axiosInstance.delete<ApiResponse<void>>(`/v1/crm/quotes/${id}`),
+
+  convertToSalesOrder: (id: string, data?: ConvertQuoteRequest) =>
+    axiosInstance.post<ApiResponse<SalesOrder>>(`/v1/crm/quotes/${id}/convert-to-order`, data),
 }
 
 // Activity APIs

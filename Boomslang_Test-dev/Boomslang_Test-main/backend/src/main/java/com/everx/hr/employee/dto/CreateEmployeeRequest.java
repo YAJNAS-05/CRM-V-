@@ -2,6 +2,8 @@ package com.everx.hr.employee.dto;
 
 import com.everx.hr.EmployeeStatus;
 import com.everx.hr.EmploymentType;
+import com.everx.hr.employee.Employee.LifecycleStage;
+import com.everx.hr.employee.Employee.WorkLocation;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -42,4 +44,26 @@ public class CreateEmployeeRequest {
     private EmployeeStatus status;
     private LocalDate hireDate;
     private LocalDate terminationDate;
+
+    // Extended profile
+    private LocalDate dateOfBirth;
+    private String gender;
+    private String nationality;
+    private String avatarUrl;
+    private LocalDate probationEndDate;
+    private LocalDate confirmationDate;
+    private WorkLocation workLocation;
+    private LifecycleStage lifecycleStage;
+
+    // Emergency contact
+    private String emergencyContactName;
+    private String emergencyContactPhone;
+    private String emergencyContactRelation;
+
+    // Address
+    private String addressLine1;
+    private String addressCity;
+    private String addressState;
+    private String addressCountry;
+    private String addressPincode;
 }

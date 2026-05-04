@@ -108,6 +108,11 @@ export type {
   PayrollItemStatus,
   PayFrequency,
   PayType,
+  HRDashboardMetrics,
+  ReimbursementRequest,
+  ReimbursementStatus,
+  CreateReimbursementRequest,
+  UpdateReimbursementRequest,
 } from './hr'
 
 // Export Insights types

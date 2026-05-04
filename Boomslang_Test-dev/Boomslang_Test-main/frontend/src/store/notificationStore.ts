@@ -8,13 +8,16 @@ export interface Notification {
   duration?: number
   dedupeKey?: string
   timestamp: number
+  read?: boolean
 }
 
 interface NotificationStore {
   notifications: Notification[]
+  unreadCount: number
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void
   removeNotification: (id: string) => void
   clearNotifications: () => void
+  markAllRead: () => void
 }
 
 /**
@@ -23,6 +26,7 @@ interface NotificationStore {
  */
 export const useNotificationStore = create<NotificationStore>((set, get) => ({
   notifications: [],
+  unreadCount: 0,
 
   addNotification: (notification) => {
     if (notification.dedupeKey) {
@@ -38,10 +42,12 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       id,
       timestamp: Date.now(),
       duration: notification.duration || 3000,
+      read: false,
     }
 
     set((state) => ({
       notifications: [...state.notifications, newNotification],
+      unreadCount: state.unreadCount + 1,
     }))
 
     // Auto-remove notification after duration
@@ -55,12 +61,24 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   },
 
   removeNotification: (id) => {
-    set((state) => ({
-      notifications: state.notifications.filter((n) => n.id !== id),
-    }))
+    set((state) => {
+      const target = state.notifications.find((n) => n.id === id)
+      return {
+        notifications: state.notifications.filter((n) => n.id !== id),
+        unreadCount: Math.max(0, state.unreadCount - (target?.read ? 0 : 1)),
+      }
+    })
   },
 
   clearNotifications: () => {
-    set({ notifications: [] })
+    set({ notifications: [], unreadCount: 0 })
+  },
+
+  markAllRead: () => {
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+      unreadCount: 0,
+    }))
   },
 }))
+

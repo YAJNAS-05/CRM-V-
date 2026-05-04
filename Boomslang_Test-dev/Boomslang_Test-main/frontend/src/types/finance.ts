@@ -147,3 +147,24 @@ export interface CashFlow {
   totalInflow: number
   entries: CashFlow[]
 }
+
+export interface ThreeWayMatchException {
+  id: string
+  poId?: string | null
+  invoiceId?: string | null
+  receiptId?: string | null
+  exceptionType: string
+  varianceAmount?: number | string | null
+  status: string
+  periodEnd?: string | null
+  notes?: string | null
+  resolvedBy?: string | null
+  resolvedAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface ResolveMatchExceptionRequest {
+  action?: string
+  notes?: string
+}

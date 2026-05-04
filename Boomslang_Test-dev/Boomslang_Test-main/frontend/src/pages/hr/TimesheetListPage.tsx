@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import { employeeApi, timesheetApi } from '../../api/hrApi'
-import { Employee, Timesheet } from '../../types/hr'
+import { Employee, Timesheet, TimesheetStatus } from '../../types/hr'
+
+const STATUS_OPTIONS: TimesheetStatus[] = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED']
+const SORT_OPTIONS = [
+  { label: 'Newest work date', value: 'workDate,desc' },
+  { label: 'Oldest work date', value: 'workDate,asc' },
+  { label: 'Hours (high to low)', value: 'hoursWorked,desc' },
+]
 
 const TimesheetListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -13,10 +21,15 @@ const TimesheetListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [statusFilter, setStatusFilter] = useState<TimesheetStatus | ''>('')
+  const [employeeFilter, setEmployeeFilter] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [sort, setSort] = useState('workDate,desc')
 
   useEffect(() => {
     fetchTimesheets()
-  }, [page, pageSize])
+  }, [page, pageSize, statusFilter, employeeFilter, startDate, endDate, sort])
 
   useEffect(() => {
     loadEmployees()
@@ -25,7 +38,13 @@ const TimesheetListPage: React.FC = () => {
   const fetchTimesheets = async () => {
     try {
       setLoading(true)
-      const response = await timesheetApi.getAll(page, pageSize)
+      const response = await timesheetApi.getAll(page, pageSize, {
+        employeeId: employeeFilter || undefined,
+        status: statusFilter || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        sort: sort || undefined,
+      })
       const data = response.data.data
       if (data?.content) {
         setTimesheets(data.content)
@@ -71,12 +90,92 @@ const TimesheetListPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Timesheets</h1>
           <p className="text-sm text-gray-500 mt-1">{totalItems} total records</p>
         </div>
-        <Link
-          to="/hr/timesheets/new"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        <FeatureGate requiredPermission="HR_CREATE">
+          <Link
+            to="/hr/timesheets/new"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          >
+            New Timesheet
+          </Link>
+        </FeatureGate>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-4">
+        <select
+          value={employeeFilter}
+          onChange={(event) => {
+            setEmployeeFilter(event.target.value)
+            setPage(0)
+          }}
+          className="min-w-[200px] rounded border border-gray-200 px-3 py-2 text-sm"
         >
-          New Timesheet
-        </Link>
+          <option value="">All employees</option>
+          {employees.map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {employee.firstName} {employee.lastName}
+            </option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as TimesheetStatus | '')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(event) => {
+            setStartDate(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={endDate}
+          onChange={(event) => {
+            setEndDate(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        />
+        <select
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              Sort: {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setEmployeeFilter('')
+            setStatusFilter('')
+            setStartDate('')
+            setEndDate('')
+            setSort('workDate,desc')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

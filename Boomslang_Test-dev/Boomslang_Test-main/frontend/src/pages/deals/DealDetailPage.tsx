@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { dealApi, accountApi, contactApi } from '../../api/crmApi'
 import { Deal, Account, Contact } from '../../types/crm'
-import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 
 const STAGE_COLORS: Record<string, string> = {
@@ -37,9 +37,6 @@ interface DealDetailPageProps { isNew?: boolean }
 const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const permissions = useAuthStore((state) => state.user?.permissions)
-  const canEdit = permissions?.includes('CRM_EDIT') ?? false
-  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [isSaving, setIsSaving] = useState(false)
   const [isFetching, setIsFetching] = useState(!isNew)
   const [deal, setDeal] = useState<Deal | null>(null)
@@ -80,15 +77,16 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
     } catch (err: any) { toast.error(err.response?.data?.message || 'Failed') } finally { setIsSaving(false) }
   }
   const handleDelete = async () => {
-    if (!canDelete) {
-      toast.error('You do not have permission to delete deals')
-      return
-    }
     if (!confirm('Delete this deal?')) return
     try { await dealApi.delete(id!); toast.success('Deleted'); navigate('/crm/deals') } catch { toast.error('Failed') }
   }
 
-  const fmt = (v?: number) => v ? `$${v.toLocaleString()}` : '—'
+  const fmt = (value?: number | string | null) => {
+    if (value === null || value === undefined) return '—'
+    const numeric = typeof value === 'string' ? Number(value) : value
+    if (!Number.isFinite(numeric)) return '—'
+    return `$${numeric.toLocaleString()}`
+  }
 
   if (isFetching) return <div className="flex items-center justify-center py-24"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div></div>
 
@@ -129,22 +127,24 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canEdit && (
+            <FeatureGate requiredPermission="CRM_EDIT">
               <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>
-            )}
-            {canDelete && (
+            </FeatureGate>
+            <FeatureGate requiredPermission="CRM_DELETE">
               <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
-            )}
+            </FeatureGate>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Amount', value: fmt(deal.amount) },
+          { label: 'Weighted Revenue', value: fmt(deal.expectedRevenueWeighted) },
           { label: 'Probability', value: `${deal.probability || 0}%` },
           { label: 'Close Date', value: deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : '—' },
-          { label: 'Source', value: deal.leadSource?.replace('_', ' ') || '—' },
+          { label: 'Days in Stage', value: deal.daysInStage ?? '—' },
+          { label: 'Days in Pipeline', value: deal.daysInPipeline ?? '—' },
         ].map(({ label, value }) => (
           <div key={label} className="bg-white rounded-lg border border-gray-200 p-4">
             <p className="text-xs text-gray-400 mb-1">{label}</p>
@@ -155,7 +155,19 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-          {[['Deal Name', deal.name], ['Stage', deal.stage], ['Amount', fmt(deal.amount)], ['Probability', `${deal.probability || 0}%`], ['Expected Close', deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : null], ['Lead Source', deal.leadSource], ['Next Step', deal.nextStep], ['Created', new Date(deal.createdAt).toLocaleDateString()]].map(([l, v]) => (
+          {[
+            ['Deal Name', deal.name],
+            ['Stage', deal.stage],
+            ['Amount', fmt(deal.amount)],
+            ['Weighted Revenue', fmt(deal.expectedRevenueWeighted)],
+            ['Probability', `${deal.probability || 0}%`],
+            ['Days in Stage', deal.daysInStage ?? null],
+            ['Days in Pipeline', deal.daysInPipeline ?? null],
+            ['Expected Close', deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : null],
+            ['Lead Source', deal.leadSource],
+            ['Next Step', deal.nextStep],
+            ['Created', new Date(deal.createdAt).toLocaleDateString()],
+          ].map(([l, v]) => (
             <div key={l as string}><dt className="text-xs text-gray-400 mb-0.5">{l}</dt><dd className="text-sm text-gray-900">{(v as string) || '—'}</dd></div>
           ))}
         </div>

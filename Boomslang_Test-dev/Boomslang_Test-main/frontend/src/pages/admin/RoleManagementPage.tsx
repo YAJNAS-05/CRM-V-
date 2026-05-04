@@ -8,6 +8,7 @@ import {
 } from '../../types/auth'
 import { toast } from 'sonner'
 import { Plus, Shield, Edit2, Trash2, X } from 'lucide-react'
+import { FeatureGate } from '../../components/rbac'
 
 const RoleManagementPage: React.FC = () => {
   const [roles, setRoles] = useState<RoleDefinition[]>([])
@@ -176,13 +177,15 @@ const RoleManagementPage: React.FC = () => {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Roles & Permissions</h1>
           <p className="text-slate-500 font-medium">Create custom roles and control granular user access.</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg shadow-indigo-200 transition flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Create Role
-        </button>
+        <FeatureGate requiredPermission="ROLE_CREATE">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg shadow-indigo-200 transition flex items-center gap-2"
+          >
+            <Plus size={18} />
+            Create Role
+          </button>
+        </FeatureGate>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
@@ -217,24 +220,28 @@ const RoleManagementPage: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-6 py-5 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => openPermissionModal(role)}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition"
-                      title="Edit permissions"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    {!role.isSystem && (
-                      <button
-                        onClick={() => handleDeleteRole(role)}
-                        className="text-xs font-bold text-red-600 hover:text-red-700 transition"
-                        title="Delete role"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
+                    <div className="flex justify-end gap-2">
+                      <FeatureGate requiredPermission="ROLE_EDIT">
+                        <button
+                          onClick={() => openPermissionModal(role)}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition"
+                          title="Edit permissions"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </FeatureGate>
+                      {!role.isSystem && (
+                        <FeatureGate requiredPermission="ROLE_DELETE">
+                          <button
+                            onClick={() => handleDeleteRole(role)}
+                            className="text-xs font-bold text-red-600 hover:text-red-700 transition"
+                            title="Delete role"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </FeatureGate>
+                      )}
+                    </div>
                 </td>
               </tr>
             ))}

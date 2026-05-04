@@ -18,8 +18,12 @@ import { usePermissions, type RoleName } from '../../hooks/usePermissions'
 interface FeatureGateProps {
   /** Single permission key */
   permission?: string
+  /** Backward-compatible alias for single permission key */
+  requiredPermission?: string
   /** Multiple permission keys – user needs at least ONE */
   permissions?: string[]
+  /** Backward-compatible alias for multiple permission keys */
+  requiredPermissions?: string[]
   /** If true, user must have ALL permissions instead of any */
   requireAll?: boolean
   /** Content to render when user lacks the permission */
@@ -29,14 +33,19 @@ interface FeatureGateProps {
 
 export const FeatureGate: React.FC<FeatureGateProps> = ({
   permission,
+  requiredPermission,
   permissions,
+  requiredPermissions,
   requireAll = false,
   fallback = null,
   children,
 }) => {
   const { hasAnyPermission, hasAllPermissions } = usePermissions()
 
-  const effectivePermissions = permissions ?? (permission ? [permission] : [])
+  const effectivePermissions =
+    permissions ??
+    requiredPermissions ??
+    (permission ? [permission] : requiredPermission ? [requiredPermission] : [])
 
   if (effectivePermissions.length === 0) {
     return <>{children}</>

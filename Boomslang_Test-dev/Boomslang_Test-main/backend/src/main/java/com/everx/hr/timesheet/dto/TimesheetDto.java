@@ -19,7 +19,11 @@ public class TimesheetDto {
     private UUID employeeId;
     private UUID fieldJobId;
     private LocalDate workDate;
+    private LocalDate weekStartDate;
     private BigDecimal hoursWorked;
+    private BigDecimal totalBillableHours;
+    private BigDecimal totalNonBillableHours;
+    private BigDecimal totalHours;
     private TimesheetStatus status;
     private UUID approvedBy;
     private OffsetDateTime approvedAt;

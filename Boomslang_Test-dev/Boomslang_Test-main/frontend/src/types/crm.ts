@@ -86,6 +86,9 @@ export interface Deal {
   stage: string
   amount?: number
   probability?: number
+  expectedRevenueWeighted?: number
+  daysInStage?: number
+  daysInPipeline?: number
   expectedCloseDate?: string
   actualCloseDate?: string
   leadSource?: string
@@ -131,6 +134,26 @@ export interface Quote {
   lineItems: QuoteLineItem[]
   createdAt: string
   updatedAt: string
+}
+
+export interface UpdateDealStageRequest {
+  stage: string
+}
+
+export interface RecordLeadScoreRequest {
+  activityType: string
+}
+
+export interface LeadScore {
+  id: string
+  leadId: string
+  scoreType: string
+  points: number
+  createdAt: string
+}
+
+export interface ConvertQuoteRequest {
+  notes?: string
 }
 
 export interface CreateAccountRequest {

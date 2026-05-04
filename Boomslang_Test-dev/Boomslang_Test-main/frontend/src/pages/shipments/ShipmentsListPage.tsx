@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { shipmentApi } from '../../api/erpApi'
 import { Shipment } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function ShipmentsListPage() {
   const [shipments, setShipments] = useState<Shipment[]>([])
@@ -75,7 +76,9 @@ export default function ShipmentsListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/shipments/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Shipment</button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/shipments/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Shipment</button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -93,8 +96,8 @@ export default function ShipmentsListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {shipments.map((shipment) => (
-              <tr key={shipment.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{shipment.trackingNumber || 'N/A'}</td>
+              <tr key={shipment.id} onClick={() => navigate(`/erp/shipments/${shipment.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                <td className="px-6 py-4 text-sm font-medium text-blue-600 hover:underline">{shipment.trackingNumber || 'N/A'}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{shipment.carrier}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{shipment.originCountry}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{shipment.destinationCountry}</td>

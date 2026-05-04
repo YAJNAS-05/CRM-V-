@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 @Repository
 public interface QuoteRepository extends JpaRepository<Quote, UUID> {
@@ -27,4 +28,7 @@ public interface QuoteRepository extends JpaRepository<Quote, UUID> {
 
     @Query("SELECT q FROM Quote q WHERE q.isDeleted = false AND q.dealId = :dealId ORDER BY q.createdAt DESC")
     Page<Quote> findByDealId(@Param("dealId") java.util.UUID dealId, Pageable pageable);
+
+    @Query("SELECT q FROM Quote q WHERE q.isDeleted = false AND q.dealId = :dealId")
+    List<Quote> findAllByDealId(@Param("dealId") java.util.UUID dealId);
 }

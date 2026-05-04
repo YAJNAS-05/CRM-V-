@@ -68,6 +68,10 @@ public class Invoice extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Builder.Default
+    @Column(name = "three_way_matched", nullable = false, columnDefinition = "boolean default false")
+    private Boolean threeWayMatched = false;
+
     @Column(name = "reversal_of")
     private UUID reversalOf;
 

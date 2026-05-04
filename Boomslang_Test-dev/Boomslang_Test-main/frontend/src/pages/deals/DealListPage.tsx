@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { dealApi } from '../../api/crmApi'
 import { Deal } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import DealsViewHeader from './components/DealsViewHeader'
@@ -152,7 +153,9 @@ const DealListPage: React.FC = () => {
                 <tr><td colSpan={8} className="px-4 py-16 text-center">
                   <div className="text-gray-400">
                     <p className="text-sm font-medium">No Deals Found</p>
-                    {canCreate && <Link to="/crm/deals/new" className="inline-block mt-3 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">New Deal</Link>}
+                    <FeatureGate requiredPermission="CRM_CREATE">
+                      <Link to="/crm/deals/new" className="inline-block mt-3 px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">New Deal</Link>
+                    </FeatureGate>
                   </div>
                 </td></tr>
               ) : deals.map(deal => (
@@ -176,11 +179,11 @@ const DealListPage: React.FC = () => {
                   <td className="px-4 py-3 text-gray-500 text-xs">{deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{new Date(deal.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    {canDelete && (
+                    <FeatureGate requiredPermission="CRM_DELETE">
                       <button onClick={e => handleDelete(deal.id, e)} className="p-1 text-gray-400 hover:text-red-600 rounded transition">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
-                    )}
+                    </FeatureGate>
                   </td>
                 </tr>
               ))}

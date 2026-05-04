@@ -1,44 +1,73 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { employeeApi, leaveRequestApi, reimbursementApi, timesheetApi } from '../../api/hrApi'
 import { usePermissions } from '../../hooks/usePermissions'
-import { dashboardApi } from '../../api/dashboardApi'
+import { useHRMetrics } from '../../hooks/useHRMetrics'
+import { Employee, LeaveRequest, ReimbursementRequest, Timesheet } from '../../types/hr'
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 const HRDashboardPage: React.FC = () => {
   const { hasAnyPermission } = usePermissions()
-  const [isLoading, setIsLoading] = useState(true)
-
-  const [metrics, setMetrics] = useState({
-    totalEmployees: 0,
-    activeEmployees: 0,
-    newHiresThisMonth: 0,
-    attritionRate: 0,
-    pendingLeaves: 0,
-    approvedLeaves: 0,
-    upcomingLeaves: 0,
-    pendingTimesheets: 0,
-    complianceRate: 0,
-    openPositions: 0,
-    trainingCompleted: 0,
-    pendingReimbursements: 0,
-  })
+  const { metrics, loading, error, refresh } = useHRMetrics()
+  const [queueLoading, setQueueLoading] = useState(true)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [pendingLeaves, setPendingLeaves] = useState<LeaveRequest[]>([])
+  const [pendingTimesheets, setPendingTimesheets] = useState<Timesheet[]>([])
+  const [pendingReimbursements, setPendingReimbursements] = useState<ReimbursementRequest[]>([])
 
   useEffect(() => {
-    const loadHRData = async () => {
+    let active = true
+
+    const loadQueues = async () => {
       try {
-        setIsLoading(true)
-        const response = await dashboardApi.getHRMetrics()
-        setMetrics(response.data.data)
-      } catch (error) {
-        console.error('Failed to load HR metrics', error)
+        setQueueLoading(true)
+        const [employeeRes, leaveRes, timesheetRes, reimbursementRes] = await Promise.all([
+          employeeApi.getAll(0, 200, { sort: 'lastName,asc' }),
+          leaveRequestApi.getAll(0, 5, { status: 'REQUESTED', sort: 'startDate,asc' }),
+          timesheetApi.getAll(0, 5, { status: 'SUBMITTED', sort: 'workDate,desc' }),
+          reimbursementApi.getAll(0, 5, { status: 'SUBMITTED', sort: 'requestDate,desc' }),
+        ])
+
+        if (!active) return
+
+        setEmployees(employeeRes.data.data?.content || [])
+        setPendingLeaves(leaveRes.data.data?.content || [])
+        setPendingTimesheets(timesheetRes.data.data?.content || [])
+        setPendingReimbursements(reimbursementRes.data.data?.content || [])
+      } catch (queueError) {
+        console.error('Failed to load HR queues', queueError)
       } finally {
-        setIsLoading(false)
+        if (active) {
+          setQueueLoading(false)
+        }
       }
     }
-    loadHRData()
+
+    loadQueues()
+
+    return () => {
+      active = false
+    }
   }, [])
 
-  if (isLoading) {
+  const employeeMap = useMemo(() => {
+    const map = new Map<string, Employee>()
+    employees.forEach((employee) => {
+      map.set(employee.id, employee)
+      if (employee.userId) {
+        map.set(employee.userId, employee)
+      }
+    })
+    return map
+  }, [employees])
+
+  const formatEmployee = (employeeId?: string | null) => {
+    if (!employeeId) return 'Employee'
+    const employee = employeeMap.get(employeeId)
+    return employee ? `${employee.firstName} ${employee.lastName}` : 'Employee'
+  }
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
@@ -47,6 +76,42 @@ const HRDashboardPage: React.FC = () => {
         </div>
       </div>
     )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-gray-500 text-sm">{error}</p>
+          <button
+            type="button"
+            onClick={refresh}
+            className="mt-3 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const formatCurrency = (value: number) => {
+    const v = Number(value || 0)
+    return `AUD ${v.toLocaleString()}`
+  }
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
+  }
+
+  const formatDateRange = (start?: string, end?: string) => {
+    if (!start || !end) return 'Dates pending'
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 'Dates pending'
+    return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`
   }
 
   return (
@@ -92,6 +157,89 @@ const HRDashboardPage: React.FC = () => {
           icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
           iconBg="bg-rose-50" iconColor="text-rose-600"
           title="Attrition Rate" value={`${metrics.attritionRate}%`}
+        />
+      </div>
+
+      {/* People Pulse */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatTile
+          label="Active employees"
+          value={metrics.activeEmployees}
+          hint="Currently active"
+          tone="blue"
+        />
+        <StatTile
+          label="Open leave requests"
+          value={metrics.pendingLeaves}
+          hint="Needs approval"
+          tone="amber"
+        />
+        <StatTile
+          label="Visas expiring"
+          value={metrics.visasExpiring}
+          hint="Next 30 days"
+          tone="rose"
+        />
+        <StatTile
+          label="Next payroll"
+          value={formatCurrency(metrics.nextPayrollAmount)}
+          hint={`${metrics.daysToNextPayRun} days to pay run`}
+          tone="emerald"
+        />
+        <StatTile
+          label="Onboarding"
+          value={metrics.onboardingInProgress}
+          hint="In progress"
+          tone="indigo"
+        />
+        <StatTile
+          label="Compliance"
+          value={`${metrics.complianceRate}%`}
+          hint="Award checks"
+          tone="slate"
+        />
+      </div>
+
+      {/* My Work Queue */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <QueueCard
+          title="Leave approvals"
+          actionLabel="View all"
+          actionHref="/hr/leave-requests"
+          loading={queueLoading}
+          emptyLabel="No leave approvals pending"
+          items={pendingLeaves.map((leave) => ({
+            id: leave.id,
+            title: `${formatEmployee(leave.employeeId)} · ${leave.leaveType.replace(/_/g, ' ')}`,
+            meta: formatDateRange(leave.startDate, leave.endDate),
+            href: `/hr/leave-requests/${leave.id}`,
+          }))}
+        />
+        <QueueCard
+          title="Timesheet approvals"
+          actionLabel="View all"
+          actionHref="/hr/timesheets"
+          loading={queueLoading}
+          emptyLabel="No timesheets awaiting approval"
+          items={pendingTimesheets.map((timesheet) => ({
+            id: timesheet.id,
+            title: `${formatEmployee(timesheet.employeeId)} · ${timesheet.hoursWorked ?? 0} hrs`,
+            meta: formatDate(timesheet.workDate),
+            href: `/hr/timesheets/${timesheet.id}`,
+          }))}
+        />
+        <QueueCard
+          title="Reimbursement approvals"
+          actionLabel="View all"
+          actionHref="/hr/reimbursements"
+          loading={queueLoading}
+          emptyLabel="No reimbursements awaiting review"
+          items={pendingReimbursements.map((request) => ({
+            id: request.id,
+            title: `${formatEmployee(request.requestedBy)} · ${request.category}`,
+            meta: `${formatCurrency(request.amount)} · ${formatDate(request.requestDate)}`,
+            href: `/hr/reimbursements/${request.id}`,
+          }))}
         />
       </div>
 
@@ -160,8 +308,36 @@ const HRDashboardPage: React.FC = () => {
             )}
             <QuickAction to="/hr/leave-requests" icon="M8 7V3m8 4V3m-9 8h10m-10 4h6" label="Leave Requests" />
             <QuickAction to="/hr/payroll-runs" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 10v1" label="Payroll Runs" />
+            <QuickAction to="/hr/reimbursements" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 10v1" label="Reimbursements" />
             <QuickAction to="/hr/departments" icon="M3 7h18M3 12h18M3 17h18" label="Departments" />
           </div>
+        </div>
+      </div>
+
+      {/* Priority Alerts */}
+      <div className="shell-card p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-800">Priority alerts</h3>
+          <Link to="/hr/compliance" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+            Review →
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <AlertTile
+            title="Visa expiries"
+            detail={`${metrics.visasExpiring} expiring in 30 days`}
+            tone="amber"
+          />
+          <AlertTile
+            title="Next payroll"
+            detail={`${metrics.daysToNextPayRun} days to run`}
+            tone="blue"
+          />
+          <AlertTile
+            title="Onboarding"
+            detail={`${metrics.onboardingInProgress} new hires in progress`}
+            tone="rose"
+          />
         </div>
       </div>
     </div>
@@ -199,6 +375,104 @@ const InsightTile = ({ label, value, hint, tone }: { label: string; value: strin
       <p className="text-[11px] uppercase tracking-wide opacity-80">{label}</p>
       <p className="text-lg font-bold mt-1 leading-tight">{value}</p>
       <p className="text-[11px] opacity-80 mt-1">{hint}</p>
+    </div>
+  )
+}
+
+const StatTile = ({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string
+  value: string | number
+  hint: string
+  tone: 'slate' | 'blue' | 'emerald' | 'amber' | 'rose' | 'indigo'
+}) => (
+  <div
+    className={`rounded-xl border p-4 ${
+      {
+        slate: 'border-slate-200 bg-white text-slate-900',
+        blue: 'border-blue-200 bg-blue-50/40 text-blue-900',
+        emerald: 'border-emerald-200 bg-emerald-50/40 text-emerald-900',
+        amber: 'border-amber-200 bg-amber-50/40 text-amber-900',
+        rose: 'border-rose-200 bg-rose-50/40 text-rose-900',
+        indigo: 'border-indigo-200 bg-indigo-50/40 text-indigo-900',
+      }[tone]
+    }`}
+  >
+    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
+    <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+    <p className="mt-1 text-xs text-slate-500">{hint}</p>
+  </div>
+)
+
+const QueueCard = ({
+  title,
+  actionLabel,
+  actionHref,
+  items,
+  loading,
+  emptyLabel,
+}: {
+  title: string
+  actionLabel: string
+  actionHref: string
+  items: { id: string; title: string; meta: string; href: string }[]
+  loading: boolean
+  emptyLabel: string
+}) => (
+  <div className="shell-card p-5">
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+      <Link to={actionHref} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+        {actionLabel} →
+      </Link>
+    </div>
+    <div className="space-y-2 text-sm text-gray-600">
+      {loading && (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-500">
+          Loading queue...
+        </div>
+      )}
+      {!loading && items.length === 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-500">
+          {emptyLabel}
+        </div>
+      )}
+      {!loading && items.map((item) => (
+        <Link
+          key={item.id}
+          to={item.href}
+          className="block rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          <div className="font-medium text-slate-900">{item.title}</div>
+          <div className="text-xs text-slate-500 mt-1">{item.meta}</div>
+        </Link>
+      ))}
+    </div>
+  </div>
+)
+
+const AlertTile = ({
+  title,
+  detail,
+  tone,
+}: {
+  title: string
+  detail: string
+  tone: 'blue' | 'amber' | 'rose'
+}) => {
+  const toneClasses = {
+    blue: 'border-blue-200 bg-blue-50 text-blue-900',
+    amber: 'border-amber-200 bg-amber-50 text-amber-900',
+    rose: 'border-rose-200 bg-rose-50 text-rose-900',
+  }
+  return (
+    <div className={`rounded-xl border p-4 ${toneClasses[tone]}`}>
+      <p className="text-xs uppercase tracking-[0.12em] opacity-80">{title}</p>
+      <p className="mt-2 text-sm font-semibold">{detail}</p>
     </div>
   )
 }

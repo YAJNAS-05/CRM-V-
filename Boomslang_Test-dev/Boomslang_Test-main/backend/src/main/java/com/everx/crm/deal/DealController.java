@@ -3,6 +3,7 @@ package com.everx.crm.deal;
 import com.everx.crm.deal.dto.CreateDealRequest;
 import com.everx.crm.deal.dto.DealDto;
 import com.everx.crm.deal.dto.UpdateDealRequest;
+import com.everx.crm.deal.dto.UpdateDealStageRequest;
 import com.everx.shared.dto.ApiResponse;
 import java.util.Objects;
 import lombok.NonNull;
@@ -97,6 +98,24 @@ public class DealController {
         log.info("PUT /api/v1/crm/deals/{}", dealId);
         DealDto deal = dealService.updateDeal(dealId, request);
         return ResponseEntity.ok(ApiResponse.ok(deal, "Deal updated successfully"));
+    }
+
+    @PatchMapping("/{dealId:[0-9a-fA-F-]{36}}/stage")
+    @PreAuthorize("hasAuthority('CRM_EDIT')")
+    public ResponseEntity<ApiResponse<DealDto>> updateDealStage(
+            @PathVariable @NonNull UUID dealId,
+            @Valid @RequestBody UpdateDealStageRequest request) {
+        log.info("PATCH /api/v1/crm/deals/{}/stage", dealId);
+        DealDto deal = dealService.updateStage(dealId, request.getStage());
+        return ResponseEntity.ok(ApiResponse.ok(deal, "Deal stage updated"));
+    }
+
+    @GetMapping("/{dealId:[0-9a-fA-F-]{36}}/weighted-revenue")
+    @PreAuthorize("hasAuthority('CRM_VIEW')")
+    public ResponseEntity<ApiResponse<java.math.BigDecimal>> getWeightedRevenue(
+            @PathVariable @NonNull UUID dealId) {
+        log.info("GET /api/v1/crm/deals/{}/weighted-revenue", dealId);
+        return ResponseEntity.ok(ApiResponse.ok(dealService.calculateWeightedRevenue(dealId)));
     }
 
     @DeleteMapping("/{dealId:[0-9a-fA-F-]{36}}")

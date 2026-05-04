@@ -33,8 +33,10 @@ public class DepartmentController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<DepartmentDto>>> getDepartments(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(departmentService.getDepartments(pageable)));
+    public ResponseEntity<ApiResponse<Page<DepartmentDto>>> getDepartments(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(departmentService.getDepartments(pageable, search)));
     }
 
     @PutMapping("/{id}")

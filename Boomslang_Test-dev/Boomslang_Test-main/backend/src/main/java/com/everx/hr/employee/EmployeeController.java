@@ -3,6 +3,8 @@ package com.everx.hr.employee;
 import com.everx.hr.employee.dto.CreateEmployeeRequest;
 import com.everx.hr.employee.dto.EmployeeDto;
 import com.everx.hr.employee.dto.UpdateEmployeeRequest;
+import com.everx.hr.EmployeeStatus;
+import com.everx.hr.EmploymentType;
 import com.everx.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +35,15 @@ public class EmployeeController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<EmployeeDto>>> getEmployees(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(employeeService.getEmployees(pageable)));
+    public ResponseEntity<ApiResponse<Page<EmployeeDto>>> getEmployees(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) EmployeeStatus status,
+            @RequestParam(required = false) EmploymentType employmentType,
+            @RequestParam(required = false) UUID departmentId,
+            @RequestParam(required = false) UUID positionId,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                employeeService.getEmployees(pageable, search, status, employmentType, departmentId, positionId)));
     }
 
     @PutMapping("/{id}")

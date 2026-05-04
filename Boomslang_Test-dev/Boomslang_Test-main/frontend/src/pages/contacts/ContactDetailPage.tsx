@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { contactApi, accountApi } from '../../api/crmApi'
 import { Contact, Account } from '../../types/crm'
-import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 
 const contactSchema = z.object({
@@ -34,9 +34,6 @@ interface ContactDetailPageProps { isNew?: boolean }
 const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const permissions = useAuthStore((state) => state.user?.permissions)
-  const canEdit = permissions?.includes('CRM_EDIT') ?? false
-  const canDelete = permissions?.includes('CRM_DELETE') ?? false
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(!isNew)
   const [contact, setContact] = useState<Contact | null>(null)
@@ -74,10 +71,6 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
     } finally { setIsLoading(false) }
   }
   const handleDelete = async () => {
-    if (!canDelete) {
-      toast.error('You do not have permission to delete contacts')
-      return
-    }
     if (!confirm('Delete this contact?')) return
     try { await contactApi.delete(id!); toast.success('Deleted'); navigate('/crm/contacts') } catch { toast.error('Failed') }
   }
@@ -102,8 +95,12 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canEdit && <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>}
-            {canDelete && <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>}
+            <FeatureGate requiredPermission="CRM_EDIT">
+              <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>
+            </FeatureGate>
+            <FeatureGate requiredPermission="CRM_DELETE">
+              <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+            </FeatureGate>
           </div>
         </div>
       </div>

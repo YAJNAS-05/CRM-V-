@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { warrantyApi } from '../../api/erpApi'
+import { FeatureGate } from '../../components/rbac'
 
 export default function WarrantyDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -54,12 +55,16 @@ export default function WarrantyDetailPage() {
         <div className="flex gap-2">
           {editMode ? (
             <>
-              <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded">Save</button>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded">Save</button>
+              </FeatureGate>
               <button onClick={() => { setEditMode(false); setFormData(warranty) }} className="px-4 py-2 bg-gray-600 text-white rounded">Cancel</button>
             </>
           ) : (
             <>
-              <button onClick={() => setEditMode(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Edit</button>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                <button onClick={() => setEditMode(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Edit</button>
+              </FeatureGate>
               <button onClick={() => navigate('/erp/warranties')} className="px-4 py-2 bg-gray-600 text-white rounded">Back</button>
             </>
           )}

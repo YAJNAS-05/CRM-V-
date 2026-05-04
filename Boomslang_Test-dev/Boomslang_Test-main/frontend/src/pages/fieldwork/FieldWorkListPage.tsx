@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { fieldworkApi } from '../../api/fieldworkApi'
 import { FieldJobDto } from '../../types/fieldwork'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 interface FieldWorkOrder {
   id: number | string
@@ -179,12 +180,14 @@ export const FieldWorkListPage = () => {
           >
             Export
           </button>
-          <button
-            onClick={() => navigate(`${basePath}/new`)}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            + New Work Order
-          </button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button
+              onClick={() => navigate(`${basePath}/new`)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+            >
+              + New Work Order
+            </button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -199,12 +202,14 @@ export const FieldWorkListPage = () => {
           <p className="text-muted-foreground">
             {search || statusFilter ? 'No work orders found' : 'No work orders yet'}
           </p>
-          <button
-            onClick={() => navigate(`${basePath}/new`)}
-            className="mt-4 text-sm text-primary hover:underline"
-          >
-            Create your first work order
-          </button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button
+              onClick={() => navigate(`${basePath}/new`)}
+              className="mt-4 text-sm text-primary hover:underline"
+            >
+              Create your first work order
+            </button>
+          </FeatureGate>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

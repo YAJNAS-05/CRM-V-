@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supplierApi } from '../../api/erpApi'
 import { Supplier } from '../../types/erp'
+import { FeatureGate } from '../../components/rbac'
 
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -103,12 +104,14 @@ export default function SupplierDetailPage() {
         <div className="flex gap-2">
           {editMode ? (
             <>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                Save
-              </button>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Save
+                </button>
+              </FeatureGate>
               <button
                 onClick={() => {
                   setEditMode(false)
@@ -121,18 +124,22 @@ export default function SupplierDetailPage() {
             </>
           ) : (
             <>
-              <button
-                onClick={() => setEditMode(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Edit
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Delete
-              </button>
+              <FeatureGate requiredPermission="ERP_EDIT">
+                <button
+                  onClick={() => setEditMode(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Edit
+                </button>
+              </FeatureGate>
+              <FeatureGate requiredPermission="ERP_DELETE">
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </FeatureGate>
             </>
           )}
           <button

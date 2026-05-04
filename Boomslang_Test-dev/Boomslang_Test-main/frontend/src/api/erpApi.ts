@@ -17,12 +17,36 @@ import {
 } from '../types/erp'
 import { ApiResponse, Page } from '../types'
 
+const buildQueryString = (params: Record<string, string | number | boolean | undefined | null>) => {
+  const searchParams = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.set(key, String(value))
+    }
+  })
+  return searchParams.toString()
+}
+
 export const erpApi = {
-  getInventoryItems: async (page?: number, size?: number): Promise<ApiResponse<{ content: InventoryItem[] }>> => {
-    const params = new URLSearchParams()
-    if (page !== undefined) params.append('page', page.toString())
-    if (size !== undefined) params.append('size', size.toString())
-    const response = await axiosInstance.get<ApiResponse<{ content: InventoryItem[] }>>(`/v1/erp/inventory?${params}`)
+  getInventoryItems: async (
+    page?: number,
+    size?: number,
+    filters?: {
+      search?: string
+      category?: string
+      status?: string
+      sort?: string
+    },
+  ): Promise<ApiResponse<Page<InventoryItem>>> => {
+    const query = buildQueryString({
+      page,
+      size,
+      search: filters?.search,
+      category: filters?.category,
+      status: filters?.status,
+      sort: filters?.sort,
+    })
+    const response = await axiosInstance.get<ApiResponse<Page<InventoryItem>>>(`/v1/erp/inventory?${query}`)
     return response.data
   },
 
@@ -127,13 +151,11 @@ export const inventoryApi = {
     return response.data
   },
   // Add stubs for missing methods
-  getByCategory: async (category: string, page: number, size: number): Promise<ApiResponse<{ content: InventoryItem[] }>> => {
-    const response = await axiosInstance.get<ApiResponse<{ content: InventoryItem[] }>>(`/v1/erp/inventory?category=${category}&page=${page}&size=${size}`)
-    return response.data
+  getByCategory: async (category: string, page: number, size: number): Promise<ApiResponse<Page<InventoryItem>>> => {
+    return erpApi.getInventoryItems(page, size, { category })
   },
-  getByStatus: async (status: string, page: number, size: number): Promise<ApiResponse<{ content: InventoryItem[] }>> => {
-    const response = await axiosInstance.get<ApiResponse<{ content: InventoryItem[] }>>(`/v1/erp/inventory?status=${status}&page=${page}&size=${size}`)
-    return response.data
+  getByStatus: async (status: string, page: number, size: number): Promise<ApiResponse<Page<InventoryItem>>> => {
+    return erpApi.getInventoryItems(page, size, { status })
   },
 }
 

@@ -33,18 +33,12 @@ public class InventoryItemController {
     @GetMapping
     @PreAuthorize("hasAuthority('ERP_VIEW')")
     public ResponseEntity<ApiResponse<Page<InventoryItemDto>>> getAllInventoryItems(
+            @RequestParam(required = false) String search,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/erp/inventory");
-        Page<InventoryItemDto> items;
-        if (category != null && !category.isBlank()) {
-            items = inventoryItemService.getInventoryItemsByCategory(category, pageable);
-        } else if (status != null && !status.isBlank()) {
-            items = inventoryItemService.getInventoryItemsByStatus(status, pageable);
-        } else {
-            items = inventoryItemService.getAllInventoryItems(pageable);
-        }
+        Page<InventoryItemDto> items = inventoryItemService.getInventoryItemsFiltered(search, category, status, pageable);
         return ResponseEntity.ok(ApiResponse.ok(items, "Inventory items retrieved successfully"));
     }
 

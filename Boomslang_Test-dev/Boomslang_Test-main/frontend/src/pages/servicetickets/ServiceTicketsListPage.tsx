@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { serviceTicketApi } from '../../api/erpApi'
 import { ServiceTicket } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function ServiceTicketsListPage() {
   const [tickets, setTickets] = useState<ServiceTicket[]>([])
@@ -84,7 +85,9 @@ export default function ServiceTicketsListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/service-tickets/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Ticket</button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/service-tickets/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Ticket</button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -102,8 +105,8 @@ export default function ServiceTicketsListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {tickets.map((ticket) => (
-              <tr key={ticket.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{ticket.ticketNumber}</td>
+              <tr key={ticket.id} onClick={() => navigate(`/erp/service-tickets/${ticket.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                <td className="px-6 py-4 text-sm font-medium text-blue-600 hover:underline">{ticket.ticketNumber}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{ticket.type}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-semibold rounded ${getPriorityColor(ticket.priority)}`}>

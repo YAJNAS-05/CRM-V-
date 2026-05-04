@@ -34,8 +34,20 @@ public class Timesheet extends BaseEntity {
     @Column(name = "work_date", nullable = false)
     private LocalDate workDate;
 
+    @Column(name = "week_start_date")
+    private LocalDate weekStartDate;
+
     @Column(name = "hours_worked", precision = 10, scale = 2)
     private BigDecimal hoursWorked;
+
+    @Column(name = "total_billable_hours", precision = 10, scale = 2)
+    private BigDecimal totalBillableHours;
+
+    @Column(name = "total_non_billable_hours", precision = 10, scale = 2)
+    private BigDecimal totalNonBillableHours;
+
+    @Column(name = "total_hours", precision = 10, scale = 2)
+    private BigDecimal totalHours;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)

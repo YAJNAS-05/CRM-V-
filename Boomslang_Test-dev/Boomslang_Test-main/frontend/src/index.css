@@ -111,6 +111,26 @@ textarea {
   animation: fade-out 0.3s ease-in;
 }
 
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .payslip-print {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .payslip-print .payslip-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

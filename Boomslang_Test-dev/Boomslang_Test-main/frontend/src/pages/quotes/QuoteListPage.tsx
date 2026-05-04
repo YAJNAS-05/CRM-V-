@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { quoteApi } from '../../api/crmApi'
 import { Quote } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 
 const QuoteListPage: React.FC = () => {
@@ -73,14 +74,14 @@ const QuoteListPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Quotes</h1>
-        {canCreate && (
+        <FeatureGate requiredPermission="CRM_CREATE">
           <button
             onClick={() => navigate('/crm/quotes/new')}
             className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
           >
             New Quote
           </button>
-        )}
+        </FeatureGate>
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -128,14 +129,14 @@ const QuoteListPage: React.FC = () => {
                     >
                       Edit
                     </button>
-                    {canDelete && (
+                    <FeatureGate requiredPermission="CRM_DELETE">
                       <button
                         onClick={() => handleDelete(quote.id)}
                         className="text-red-600 hover:text-red-800"
                       >
                         Delete
                       </button>
-                    )}
+                    </FeatureGate>
                   </td>
                 </tr>
               ))

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { warrantyApi } from '../../api/erpApi'
 import { Warranty } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function WarrantiesListPage() {
   const [warranties, setWarranties] = useState<Warranty[]>([])
@@ -72,7 +73,9 @@ export default function WarrantiesListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/warranties/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Warranty</button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/warranties/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Warranty</button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -91,8 +94,8 @@ export default function WarrantiesListPage() {
             {warranties.map((warranty) => {
               const daysRemaining = Math.ceil((new Date(warranty.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
               return (
-                <tr key={warranty.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{warranty.type}</td>
+                <tr key={warranty.id} onClick={() => navigate(`/erp/warranties/${warranty.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                  <td className="px-6 py-4 text-sm font-medium text-blue-600 hover:underline">{warranty.type}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(warranty.status)}`}>
                       {warranty.status}

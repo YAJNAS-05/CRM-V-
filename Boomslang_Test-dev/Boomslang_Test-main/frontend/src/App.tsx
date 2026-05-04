@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
 import { authApi } from './api/authApi'
+import useEmployeeWorkspaceSync from './hooks/useEmployeeWorkspaceSync'
 import LoginPage from './pages/auth/LoginPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
 import NotificationPanel from './components/NotificationPanel'
@@ -66,6 +67,7 @@ import InvoiceForm from './pages/finance/InvoiceForm'
 import PaymentListPage from './pages/finance/PaymentListPage'
 import CurrencyRatePage from './pages/finance/CurrencyRatePage'
 import ReportPage from './pages/finance/ReportPage'
+import FinancialClosePage from './pages/finance/FinancialClosePage'
 
 // Field Work Pages
 import { FieldWorkListPage } from './pages/fieldwork/FieldWorkListPage'
@@ -75,9 +77,10 @@ import { FieldWorkDetailPage } from './pages/fieldwork/FieldWorkDetailPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import FinanceDashboardPage from './pages/dashboard/FinanceDashboardPage'
 import FieldworkDashboardPage from './pages/dashboard/FieldworkDashboardPage'
-import HRDashboardPage from './pages/dashboard/HRDashboardPage'
-import EmployeeDashboardPage from './pages/dashboard/EmployeeDashboardPage'
+import HrDashboardPage from './pages/dashboard/HRDashboardPage'
+import HRManagerDashboardPage from './pages/dashboard/HRManagerDashboardPage'
 import OperationsDashboardPage from './pages/dashboard/OperationsDashboardPage'
+import TechnicianDashboardPage from './pages/fieldwork/TechnicianDashboardPage'
 import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage'
 import { ReportListPage } from './pages/reports/ReportListPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
@@ -92,6 +95,17 @@ import InventoryLedger from './pages/erp/inventory/InventoryLedger'
 import InventoryTransfers from './pages/erp/inventory/InventoryTransfers'
 
 // HR Pages
+import HRLandingPage from './pages/hr/HRLandingPage'
+import HRPeoplePage from './pages/hr/HRPeoplePage'
+import HRPayrollPage from './pages/hr/HRPayrollPage'
+import HRPayrollWizardPage from './pages/hr/HRPayrollWizardPage'
+import HRLeavePage from './pages/hr/HRLeavePage'
+import HRTimePage from './pages/hr/HRTimePage'
+import HRRecruitmentPage from './pages/hr/HRRecruitmentPage'
+import HROnboardingPage from './pages/hr/HROnboardingPage'
+import HRPerformancePage from './pages/hr/HRPerformancePage'
+import HRCompliancePage from './pages/hr/HRCompliancePage'
+import HRAnalyticsPage from './pages/hr/HRAnalyticsPage'
 import EmployeeListPage from './pages/hr/EmployeeListPage'
 import EmployeeDetailPage from './pages/hr/EmployeeDetailPage'
 import EmployeeFormPage from './pages/hr/EmployeeFormPage'
@@ -104,6 +118,9 @@ import PositionFormPage from './pages/hr/PositionFormPage'
 import LeaveRequestListPage from './pages/hr/LeaveRequestListPage'
 import LeaveRequestDetailPage from './pages/hr/LeaveRequestDetailPage'
 import LeaveRequestFormPage from './pages/hr/LeaveRequestFormPage'
+import LeavePoliciesPage from './pages/hr/LeavePoliciesPage'
+import LeaveBalancesPage from './pages/hr/LeaveBalancesPage'
+import HolidayListPage from './pages/hr/HolidayListPage'
 import TimesheetListPage from './pages/hr/TimesheetListPage'
 import TimesheetDetailPage from './pages/hr/TimesheetDetailPage'
 import TimesheetFormPage from './pages/hr/TimesheetFormPage'
@@ -112,16 +129,61 @@ import PayrollRunDetailPage from './pages/hr/PayrollRunDetailPage'
 import PayrollRunFormPage from './pages/hr/PayrollRunFormPage'
 import PayrollProfilePage from './pages/hr/PayrollProfilePage'
 import ReimbursementRequestPage from './pages/hr/ReimbursementRequestPage'
-import { MyInsightsPage } from './pages/insights/MyInsightsPage'
-import WorkspaceHomePage from './pages/workspace/WorkspaceHomePage'
-import NotificationsPage from './pages/notifications/NotificationsPage'
+import ReimbursementListPage from './pages/hr/ReimbursementListPage'
+import ReimbursementDetailPage from './pages/hr/ReimbursementDetailPage'
+import OrgChartPage from './pages/hr/OrgChartPage'
+import TrainingListPage from './pages/hr/TrainingListPage'
+import TrainingDetailPage from './pages/hr/TrainingDetailPage'
+import TrainingFormPage from './pages/hr/TrainingFormPage'
+import DocumentListPage from './pages/hr/DocumentListPage'
+import DocumentUploadPage from './pages/hr/DocumentUploadPage'
+import OfferLetterListPage from './pages/hr/OfferLetterListPage'
+import OfferLetterFormPage from './pages/hr/OfferLetterFormPage'
+import PayslipListPage from './pages/hr/PayslipListPage'
+import PayslipCreatePage from './pages/hr/PayslipCreatePage'
+import PayslipDetailPage from './pages/hr/PayslipDetailPage'
+import MyPayslipsPage from './pages/hr/MyPayslipsPage'
+import MyAppraisalPage from './pages/hr/MyAppraisalPage'
+import CandidatePipelinePage from './pages/hr/CandidatePipelinePage'
+import InterviewScorecardPage from './pages/hr/InterviewScorecardPage'
+import AttendancePage from './pages/hr/AttendancePage'
+import OnboardingTasksPage from './pages/hr/OnboardingTasksPage'
+import ExitFnFPage from './pages/hr/ExitFnFPage'
+import TaskKanbanPage from './pages/hr/TaskKanbanPage'
+import MyAssetsPage from './pages/hr/MyAssetsPage'
+import AuditLogPage from './pages/admin/AuditLogPage'
 
 // Components
 import Layout from './components/layout/Layout'
 
+const EmployeeWorkspaceDashboardPage = lazy(() => import('./pages/employee/EmployeeWorkspaceDashboardPage'))
+const ProjectsPage = lazy(() => import('./pages/employee/ProjectsPage'))
+const ProjectDetailPage = lazy(() => import('./pages/employee/ProjectDetailPage'))
+const MyTasksPage = lazy(() => import('./pages/employee/MyTasksPage'))
+const EmployeeTimesheetsPage = lazy(() => import('./pages/employee/EmployeeTimesheetsPage'))
+const EmployeeAttendancePage = lazy(() => import('./pages/employee/EmployeeAttendancePage'))
+
+const queryClient = new QueryClient()
+
 interface ProtectedRouteProps {
   children: React.ReactNode
   requiredPermissions?: string[]
+  requiredRoles?: string[]
+}
+
+const HR_ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'HR']
+const HR_MANAGER_ROLES = ['MANAGER', ...HR_ADMIN_ROLES]
+const HR_RECRUITER_ROLES = ['RECRUITER', ...HR_ADMIN_ROLES]
+const HR_PAYROLL_ROLES = ['PAYROLL', ...HR_ADMIN_ROLES]
+const HR_EXECUTIVE_ROLES = ['EXECUTIVE', ...HR_ADMIN_ROLES]
+const HR_SELF_SERVICE_ROLES = ['EMPLOYEE', ...HR_MANAGER_ROLES]
+const WORKSPACE_MODULE_ROLES = ['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN']
+
+const resolveUserRoles = (user?: { roles?: string[]; role?: string } | null) => {
+  if (!user) return []
+  if (user.roles && user.roles.length > 0) return user.roles
+  if (user.role) return [user.role]
+  return []
 }
 
 const inferRoutePermissions = (pathname: string): string[] => {
@@ -141,25 +203,27 @@ const inferRoutePermissions = (pathname: string): string[] => {
   if (pathname === '/dashboard/operations') return ['DASHBOARD_OPERATIONS_VIEW']
   if (pathname === '/dashboard/finance') return ['DASHBOARD_FINANCE_VIEW']
   if (pathname === '/dashboard/hr') return ['DASHBOARD_HR_VIEW']
+  if (pathname === '/dashboard/hr/manager' || pathname === '/dashboard/manager') return ['DASHBOARD_HR_VIEW', 'HR_VIEW']
   if (pathname === '/dashboard/technician') return ['DASHBOARD_TECH_VIEW']
   if (pathname === '/dashboard/fieldwork') return ['FIELDWORK_VIEW']
   if (pathname === '/dashboard/employee') return ['HR_VIEW']
-  if (pathname === '/home') return ['INSIGHTS_VIEW']
-  if (pathname.startsWith('/notifications')) return ['INSIGHTS_VIEW']
+  if (pathname === '/employee' || pathname.startsWith('/employee/')) return ['HR_VIEW']
   if (pathname === '/crm/dashboard/team') return ['DASHBOARD_TEAM_VIEW']
   if (pathname === '/crm/dashboard/user') return ['DASHBOARD_SELF_VIEW']
   if (pathname === '/crm/dashboard') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
-  if (pathname.startsWith('/me/')) return ['INSIGHTS_VIEW']
   if (pathname.startsWith('/crm/')) return ['CRM_VIEW']
   if (pathname.startsWith('/erp/')) return ['ERP_VIEW']
-  if (pathname.startsWith('/hr/')) return ['HR_VIEW']
+  if (pathname === '/hr' || pathname.startsWith('/hr/')) return ['HR_VIEW']
   if (pathname.startsWith('/finance/')) return ['FINANCE_VIEW']
   if (pathname.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
   if (pathname.startsWith('/reports')) return ['REPORT_VIEW']
   return []
 }
 
-const getFirstDashboardPath = (permissions: string[]): string => {
+const getFirstDashboardPath = (permissions: string[], roles: string[] = []): string => {
+  const hasAdminAccess = roles.some((role) => HR_ADMIN_ROLES.includes(role))
+  if (!hasAdminAccess && roles.includes('MANAGER')) return '/dashboard/manager'
+  if (!hasAdminAccess && roles.includes('EMPLOYEE')) return '/employee'
   if (permissions.includes('DASHBOARD_OPERATIONS_VIEW')) return '/dashboard/operations'
   if (permissions.includes('DASHBOARD_FINANCE_VIEW')) return '/dashboard/finance'
   if (permissions.includes('DASHBOARD_HR_VIEW')) return '/dashboard/hr'
@@ -170,8 +234,7 @@ const getFirstDashboardPath = (permissions: string[]): string => {
   return '/profile'
 }
 
-const getFirstAuthorizedPath = (permissions: string[]): string => {
-  if (permissions.includes('INSIGHTS_VIEW')) return '/home'
+const getFirstAuthorizedPath = (permissions: string[], roles: string[] = []): string => {
   if (
     permissions.some((permission) =>
       [
@@ -186,11 +249,11 @@ const getFirstAuthorizedPath = (permissions: string[]): string => {
       ].includes(permission)
     )
   ) {
-    return getFirstDashboardPath(permissions)
+    return getFirstDashboardPath(permissions, roles)
   }
   if (permissions.includes('CRM_VIEW')) return '/crm/accounts'
   if (permissions.includes('ERP_VIEW')) return '/erp/equipment'
-  if (permissions.includes('HR_VIEW')) return '/hr/employees'
+  if (permissions.includes('HR_VIEW')) return '/hr'
   if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
   if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
   if (permissions.includes('REPORT_VIEW')) return '/reports'
@@ -204,6 +267,7 @@ interface DashboardRouteResolverProps {
 const DashboardRouteResolver: React.FC<DashboardRouteResolverProps> = ({ basePath = '/dashboard/crm' }) => {
   const user = useAuthStore((state) => state.user)
   const permissions = user?.permissions || []
+  const userRoles = resolveUserRoles(user)
 
   if (permissions.includes('DASHBOARD_TEAM_VIEW')) {
     return <Navigate to={`${basePath}/team`} replace />
@@ -213,13 +277,41 @@ const DashboardRouteResolver: React.FC<DashboardRouteResolverProps> = ({ basePat
     return <Navigate to={`${basePath}/user`} replace />
   }
 
-  return <Navigate to={getFirstAuthorizedPath(permissions)} replace />
+  return <Navigate to={getFirstAuthorizedPath(permissions, userRoles)} replace />
 }
 
 const DashboardLandingRoute: React.FC = () => {
   const user = useAuthStore((state) => state.user)
   const permissions = user?.permissions || []
-  return <Navigate to={getFirstDashboardPath(permissions)} replace />
+  const userRoles = resolveUserRoles(user)
+  return <Navigate to={getFirstDashboardPath(permissions, userRoles)} replace />
+}
+
+interface EmployeeSelfServiceRouteProps {
+  employeePath: string
+  children: React.ReactNode
+}
+
+const EmployeeSelfServiceRoute: React.FC<EmployeeSelfServiceRouteProps> = ({ employeePath, children }) => {
+  const user = useAuthStore((state) => state.user)
+  const roles = resolveUserRoles(user)
+  const isEmployeeOnly = roles.includes('EMPLOYEE') && !roles.some((role) => HR_MANAGER_ROLES.includes(role))
+
+  if (isEmployeeOnly) {
+    return <Navigate to={employeePath} replace />
+  }
+
+  return <>{children}</>
+}
+
+const EmployeeModuleFallback: React.FC = () => (
+  <div className="shell-card p-8 text-sm text-slate-500">Loading employee workspace...</div>
+)
+
+const EmployeeModuleBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useEmployeeWorkspaceSync()
+
+  return <Suspense fallback={<EmployeeModuleFallback />}>{children}</Suspense>
 }
 
 const AuthSessionSync: React.FC = () => {
@@ -296,7 +388,11 @@ const AuthSessionSync: React.FC = () => {
   return null
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermissions }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requiredPermissions,
+  requiredRoles,
+}) => {
   const location = useLocation()
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const user = useAuthStore((state) => state.user)
@@ -306,6 +402,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermi
   }
 
   const userPermissions = user?.permissions || []
+  const userRoles = resolveUserRoles(user)
 
   const inferredPermissions = inferRoutePermissions(location.pathname)
   const effectiveRequiredPermissions =
@@ -318,7 +415,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermi
         : false
 
     if (!hasPermissionAccess) {
-      return <Navigate to={getFirstAuthorizedPath(userPermissions)} replace />
+      return <Navigate to={getFirstAuthorizedPath(userPermissions, userRoles)} replace />
+    }
+  }
+
+  if (requiredRoles && requiredRoles.length > 0) {
+    const hasRoleAccess = requiredRoles.some((role) => userRoles.includes(role))
+    if (!hasRoleAccess) {
+      return <Navigate to={getFirstAuthorizedPath(userPermissions, userRoles)} replace />
     }
   }
 
@@ -356,8 +460,6 @@ const NotFoundPage: React.FC = () => {
 }
 
 function App() {
-  const queryClient = new QueryClient()
-  
   return (
     <QueryClientProvider client={queryClient}>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -368,36 +470,10 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
 
         <Route
-          path="/home"
-          element={
-            <ProtectedRoute requiredPermissions={['INSIGHTS_VIEW']}>
-              <WorkspaceHomePage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/notifications"
-          element={
-            <ProtectedRoute requiredPermissions={['INSIGHTS_VIEW']}>
-              <NotificationsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/profile"
           element={
             <ProtectedRoute>
               <UserProfilePage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/me/insights"
-          element={
-            <ProtectedRoute requiredPermissions={['INSIGHTS_VIEW']}>
-              <MyInsightsPage />
             </ProtectedRoute>
           }
         />
@@ -442,8 +518,33 @@ function App() {
         <Route
           path="/dashboard/hr"
           element={
-            <ProtectedRoute requiredPermissions={['DASHBOARD_HR_VIEW']}>
-              <HRDashboardPage />
+            <ProtectedRoute
+              requiredPermissions={['DASHBOARD_HR_VIEW']}
+              requiredRoles={HR_ADMIN_ROLES}
+            >
+              <HrDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/hr/manager"
+          element={
+            <ProtectedRoute
+              requiredPermissions={['HR_VIEW', 'DASHBOARD_HR_VIEW']}
+              requiredRoles={HR_MANAGER_ROLES}
+            >
+              <HRManagerDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/manager"
+          element={
+            <ProtectedRoute
+              requiredPermissions={['HR_VIEW', 'DASHBOARD_HR_VIEW']}
+              requiredRoles={HR_MANAGER_ROLES}
+            >
+              <HRManagerDashboardPage />
             </ProtectedRoute>
           }
         />
@@ -451,7 +552,7 @@ function App() {
           path="/dashboard/technician"
           element={
             <ProtectedRoute requiredPermissions={['DASHBOARD_TECH_VIEW']}>
-              <FieldworkDashboardPage />
+              <TechnicianDashboardPage />
             </ProtectedRoute>
           }
         />
@@ -490,8 +591,71 @@ function App() {
         <Route
           path="/dashboard/employee"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
-              <EmployeeDashboardPage />
+            <ProtectedRoute
+              requiredPermissions={['HR_VIEW']}
+              requiredRoles={WORKSPACE_MODULE_ROLES}
+            >
+              <Navigate to="/employee" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+              <EmployeeModuleBoundary>
+                <EmployeeWorkspaceDashboardPage />
+              </EmployeeModuleBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/projects"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+              <EmployeeModuleBoundary>
+                <ProjectsPage />
+              </EmployeeModuleBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/projects/:id"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+              <EmployeeModuleBoundary>
+                <ProjectDetailPage />
+              </EmployeeModuleBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/tasks"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+              <EmployeeModuleBoundary>
+                <MyTasksPage />
+              </EmployeeModuleBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/timesheets"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+              <EmployeeModuleBoundary>
+                <EmployeeTimesheetsPage />
+              </EmployeeModuleBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/attendance"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+              <EmployeeModuleBoundary>
+                <EmployeeAttendancePage />
+              </EmployeeModuleBoundary>
             </ProtectedRoute>
           }
         />
@@ -1166,9 +1330,121 @@ function App() {
 
         {/* HR Routes */}
         <Route
+          path="/hr"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HRLandingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/people"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HRPeoplePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/payroll"
+          element={
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
+              <HRPayrollPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/payroll/wizard"
+          element={
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
+              <HRPayrollWizardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/leave"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HRLeavePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/leave-policies"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <LeavePoliciesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/leave-balances"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <LeaveBalancesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/holidays"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HolidayListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/time"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HRTimePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/recruit"
+          element={
+            <ProtectedRoute requiredRoles={HR_RECRUITER_ROLES}>
+              <HRRecruitmentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/onboard"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HROnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/performance"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HRPerformancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/compliance"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <HRCompliancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/analytics"
+          element={
+            <ProtectedRoute requiredRoles={HR_EXECUTIVE_ROLES}>
+              <HRAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/hr/employees"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <EmployeeListPage />
             </ProtectedRoute>
           }
@@ -1176,7 +1452,7 @@ function App() {
         <Route
           path="/hr/employees/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <EmployeeFormPage />
             </ProtectedRoute>
           }
@@ -1184,7 +1460,7 @@ function App() {
         <Route
           path="/hr/employees/:id/edit"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <EmployeeFormPage />
             </ProtectedRoute>
           }
@@ -1192,7 +1468,7 @@ function App() {
         <Route
           path="/hr/employees/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <EmployeeDetailPage />
             </ProtectedRoute>
           }
@@ -1201,7 +1477,7 @@ function App() {
         <Route
           path="/hr/departments"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <DepartmentListPage />
             </ProtectedRoute>
           }
@@ -1209,7 +1485,7 @@ function App() {
         <Route
           path="/hr/departments/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <DepartmentFormPage />
             </ProtectedRoute>
           }
@@ -1217,7 +1493,7 @@ function App() {
         <Route
           path="/hr/departments/:id/edit"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <DepartmentFormPage />
             </ProtectedRoute>
           }
@@ -1225,7 +1501,7 @@ function App() {
         <Route
           path="/hr/departments/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <DepartmentDetailPage />
             </ProtectedRoute>
           }
@@ -1234,7 +1510,7 @@ function App() {
         <Route
           path="/hr/positions"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <PositionListPage />
             </ProtectedRoute>
           }
@@ -1242,7 +1518,7 @@ function App() {
         <Route
           path="/hr/positions/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <PositionFormPage />
             </ProtectedRoute>
           }
@@ -1250,7 +1526,7 @@ function App() {
         <Route
           path="/hr/positions/:id/edit"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <PositionFormPage />
             </ProtectedRoute>
           }
@@ -1258,7 +1534,7 @@ function App() {
         <Route
           path="/hr/positions/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
               <PositionDetailPage />
             </ProtectedRoute>
           }
@@ -1267,7 +1543,7 @@ function App() {
         <Route
           path="/hr/leave-requests"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
               <LeaveRequestListPage />
             </ProtectedRoute>
           }
@@ -1275,7 +1551,7 @@ function App() {
         <Route
           path="/hr/leave-requests/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
               <LeaveRequestFormPage />
             </ProtectedRoute>
           }
@@ -1283,7 +1559,7 @@ function App() {
         <Route
           path="/hr/leave-requests/:id/edit"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
               <LeaveRequestFormPage />
             </ProtectedRoute>
           }
@@ -1291,7 +1567,7 @@ function App() {
         <Route
           path="/hr/leave-requests/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
               <LeaveRequestDetailPage />
             </ProtectedRoute>
           }
@@ -1300,32 +1576,40 @@ function App() {
         <Route
           path="/hr/timesheets"
           element={
-            <ProtectedRoute>
-              <TimesheetListPage />
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <EmployeeSelfServiceRoute employeePath="/employee/timesheets">
+                <TimesheetListPage />
+              </EmployeeSelfServiceRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/hr/timesheets/new"
           element={
-            <ProtectedRoute>
-              <TimesheetFormPage />
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <EmployeeSelfServiceRoute employeePath="/employee/timesheets">
+                <TimesheetFormPage />
+              </EmployeeSelfServiceRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/hr/timesheets/:id/edit"
           element={
-            <ProtectedRoute>
-              <TimesheetFormPage />
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <EmployeeSelfServiceRoute employeePath="/employee/timesheets">
+                <TimesheetFormPage />
+              </EmployeeSelfServiceRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/hr/timesheets/:id"
           element={
-            <ProtectedRoute>
-              <TimesheetDetailPage />
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <EmployeeSelfServiceRoute employeePath="/employee/timesheets">
+                <TimesheetDetailPage />
+              </EmployeeSelfServiceRoute>
             </ProtectedRoute>
           }
         />
@@ -1333,8 +1617,24 @@ function App() {
         <Route
           path="/hr/reimbursements/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
               <ReimbursementRequestPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/reimbursements"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <ReimbursementListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/reimbursements/:id"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <ReimbursementDetailPage />
             </ProtectedRoute>
           }
         />
@@ -1342,7 +1642,7 @@ function App() {
         <Route
           path="/hr/payroll-runs"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
               <PayrollRunListPage />
             </ProtectedRoute>
           }
@@ -1350,7 +1650,7 @@ function App() {
         <Route
           path="/hr/payroll-runs/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
               <PayrollRunFormPage />
             </ProtectedRoute>
           }
@@ -1358,7 +1658,7 @@ function App() {
         <Route
           path="/hr/payroll-runs/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
               <PayrollRunDetailPage />
             </ProtectedRoute>
           }
@@ -1367,8 +1667,208 @@ function App() {
         <Route
           path="/hr/payroll-profiles"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
               <PayrollProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Org Chart */}
+        <Route
+          path="/hr/org-chart"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <OrgChartPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Training Routes */}
+        <Route
+          path="/hr/trainings"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <TrainingListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/trainings/new"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <TrainingFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/trainings/:id/edit"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <TrainingFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/trainings/:id"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <TrainingDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Document Routes */}
+        <Route
+          path="/hr/documents"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <DocumentListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/documents/upload"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <DocumentUploadPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Offer Letter Routes */}
+        <Route
+          path="/hr/offer-letters"
+          element={
+            <ProtectedRoute requiredRoles={HR_RECRUITER_ROLES}>
+              <OfferLetterListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/offer-letters/new"
+          element={
+            <ProtectedRoute requiredRoles={HR_RECRUITER_ROLES}>
+              <OfferLetterFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/offer-letters/:id/edit"
+          element={
+            <ProtectedRoute requiredRoles={HR_RECRUITER_ROLES}>
+              <OfferLetterFormPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Payslip Routes (Admin) */}
+        <Route
+          path="/hr/payslips"
+          element={
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
+              <PayslipListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/payslips/:id"
+          element={
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
+              <PayslipDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/payslips/new"
+          element={
+            <ProtectedRoute requiredRoles={HR_PAYROLL_ROLES}>
+              <PayslipCreatePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Employee Self-Service Routes */}
+        <Route
+          path="/hr/my-payslips"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <MyPayslipsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/my-payslips/:id"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <PayslipDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/my-appraisal"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <MyAppraisalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/candidates"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <CandidatePipelinePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/candidates/:id/scorecard"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <InterviewScorecardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/attendance"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <EmployeeSelfServiceRoute employeePath="/employee/attendance">
+                <AttendancePage />
+              </EmployeeSelfServiceRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/onboarding-tasks"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <OnboardingTasksPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/exit-fnf"
+          element={
+            <ProtectedRoute requiredRoles={HR_ADMIN_ROLES}>
+              <ExitFnFPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/tasks"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <EmployeeSelfServiceRoute employeePath="/employee/tasks">
+                <TaskKanbanPage />
+              </EmployeeSelfServiceRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/my-assets"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <MyAssetsPage />
             </ProtectedRoute>
           }
         />
@@ -1430,6 +1930,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/finance/close"
+          element={
+            <ProtectedRoute>
+              <FinancialClosePage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Field Work Routes */}
         <Route
@@ -1477,8 +1985,8 @@ function App() {
         <Route
           path="/admin/audit"
           element={
-            <ProtectedRoute>
-              <Navigate to="/admin/users" replace />
+            <ProtectedRoute requiredRoles={['SUPER_ADMIN', 'ADMIN']}>
+              <AuditLogPage />
             </ProtectedRoute>
           }
         />
@@ -1549,7 +2057,7 @@ function App() {
           }
         />
 
-        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           path="*"
           element={

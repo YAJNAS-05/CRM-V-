@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { departmentApi, employeeApi } from '../../api/hrApi'
 import { Department, Employee } from '../../types/hr'
+import { FeatureGate } from '../../components/rbac'
 
 const DepartmentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -86,18 +87,22 @@ const DepartmentDetailPage: React.FC = () => {
           <p className="text-sm text-gray-500">Department Code: {department.code}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            to={`/hr/departments/${department.id}/edit`}
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-          >
-            Edit
-          </Link>
-          <button
-            onClick={handleDelete}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-          >
-            Delete
-          </button>
+          <FeatureGate requiredPermission="HR_EDIT">
+            <Link
+              to={`/hr/departments/${department.id}/edit`}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+            >
+              Edit
+            </Link>
+          </FeatureGate>
+          <FeatureGate requiredPermission="HR_DELETE">
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </FeatureGate>
           <Link to="/hr/departments" className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
             Back
           </Link>

@@ -2,6 +2,8 @@ package com.everx.hr.employee;
 
 import com.everx.auth.entity.User;
 import com.everx.auth.repository.UserRepository;
+import com.everx.hr.EmployeeStatus;
+import com.everx.hr.EmploymentType;
 import com.everx.hr.employee.dto.CreateEmployeeRequest;
 import com.everx.hr.employee.dto.EmployeeDto;
 import com.everx.hr.employee.dto.UpdateEmployeeRequest;
@@ -52,8 +54,14 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
-    public Page<EmployeeDto> getEmployees(Pageable pageable) {
-        return employeeRepository.findAllNotDeleted(pageable).map(this::toDto);
+    public Page<EmployeeDto> getEmployees(Pageable pageable,
+                                          String search,
+                                          EmployeeStatus status,
+                                          EmploymentType employmentType,
+                                          UUID departmentId,
+                                          UUID positionId) {
+        return employeeRepository.findAllFiltered(search, status, employmentType, departmentId, positionId, pageable)
+                .map(this::toDto);
     }
 
     @Transactional
@@ -88,6 +96,25 @@ public class EmployeeService {
         updateIfPresent(request.getStatus(), employee::setStatus);
         updateIfPresent(request.getHireDate(), employee::setHireDate);
         updateIfPresent(request.getTerminationDate(), employee::setTerminationDate);
+        updateIfPresent(request.getDateOfBirth(), employee::setDateOfBirth);
+        updateIfPresent(request.getGender(), employee::setGender);
+        updateIfPresent(request.getNationality(), employee::setNationality);
+        updateIfPresent(request.getAvatarUrl(), employee::setAvatarUrl);
+        updateIfPresent(request.getProbationEndDate(), employee::setProbationEndDate);
+        updateIfPresent(request.getConfirmationDate(), employee::setConfirmationDate);
+        updateIfPresent(request.getWorkLocation(), employee::setWorkLocation);
+        updateIfPresent(request.getLifecycleStage(), employee::setLifecycleStage);
+        updateIfPresent(request.getEmergencyContactName(), employee::setEmergencyContactName);
+        updateIfPresent(request.getEmergencyContactPhone(), employee::setEmergencyContactPhone);
+        updateIfPresent(request.getEmergencyContactRelation(), employee::setEmergencyContactRelation);
+        updateIfPresent(request.getPanNumber(), employee::setPanNumber);
+        updateIfPresent(request.getAadhaarMasked(), employee::setAadhaarMasked);
+        updateIfPresent(request.getPassportNumber(), employee::setPassportNumber);
+        updateIfPresent(request.getAddressLine1(), employee::setAddressLine1);
+        updateIfPresent(request.getAddressCity(), employee::setAddressCity);
+        updateIfPresent(request.getAddressState(), employee::setAddressState);
+        updateIfPresent(request.getAddressCountry(), employee::setAddressCountry);
+        updateIfPresent(request.getAddressPincode(), employee::setAddressPincode);
 
         return toDto(employeeRepository.save(employee));
     }
@@ -114,6 +141,23 @@ public class EmployeeService {
         employee.setStatus(request.getStatus() != null ? request.getStatus() : employee.getStatus());
         employee.setHireDate(request.getHireDate());
         employee.setTerminationDate(request.getTerminationDate());
+
+        employee.setDateOfBirth(request.getDateOfBirth());
+        employee.setGender(request.getGender());
+        employee.setNationality(request.getNationality());
+        employee.setAvatarUrl(request.getAvatarUrl());
+        employee.setProbationEndDate(request.getProbationEndDate());
+        employee.setConfirmationDate(request.getConfirmationDate());
+        if (request.getWorkLocation() != null) employee.setWorkLocation(request.getWorkLocation());
+        if (request.getLifecycleStage() != null) employee.setLifecycleStage(request.getLifecycleStage());
+        employee.setEmergencyContactName(request.getEmergencyContactName());
+        employee.setEmergencyContactPhone(request.getEmergencyContactPhone());
+        employee.setEmergencyContactRelation(request.getEmergencyContactRelation());
+        employee.setAddressLine1(request.getAddressLine1());
+        employee.setAddressCity(request.getAddressCity());
+        employee.setAddressState(request.getAddressState());
+        employee.setAddressCountry(request.getAddressCountry());
+        employee.setAddressPincode(request.getAddressPincode());
     }
 
     private EmployeeDto toDto(Employee employee) {
@@ -132,6 +176,22 @@ public class EmployeeService {
         dto.setStatus(employee.getStatus());
         dto.setHireDate(employee.getHireDate());
         dto.setTerminationDate(employee.getTerminationDate());
+        dto.setDateOfBirth(employee.getDateOfBirth());
+        dto.setGender(employee.getGender());
+        dto.setNationality(employee.getNationality());
+        dto.setAvatarUrl(employee.getAvatarUrl());
+        dto.setProbationEndDate(employee.getProbationEndDate());
+        dto.setConfirmationDate(employee.getConfirmationDate());
+        dto.setWorkLocation(employee.getWorkLocation());
+        dto.setLifecycleStage(employee.getLifecycleStage());
+        dto.setEmergencyContactName(employee.getEmergencyContactName());
+        dto.setEmergencyContactPhone(employee.getEmergencyContactPhone());
+        dto.setEmergencyContactRelation(employee.getEmergencyContactRelation());
+        dto.setAddressLine1(employee.getAddressLine1());
+        dto.setAddressCity(employee.getAddressCity());
+        dto.setAddressState(employee.getAddressState());
+        dto.setAddressCountry(employee.getAddressCountry());
+        dto.setAddressPincode(employee.getAddressPincode());
         if (employee.getCreatedAt() != null) {
             dto.setCreatedAt(employee.getCreatedAt().toInstant());
         }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { activityApi } from '../../api/crmApi'
 import { Activity, CreateActivityRequest } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 
@@ -120,12 +121,12 @@ export default function ActivityListPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export
           </button>
-          {canCreate && (
+          <FeatureGate requiredPermission="CRM_CREATE">
             <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">
               <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               Add Activity
             </button>
-          )}
+          </FeatureGate>
         </div>
       </div>
 
@@ -189,14 +190,16 @@ export default function ActivityListPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {canEdit && !a.completedAt && (
-                        <button onClick={() => handleComplete(a.id)} className="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100" title="Complete">✓ Done</button>
-                      )}
-                      {canDelete && (
+                      <FeatureGate requiredPermission="CRM_EDIT">
+                        {!a.completedAt && (
+                          <button onClick={() => handleComplete(a.id)} className="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100" title="Complete">✓ Done</button>
+                        )}
+                      </FeatureGate>
+                      <FeatureGate requiredPermission="CRM_DELETE">
                         <button onClick={() => handleDelete(a.id)} className="p-1 text-gray-400 hover:text-red-500" title="Delete">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
-                      )}
+                      </FeatureGate>
                     </div>
                   </td>
                 </tr>

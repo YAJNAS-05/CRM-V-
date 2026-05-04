@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { equipmentApi } from '../../api/erpApi'
 import { Equipment } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function EquipmentListPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -74,12 +75,14 @@ export default function EquipmentListPage() {
           >
             Export
           </button>
-          <button
-            onClick={() => navigate('/erp/equipment/new')}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Add Equipment
-          </button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button
+              onClick={() => navigate('/erp/equipment/new')}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Add Equipment
+            </button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -98,8 +101,12 @@ export default function EquipmentListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {equipment.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <tr 
+                key={item.id} 
+                onClick={() => navigate(`/erp/equipment/${item.id}`)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:underline">
                   {item.internalCode}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900">
@@ -121,7 +128,6 @@ export default function EquipmentListPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <button
-                    onClick={() => navigate(`/erp/equipment/${item.id}`)}
                     className="text-blue-600 hover:text-blue-900"
                   >
                     View

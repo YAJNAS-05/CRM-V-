@@ -23,6 +23,9 @@ public class DealDto {
     private DealStage stage;
     private BigDecimal amount;
     private Integer probability;
+    private Integer daysInStage;
+    private Integer daysInPipeline;
+    private BigDecimal expectedRevenueWeighted;
     private LocalDate expectedCloseDate;
     private LocalDate actualCloseDate;
     private String leadSource;
@@ -43,6 +46,9 @@ public class DealDto {
                 .stage(deal.getStage())
                 .amount(deal.getAmount())
                 .probability(deal.getProbability())
+                .daysInStage(deal.getDaysInStage())
+                .daysInPipeline(deal.getDaysInPipeline())
+                .expectedRevenueWeighted(deal.getExpectedRevenueWeighted())
                 .expectedCloseDate(deal.getExpectedCloseDate())
                 .actualCloseDate(deal.getActualCloseDate())
                 .leadSource(deal.getLeadSource())

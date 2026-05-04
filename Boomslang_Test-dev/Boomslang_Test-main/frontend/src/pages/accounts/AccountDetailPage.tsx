@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { accountApi, contactApi, dealApi } from '../../api/crmApi'
 import { Account, Contact, Deal } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 
 const accountSchema = z.object({
@@ -100,8 +101,12 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canEdit && <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>}
-            {canDelete && <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>}
+            <FeatureGate requiredPermission="CRM_EDIT">
+              <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>
+            </FeatureGate>
+            <FeatureGate requiredPermission="CRM_DELETE">
+              <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+            </FeatureGate>
           </div>
         </div>
       </div>

@@ -86,9 +86,7 @@ public class UserDto {
                 .toList();
         }
 
-        String primaryRole = user.getRole() != null
-            ? user.getRole().name()
-            : roleNames.stream().findFirst().orElse(null);
+        String primaryRole = resolveEffectivePrimaryRole(roleNames, user.getRole());
 
         return UserDto.builder()
                 .id(user.getId())
@@ -103,5 +101,36 @@ public class UserDto {
                 .lastLogin(user.getLastLogin())
                 .avatarUrl(user.getAvatarUrl())
                 .build();
+    }
+
+    private static String resolveEffectivePrimaryRole(LinkedHashSet<String> roleNames, User.UserRole legacyPrimaryRole) {
+        List<String> priority = List.of(
+            User.UserRole.SUPER_ADMIN.name(),
+            User.UserRole.ADMIN.name(),
+            User.UserRole.MANAGER.name(),
+            User.UserRole.HR.name(),
+            User.UserRole.PAYROLL.name(),
+            User.UserRole.RECRUITER.name(),
+            User.UserRole.EXECUTIVE.name(),
+            User.UserRole.FINANCE.name(),
+            User.UserRole.SALES_MANAGER.name(),
+            User.UserRole.SERVICE_TECH.name(),
+            User.UserRole.SALES_REP.name(),
+            User.UserRole.EMPLOYEE.name(),
+            User.UserRole.VIEWER.name(),
+            User.UserRole.READ_ONLY.name()
+        );
+
+        for (String roleName : priority) {
+            if (roleNames.contains(roleName)) {
+                return roleName;
+            }
+        }
+
+        if (legacyPrimaryRole != null) {
+            return legacyPrimaryRole.name();
+        }
+
+        return roleNames.stream().findFirst().orElse(null);
     }
 }

@@ -84,7 +84,8 @@ public class UserService implements UserDetailsService {
 
         try {
             Set<Role> assignedRoles = resolveAssignedRoles(request.getRoles(), request.getRole());
-            User.UserRole primaryRole = resolvePrimaryRole(request.getRole(), assignedRoles, User.UserRole.READ_ONLY);
+            User.UserRole primaryRole = resolvePrimaryRole(request.getRole(), assignedRoles, User.UserRole.EMPLOYEE);
+            User.UserRole persistedPrimaryRole = normalizePersistedPrimaryRole(primaryRole);
             User.OfficeLocation location = User.OfficeLocation.valueOf(request.getOfficeLocation().toUpperCase());
 
             // Parse fullName into firstName and lastName
@@ -99,7 +100,7 @@ public class UserService implements UserDetailsService {
                     .firstName(firstName)
                     .lastName(lastName)
                     .phone(request.getPhone())
-                    .role(primaryRole)
+                    .role(persistedPrimaryRole)
                     .assignedRoles(assignedRoles)
                     .officeLocation(location)
                     .isActive(request.getIsActive() == null || request.getIsActive())
@@ -144,7 +145,8 @@ public class UserService implements UserDetailsService {
         if ((request.getRoles() != null && !request.getRoles().isEmpty()) || request.getRole() != null) {
             Set<Role> assignedRoles = resolveAssignedRoles(request.getRoles(), request.getRole());
             user.setAssignedRoles(assignedRoles);
-            user.setRole(resolvePrimaryRole(request.getRole(), assignedRoles, user.getRole()));
+            User.UserRole primaryRole = resolvePrimaryRole(request.getRole(), assignedRoles, user.getRole());
+            user.setRole(normalizePersistedPrimaryRole(primaryRole));
         } else if (user.getAssignedRoles() == null || user.getAssignedRoles().isEmpty()) {
             // Keep existing data compatible if older records still have only a primary role.
             user.setAssignedRoles(resolveAssignedRoles(List.of(), user.getRole().name()));
@@ -291,5 +293,19 @@ public class UserService implements UserDetailsService {
         }
 
         return defaultRole == null ? User.UserRole.READ_ONLY : defaultRole;
+    }
+
+    private User.UserRole normalizePersistedPrimaryRole(User.UserRole primaryRole) {
+        if (primaryRole == null) {
+            return User.UserRole.READ_ONLY;
+        }
+
+        // Older deployments still rely on the legacy users.role column and reject EMPLOYEE.
+        // Employee access is enforced through assignedRoles and permissions instead.
+        if (primaryRole == User.UserRole.EMPLOYEE) {
+            return User.UserRole.READ_ONLY;
+        }
+
+        return primaryRole;
     }
 }

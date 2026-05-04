@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { invoiceApi } from '../../api/financeApi';
 import { Invoice, InvoiceStatus, InvoiceEntity } from '../../types/finance';
 import { Link } from 'react-router-dom';
+import { FeatureGate } from '../../components/rbac';
 
 const InvoicesListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -82,12 +83,14 @@ const InvoicesListPage: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-        <Link
-          to="/invoices/new"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          + New Invoice
-        </Link>
+        <FeatureGate requiredPermission="FINANCE_CREATE">
+          <Link
+            to="/invoices/new"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + New Invoice
+          </Link>
+        </FeatureGate>
       </div>
 
       <div className="mb-6 flex gap-4">

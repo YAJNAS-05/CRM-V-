@@ -15,6 +15,21 @@ interface AuditLog {
   userId: string
 }
 
+const exportCSV = (logs: AuditLog[]) => {
+  const headers = ['ID', 'Timestamp', 'Action', 'Entity Type', 'Entity ID', 'User ID', 'IP Address']
+  const rows = logs.map((l) => [l.id, l.timestamp, l.action, l.entityType, l.entityId || '', l.userId || '', l.ipAddress || ''])
+  const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `audit-log-${new Date().toISOString().split('T')[0]}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 const AuditLogPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -46,8 +61,21 @@ const AuditLogPage: React.FC = () => {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">System Audit Log</h1>
           <p className="text-slate-500 font-medium">Immutable record of all administrative and operational mutations.</p>
         </div>
-        <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 text-xs font-black uppercase tracking-widest">
-           Status: Compliant
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => exportCSV(logs)}
+            disabled={logs.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export CSV
+          </button>
+          <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 text-xs font-black uppercase tracking-widest">
+             Status: Compliant
+          </div>
         </div>
       </div>
 

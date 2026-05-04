@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { FeatureGate } from '../../../components/rbac'
 
 type DealsHeaderMetric = {
   label: string
@@ -51,7 +52,7 @@ export default function DealsViewHeader({ activeView, title, subtitle, metrics, 
             </div>
           </div>
 
-          {canCreate && (
+          <FeatureGate requiredPermission="CRM_CREATE">
             <Link
               to="/crm/deals/new"
               className="inline-flex items-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
@@ -61,7 +62,7 @@ export default function DealsViewHeader({ activeView, title, subtitle, metrics, 
               </svg>
               New Deal
             </Link>
-          )}
+          </FeatureGate>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

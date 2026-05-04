@@ -10,7 +10,6 @@ const DashboardHomePage: React.FC = () => {
     permissions.includes('DASHBOARD_SELF_VIEW') ||
     permissions.includes('DASHBOARD_TEAM_VIEW')
   const canMyWork = permissions.includes('FIELDWORK_VIEW') || permissions.includes('HR_VIEW')
-  const canInsights = permissions.includes('INSIGHTS_VIEW')
 
   if (!user) {
     return (
@@ -64,27 +63,7 @@ const DashboardHomePage: React.FC = () => {
         )}
       </div>
 
-      {canInsights && (
-        <div className="shell-card p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Workspace</p>
-              <h2 className="text-lg font-semibold text-slate-900 mt-1">Workspace home</h2>
-              <p className="text-sm text-slate-600 mt-2">
-                Keep your role-based workspace and insights within reach.
-              </p>
-            </div>
-            <Link
-              to="/home"
-              className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-            >
-              Go to home
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {!canCrm && !canMyWork && !canInsights && (
+      {!canCrm && !canMyWork && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
           No dashboard views are assigned yet. Ask an admin to grant dashboard access.
         </div>

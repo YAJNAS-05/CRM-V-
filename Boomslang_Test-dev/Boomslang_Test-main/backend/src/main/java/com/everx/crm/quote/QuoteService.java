@@ -1,10 +1,21 @@
 package com.everx.crm.quote;
 
+import com.everx.crm.activity.ActivityService;
+import com.everx.crm.activity.dto.CreateActivityRequest;
+import com.everx.crm.deal.Deal;
+import com.everx.crm.deal.DealRepository;
+import com.everx.crm.quote.dto.ConvertQuoteRequest;
 import com.everx.crm.quote.dto.CreateQuoteLineItemRequest;
 import com.everx.crm.quote.dto.CreateQuoteRequest;
 import com.everx.crm.quote.dto.QuoteDto;
 import com.everx.crm.quote.dto.UpdateQuoteRequest;
+import com.everx.erp.salesorder.SalesOrderService;
+import com.everx.erp.salesorder.dto.CreateSalesOrderItemRequest;
+import com.everx.erp.salesorder.dto.CreateSalesOrderRequest;
+import com.everx.erp.salesorder.dto.SalesOrderDto;
 import com.everx.shared.exception.EntityNotFoundException;
+import com.everx.shared.exception.ValidationException;
+import com.everx.shared.util.SecurityUserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -12,6 +23,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,6 +36,18 @@ public class QuoteService {
 
     @Autowired
     private QuoteRepository quoteRepository;
+
+    @Autowired
+    private DealRepository dealRepository;
+
+    @Autowired
+    private QuoteConversionRepository quoteConversionRepository;
+
+    @Autowired
+    private SalesOrderService salesOrderService;
+
+    @Autowired
+    private ActivityService activityService;
 
     public Page<QuoteDto> getAllQuotes(Pageable pageable) {
         log.info("Fetching quotes page {} size {}", pageable.getPageNumber(), pageable.getPageSize());
@@ -134,6 +159,67 @@ public class QuoteService {
         return quoteRepository.findByDealId(dealId, pageable).map(QuoteDto::fromEntity);
     }
 
+    public SalesOrderDto convertQuoteToSalesOrder(UUID quoteId, ConvertQuoteRequest request) {
+        Quote quote = quoteRepository.findByIdActive(quoteId)
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found with id: " + quoteId));
+
+        if (!"ACCEPTED".equalsIgnoreCase(quote.getStatus())) {
+            throw new ValidationException("Only ACCEPTED quotes can be converted to sales orders");
+        }
+
+        quoteConversionRepository.findByQuoteIdAndIsDeletedFalse(quoteId).ifPresent(existing -> {
+            throw new ValidationException("Quote is already converted");
+        });
+
+        Deal deal = dealRepository.findByIdActive(quote.getDealId())
+                .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + quote.getDealId()));
+
+        if (deal.getAccountId() == null) {
+            throw new ValidationException("Deal must have an account before conversion");
+        }
+
+        List<CreateSalesOrderItemRequest> items = quote.getLineItems() == null
+                ? List.of()
+                : quote.getLineItems().stream()
+                    .map(line -> new CreateSalesOrderItemRequest(
+                            line.getEquipmentId(),
+                            line.getQuantity(),
+                            line.getUnitPrice(),
+                            line.getLineTotal()))
+                    .collect(Collectors.toList());
+
+        CreateSalesOrderRequest soRequest = new CreateSalesOrderRequest();
+        soRequest.setDealId(deal.getId());
+        soRequest.setAccountId(deal.getAccountId());
+        soRequest.setStatus("DRAFT");
+        soRequest.setOrderDate(LocalDate.now());
+        soRequest.setCurrency(quote.getCurrency());
+        soRequest.setTotalAmount(quote.getTotalAmount());
+        soRequest.setNotes(quote.getNotes());
+        soRequest.setItems(items);
+
+        SalesOrderDto salesOrder = salesOrderService.createSalesOrder(soRequest);
+
+        QuoteConversion conversion = new QuoteConversion();
+        conversion.setQuoteId(quoteId);
+        conversion.setSalesOrderId(salesOrder.getId());
+        conversion.setConvertedBy(SecurityUserContext.getCurrentUserIdOrNull());
+        conversion.setConvertedAt(OffsetDateTime.now());
+        conversion.setNotes(request != null ? request.getNotes() : null);
+        quoteConversionRepository.save(conversion);
+
+        quote.setStatus("CONVERTED");
+        quoteRepository.save(quote);
+
+        deal.setStage(com.everx.crm.deal.DealStage.CLOSED_WON);
+        deal.setActualCloseDate(LocalDate.now());
+        dealRepository.save(deal);
+
+        logAutoActivity(deal.getId(), "QUOTE_CONVERTED", "Quote converted to sales order", quote.getQuoteNumber());
+
+        return salesOrder;
+    }
+
     private QuoteLineItem toQuoteLineItem(CreateQuoteLineItemRequest request, Quote quote) {
         QuoteLineItem item = QuoteLineItem.builder()
                 .quote(quote)
@@ -145,5 +231,16 @@ public class QuoteService {
                 .equipmentId(request.getEquipmentId())
                 .build();
         return item;
+    }
+
+    private void logAutoActivity(UUID dealId, String type, String subject, String description) {
+        CreateActivityRequest request = new CreateActivityRequest();
+        request.setType(type);
+        request.setSubject(subject);
+        request.setDescription(description);
+        request.setStatus("COMPLETED");
+        request.setDealId(dealId);
+        request.setAssignedTo(SecurityUserContext.getCurrentUserIdOrNull());
+        activityService.createActivity(request);
     }
 }

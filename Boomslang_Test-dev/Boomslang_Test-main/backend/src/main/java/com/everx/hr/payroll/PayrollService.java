@@ -105,20 +105,23 @@ public class PayrollService {
 
     @Transactional(readOnly = true)
     public PayrollRunDto getPayrollRun(UUID id) {
-        PayrollRun run = payrollRunRepository.findById(id)
+        PayrollRun run = payrollRunRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Payroll run not found with id: " + id));
         return toRunDto(run, payrollItemRepository.findByPayrollRunId(id));
     }
 
     @Transactional(readOnly = true)
-    public Page<PayrollRunDto> getPayrollRuns(Pageable pageable) {
-        return payrollRunRepository.findAllNotDeleted(pageable)
+    public Page<PayrollRunDto> getPayrollRuns(Pageable pageable,
+                                              PayrollRunStatus status,
+                                              LocalDate startDate,
+                                              LocalDate endDate) {
+        return payrollRunRepository.findAllFiltered(status, startDate, endDate, pageable)
                 .map(run -> toRunDto(run, payrollItemRepository.findByPayrollRunId(run.getId())));
     }
 
     @Transactional
     public PayrollRunDto approvePayrollRun(UUID id) {
-        PayrollRun run = payrollRunRepository.findById(id)
+        PayrollRun run = payrollRunRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Payroll run not found with id: " + id));
         run.setStatus(PayrollRunStatus.APPROVED);
         payrollRunRepository.save(run);
@@ -127,7 +130,7 @@ public class PayrollService {
 
     @Transactional
     public PayrollRunDto markPayrollRunPaid(UUID id) {
-        PayrollRun run = payrollRunRepository.findById(id)
+        PayrollRun run = payrollRunRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Payroll run not found with id: " + id));
         run.setStatus(PayrollRunStatus.PAID);
         payrollRunRepository.save(run);

@@ -1,8 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import { departmentApi, employeeApi } from '../../api/hrApi'
 import { Department, Employee } from '../../types/hr'
+
+const SORT_OPTIONS = [
+  { label: 'Name (A-Z)', value: 'name,asc' },
+  { label: 'Name (Z-A)', value: 'name,desc' },
+  { label: 'Code (A-Z)', value: 'code,asc' },
+]
 
 const DepartmentListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -13,10 +20,22 @@ const DepartmentListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('name,asc')
 
   useEffect(() => {
     fetchDepartments()
-  }, [page, pageSize])
+  }, [page, pageSize, search, sort])
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+
+    return () => clearTimeout(handler)
+  }, [searchInput])
 
   useEffect(() => {
     loadEmployees()
@@ -25,7 +44,10 @@ const DepartmentListPage: React.FC = () => {
   const fetchDepartments = async () => {
     try {
       setLoading(true)
-      const response = await departmentApi.getAll(page, pageSize)
+      const response = await departmentApi.getAll(page, pageSize, {
+        search,
+        sort: sort || undefined,
+      })
       const data = response.data.data
       if (data?.content) {
         setDepartments(data.content)
@@ -84,12 +106,49 @@ const DepartmentListPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
           <p className="text-sm text-gray-500 mt-1">{totalItems} total records</p>
         </div>
-        <Link
-          to="/hr/departments/new"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        <FeatureGate requiredPermission="HR_CREATE">
+          <Link
+            to="/hr/departments/new"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          >
+            New Department
+          </Link>
+        </FeatureGate>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="min-w-[220px] flex-1">
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search department"
+            className="w-full rounded border border-gray-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <select
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
         >
-          New Department
-        </Link>
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              Sort: {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setSearchInput('')
+            setSort('name,asc')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

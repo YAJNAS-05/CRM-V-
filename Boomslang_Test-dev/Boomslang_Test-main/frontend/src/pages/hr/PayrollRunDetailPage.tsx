@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { employeeApi, payrollApi } from '../../api/hrApi'
-import { Employee, PayrollItem, PayrollRun } from '../../types/hr'
+import { Employee, PayrollItem, PayrollRun, PayrollRunStatus } from '../../types/hr'
+import { FeatureGate } from '../../components/rbac'
 
 const PayrollRunDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -78,6 +79,8 @@ const PayrollRunDetailPage: React.FC = () => {
   }
 
   const items: PayrollItem[] = run?.items || []
+  const statusSteps: PayrollRunStatus[] = ['DRAFT', 'APPROVED', 'PAID']
+  const stepIndex = run ? statusSteps.indexOf(run.status) : 0
 
   if (loading) {
     return (
@@ -104,6 +107,20 @@ const PayrollRunDetailPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Payroll Run</h1>
           <p className="text-sm text-gray-500">Status: {run.status}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {statusSteps.map((step, index) => (
+              <span
+                key={step}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  stepIndex >= index
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                {step}
+              </span>
+            ))}
+          </div>
         </div>
         <Link to="/hr/payroll-runs" className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
           Back
@@ -133,18 +150,24 @@ const PayrollRunDetailPage: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Payroll Items</h2>
           <div className="flex gap-2">
-            <button
-              onClick={handleApprove}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-            >
-              Approve Run
-            </button>
-            <button
-              onClick={handleMarkPaid}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-            >
-              Mark Paid
-            </button>
+            <FeatureGate requiredPermission="HR_EDIT">
+              <button
+                onClick={handleApprove}
+                disabled={run.status !== 'DRAFT'}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60"
+              >
+                Approve Run
+              </button>
+            </FeatureGate>
+            <FeatureGate requiredPermission="HR_EDIT">
+              <button
+                onClick={handleMarkPaid}
+                disabled={run.status !== 'APPROVED'}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+              >
+                Mark Paid
+              </button>
+            </FeatureGate>
           </div>
         </div>
 

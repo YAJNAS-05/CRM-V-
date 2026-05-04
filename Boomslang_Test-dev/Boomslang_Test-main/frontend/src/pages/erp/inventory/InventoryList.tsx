@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter, Edit, Trash2, Package } from 'lucide-react'
 import { inventoryApi } from '../../../api/erpApi'
 import { InventoryItem, ReorderSuggestion } from '../../../types/erp'
 import { ApiResponse } from '../../../types'
 import { toast } from 'react-hot-toast'
 import { exportToExcel, getExportDateStamp } from '../../../utils/exportToExcel'
+import { FeatureGate } from '../../../components/rbac'
 
 const INVENTORY_CATEGORIES = [
   'EQUIPMENT',
@@ -20,22 +21,41 @@ const INVENTORY_CATEGORIES = [
   'OTHER',
 ]
 
+const SORT_OPTIONS = [
+  { label: 'Newest', value: 'createdAt,desc' },
+  { label: 'Name (A-Z)', value: 'name,asc' },
+  { label: 'Code (A-Z)', value: 'itemCode,asc' },
+  { label: 'Stock (high to low)', value: 'currentStock,desc' },
+]
+
 const InventoryList: React.FC = () => {
+  const navigate = useNavigate()
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [reorderSuggestions, setReorderSuggestions] = useState<ReorderSuggestion[]>([])
   const [reorderLoading, setReorderLoading] = useState(false)
+  const [sort, setSort] = useState('createdAt,desc')
 
   const pageSize = 20
 
   useEffect(() => {
     fetchInventory()
-  }, [currentPage, categoryFilter, statusFilter])
+  }, [currentPage, categoryFilter, statusFilter, search, sort])
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setCurrentPage(0)
+    }, 300)
+
+    return () => clearTimeout(handler)
+  }, [searchInput])
 
   useEffect(() => {
     fetchReorderSuggestions()
@@ -44,19 +64,19 @@ const InventoryList: React.FC = () => {
   const fetchInventory = async () => {
     try {
       setLoading(true)
-      let response: ApiResponse<any>
-
-      if (categoryFilter) {
-        response = await inventoryApi.getByCategory(categoryFilter, currentPage, pageSize)
-      } else if (statusFilter) {
-        response = await inventoryApi.getByStatus(statusFilter, currentPage, pageSize)
-      } else {
-        response = await inventoryApi.getAll(currentPage, pageSize)
-      }
+      const response: ApiResponse<any> = await inventoryApi.getAll(currentPage, pageSize, {
+        search,
+        category: categoryFilter || undefined,
+        status: statusFilter || undefined,
+        sort: sort || undefined,
+      })
 
       if (response.success) {
         setInventory(response.data?.content || [])
         setTotalPages(response.data?.totalPages || 0)
+      } else {
+        setInventory([])
+        setTotalPages(0)
       }
     } catch (error) {
       console.error('Error fetching inventory:', error)
@@ -95,14 +115,8 @@ const InventoryList: React.FC = () => {
     }
   }
 
-  const filteredInventory = inventory.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
   const handleExport = () => {
-    const rows = filteredInventory.map((item) => ({
+    const rows = inventory.map((item) => ({
       ItemCode: item.itemCode,
       Name: item.name,
       Description: item.description || '',
@@ -170,18 +184,20 @@ const InventoryList: React.FC = () => {
           </Link>
           <button
             onClick={handleExport}
-            disabled={filteredInventory.length === 0}
+            disabled={inventory.length === 0}
             className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Export
           </button>
-          <Link
-            to="/erp/inventory/new"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Link>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <Link
+              to="/erp/inventory/new"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Link>
+          </FeatureGate>
         </div>
       </div>
 
@@ -234,14 +250,17 @@ const InventoryList: React.FC = () => {
             <input
               type="text"
               placeholder="Search items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value)
+              setCurrentPage(0)
+            }}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Categories</option>
@@ -253,7 +272,10 @@ const InventoryList: React.FC = () => {
           </select>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value)
+              setCurrentPage(0)
+            }}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Status</option>
@@ -261,12 +283,28 @@ const InventoryList: React.FC = () => {
             <option value="INACTIVE">Inactive</option>
             <option value="DISCONTINUED">Discontinued</option>
           </select>
+          <select
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value)
+              setCurrentPage(0)
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                Sort: {option.label}
+              </option>
+            ))}
+          </select>
           <button
             onClick={() => {
-              setSearchTerm('')
+              setSearchInput('')
+              setSearch('')
               setCategoryFilter('')
               setStatusFilter('')
               setCurrentPage(0)
+              setSort('createdAt,desc')
             }}
             className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center justify-center"
           >
@@ -306,11 +344,11 @@ const InventoryList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredInventory.map((item) => {
+              {inventory.map((item) => {
                 const stockStatus = getStockStatus(item.quantity, item.minStockLevel || 0)
                 return (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={item.id} onClick={() => navigate(`/erp/inventory/${item.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:underline">
                       {item.itemCode}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -346,18 +384,22 @@ const InventoryList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <Link
-                          to={`/erp/inventory/${item.id}`}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <FeatureGate requiredPermission="ERP_EDIT">
+                          <Link
+                            to={`/erp/inventory/${item.id}`}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                        </FeatureGate>
+                        <FeatureGate requiredPermission="ERP_DELETE">
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </FeatureGate>
                       </div>
                     </td>
                   </tr>
@@ -367,7 +409,7 @@ const InventoryList: React.FC = () => {
           </table>
         </div>
 
-        {filteredInventory.length === 0 && (
+        {inventory.length === 0 && (
           <div className="text-center py-12">
             <Package className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No inventory items</h3>
@@ -375,13 +417,15 @@ const InventoryList: React.FC = () => {
               Get started by adding your first inventory item.
             </p>
             <div className="mt-6">
-              <Link
-                to="/erp/inventory/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Link>
+              <FeatureGate requiredPermission="ERP_CREATE">
+                <Link
+                  to="/erp/inventory/new"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Item
+                </Link>
+              </FeatureGate>
             </div>
           </div>
         )}

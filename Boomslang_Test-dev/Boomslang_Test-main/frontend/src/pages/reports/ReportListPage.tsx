@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { reportApi } from '@/api/reportApi'
 import { useNotification } from '@/hooks/useNotification'
+import { FeatureGate } from '@/components/rbac'
 
 interface CustomReportItem {
   id: string
@@ -106,12 +107,14 @@ export const ReportListPage = () => {
             </button>
           </div>
 
-          <button
-            onClick={() => navigate('/reports/custom')}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            + New Custom Report
-          </button>
+          <FeatureGate requiredPermission="REPORTS">
+            <button
+              onClick={() => navigate('/reports/custom')}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+            >
+              + New Custom Report
+            </button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -173,19 +176,23 @@ export const ReportListPage = () => {
                     >
                       View
                     </button>
-                    <button
-                      onClick={() => navigate(`/reports/custom/${report.id}`)}
-                      className="text-xs px-3 py-1 border rounded hover:bg-muted"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCustomReport(report.id, report.name)}
-                      disabled={isDeletingCustom === report.id}
-                      className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10 disabled:opacity-40"
-                    >
-                      {isDeletingCustom === report.id ? '...' : 'Delete'}
-                    </button>
+                    <FeatureGate requiredPermission="REPORTS">
+                      <button
+                        onClick={() => navigate(`/reports/custom/${report.id}`)}
+                        className="text-xs px-3 py-1 border rounded hover:bg-muted"
+                      >
+                        Edit
+                      </button>
+                    </FeatureGate>
+                    <FeatureGate requiredPermission="REPORTS">
+                      <button
+                        onClick={() => handleDeleteCustomReport(report.id, report.name)}
+                        disabled={isDeletingCustom === report.id}
+                        className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                      >
+                        {isDeletingCustom === report.id ? '...' : 'Delete'}
+                      </button>
+                    </FeatureGate>
                   </div>
                 </div>
               </div>
@@ -230,19 +237,23 @@ export const ReportListPage = () => {
                   >
                     View
                   </button>
-                  <button
-                    onClick={() => navigate(`/reports/custom/${report.id}`)}
-                    className="text-xs px-3 py-1 border rounded hover:bg-muted"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteCustomReport(report.id, report.name)}
-                    disabled={isDeletingCustom === report.id}
-                    className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10 disabled:opacity-40"
-                  >
-                    {isDeletingCustom === report.id ? '...' : 'Delete'}
-                  </button>
+                  <FeatureGate requiredPermission="REPORTS">
+                    <button
+                      onClick={() => navigate(`/reports/custom/${report.id}`)}
+                      className="text-xs px-3 py-1 border rounded hover:bg-muted"
+                    >
+                      Edit
+                    </button>
+                  </FeatureGate>
+                  <FeatureGate requiredPermission="REPORTS">
+                    <button
+                      onClick={() => handleDeleteCustomReport(report.id, report.name)}
+                      disabled={isDeletingCustom === report.id}
+                      className="text-xs px-3 py-1 border rounded text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                    >
+                      {isDeletingCustom === report.id ? '...' : 'Delete'}
+                    </button>
+                  </FeatureGate>
                 </div>
               </div>
             ))}

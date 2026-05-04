@@ -4,6 +4,7 @@ import { CreateUserRequest, RoleDefinition, UpdateUserRequest, User } from '../.
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { X, Plus, Edit2, Trash2 } from 'lucide-react'
+import { FeatureGate } from '../../components/rbac'
 
 type LocationOption = {
   name: string
@@ -227,13 +228,15 @@ const UserManagementPage: React.FC = () => {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Identity & Access</h1>
           <p className="text-slate-500 font-medium">Manage users, assign multiple roles, and control access.</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg shadow-indigo-200 transition flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add User
-        </button>
+        <FeatureGate requiredPermission="USER_CREATE">
+          <button
+            onClick={openAddModal}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg shadow-indigo-200 transition flex items-center gap-2"
+          >
+            <Plus size={18} />
+            Add User
+          </button>
+        </FeatureGate>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
@@ -295,20 +298,24 @@ const UserManagementPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditModal(user)}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition"
-                        title="Edit user"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-xs font-bold text-red-600 hover:text-red-700 transition"
-                        title="Delete user"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <FeatureGate requiredPermission="USER_EDIT">
+                        <button
+                          onClick={() => openEditModal(user)}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition"
+                          title="Edit user"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </FeatureGate>
+                      <FeatureGate requiredPermission="USER_DELETE">
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-xs font-bold text-red-600 hover:text-red-700 transition"
+                          title="Delete user"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </FeatureGate>
                     </div>
                   </td>
                 </tr>

@@ -4,15 +4,18 @@ import com.everx.hr.payroll.dto.CreatePayrollRunRequest;
 import com.everx.hr.payroll.dto.PayrollProfileDto;
 import com.everx.hr.payroll.dto.PayrollRunDto;
 import com.everx.hr.payroll.dto.UpdatePayrollProfileRequest;
+import com.everx.hr.PayrollRunStatus;
 import com.everx.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -45,8 +48,13 @@ public class PayrollController {
     }
 
     @GetMapping("/payroll-runs")
-    public ResponseEntity<ApiResponse<Page<PayrollRunDto>>> getPayrollRuns(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(payrollService.getPayrollRuns(pageable)));
+    public ResponseEntity<ApiResponse<Page<PayrollRunDto>>> getPayrollRuns(
+            @RequestParam(required = false) PayrollRunStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                payrollService.getPayrollRuns(pageable, status, startDate, endDate)));
     }
 
     @PatchMapping("/payroll-runs/{id}/approve")

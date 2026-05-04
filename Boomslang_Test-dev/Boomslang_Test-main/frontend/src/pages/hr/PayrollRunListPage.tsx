@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import { payrollApi } from '../../api/hrApi'
-import { PayrollRun } from '../../types/hr'
+import { PayrollRun, PayrollRunStatus } from '../../types/hr'
+
+const STATUS_OPTIONS: PayrollRunStatus[] = ['DRAFT', 'APPROVED', 'PAID']
+const SORT_OPTIONS = [
+  { label: 'Newest period end', value: 'periodEnd,desc' },
+  { label: 'Oldest period end', value: 'periodEnd,asc' },
+  { label: 'Run date (newest)', value: 'runDate,desc' },
+]
 
 const PayrollRunListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -12,15 +20,24 @@ const PayrollRunListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [statusFilter, setStatusFilter] = useState<PayrollRunStatus | ''>('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [sort, setSort] = useState('periodEnd,desc')
 
   useEffect(() => {
     fetchRuns()
-  }, [page, pageSize])
+  }, [page, pageSize, statusFilter, startDate, endDate, sort])
 
   const fetchRuns = async () => {
     try {
       setLoading(true)
-      const response = await payrollApi.getRuns(page, pageSize)
+      const response = await payrollApi.getRuns(page, pageSize, {
+        status: statusFilter || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        sort: sort || undefined,
+      })
       const data = response.data.data
       if (data?.content) {
         setRuns(data.content)
@@ -46,12 +63,76 @@ const PayrollRunListPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Payroll Runs</h1>
           <p className="text-sm text-gray-500 mt-1">{totalItems} total records</p>
         </div>
-        <Link
-          to="/hr/payroll-runs/new"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        <FeatureGate requiredPermission="HR_CREATE">
+          <Link
+            to="/hr/payroll-runs/new"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+          >
+            New Payroll Run
+          </Link>
+        </FeatureGate>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-4">
+        <select
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as PayrollRunStatus | '')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
         >
-          New Payroll Run
-        </Link>
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(event) => {
+            setStartDate(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={endDate}
+          onChange={(event) => {
+            setEndDate(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        />
+        <select
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value)
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              Sort: {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setStatusFilter('')
+            setStartDate('')
+            setEndDate('')
+            setSort('periodEnd,desc')
+            setPage(0)
+          }}
+          className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

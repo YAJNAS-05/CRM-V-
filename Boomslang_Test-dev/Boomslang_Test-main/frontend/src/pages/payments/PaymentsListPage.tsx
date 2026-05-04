@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { paymentApi } from '../../api/financeApi';
 import { Payment, PaymentMethod } from '../../types/finance';
 import { Link } from 'react-router-dom';
+import { FeatureGate } from '../../components/rbac';
 
 const PaymentsListPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -61,12 +62,14 @@ const PaymentsListPage: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-        <Link
-          to="/payments/new"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          + Record Payment
-        </Link>
+        <FeatureGate requiredPermission="FINANCE_CREATE">
+          <Link
+            to="/payments/new"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + Record Payment
+          </Link>
+        </FeatureGate>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

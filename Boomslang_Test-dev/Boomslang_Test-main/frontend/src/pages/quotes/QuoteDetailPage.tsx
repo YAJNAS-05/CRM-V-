@@ -43,6 +43,7 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
   const [isFetching, setIsFetching] = useState(!isNew)
   const [deals, setDeals] = useState<Deal[]>([])
   
@@ -136,6 +137,25 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
       toast.error(error.response?.data?.message || 'Operation failed')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleConvertToOrder = async () => {
+    if (!id) return
+    setIsConverting(true)
+    try {
+      const response = await quoteApi.convertToSalesOrder(id)
+      const salesOrder = response.data.data
+      toast.success('Quote converted to sales order')
+      if (salesOrder?.id) {
+        navigate(`/erp/sales-orders/${salesOrder.id}`)
+      } else {
+        navigate('/erp/sales-orders')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to convert quote')
+    } finally {
+      setIsConverting(false)
     }
   }
 
@@ -378,7 +398,17 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-4 mt-8">
+          <div className="flex flex-wrap gap-4 mt-8">
+            {!isNew && formValues.status === 'ACCEPTED' && (
+              <button
+                type="button"
+                onClick={handleConvertToOrder}
+                disabled={isConverting}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition duration-200 disabled:opacity-50"
+              >
+                {isConverting ? 'Converting...' : 'Convert to Sales Order'}
+              </button>
+            )}
             <button
               type="submit"
               disabled={isLoading}

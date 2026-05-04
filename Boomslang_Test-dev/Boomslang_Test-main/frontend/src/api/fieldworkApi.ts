@@ -14,7 +14,7 @@ import {
 } from '../types/fieldwork';
 import { Page } from '../types';
 
-const ENABLE_FIELD_JOBS_API = import.meta.env.VITE_ENABLE_FIELD_JOBS_API === 'true';
+const ENABLE_FIELD_JOBS_API = import.meta.env.VITE_ENABLE_FIELD_JOBS_API !== 'false';
 
 let preferFieldJobsTestEndpoint = true;
 let fieldJobsNetworkUnavailable = !ENABLE_FIELD_JOBS_API;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { equipmentApi } from '../../api/erpApi'
 import { Equipment } from '../../types/erp'
+import { FeatureGate } from '../../components/rbac'
 
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -58,12 +59,14 @@ export default function EquipmentDetailPage() {
             <p className="text-gray-600">{equipment.make} {equipment.model}</p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(`/erp/equipment/${id}/edit`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-            >
-              Edit
-            </button>
+            <FeatureGate requiredPermission="ERP_EDIT">
+              <button
+                onClick={() => navigate(`/erp/equipment/${id}/edit`)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Edit
+              </button>
+            </FeatureGate>
             <span className={`px-3 py-1 rounded text-sm font-semibold ${
               equipment.status === 'IN_STOCK' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
             }`}>

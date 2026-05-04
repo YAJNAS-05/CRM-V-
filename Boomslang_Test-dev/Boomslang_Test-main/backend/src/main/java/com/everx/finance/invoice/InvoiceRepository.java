@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +27,20 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Page<Invoice> findByAccountId(@Param("accountId") UUID accountId, Pageable pageable);
 
     Optional<Invoice> findTopByPoIdAndIsDeletedFalseOrderByIssueDateDesc(UUID poId);
+
+    @Query("SELECT i FROM Invoice i WHERE i.isDeleted = false AND i.issueDate <= :periodEnd")
+    List<Invoice> findByIssueDateLessThanEqual(@Param("periodEnd") LocalDate periodEnd);
+
+    @Query("SELECT i FROM Invoice i WHERE i.isDeleted = false AND i.issueDate BETWEEN :startDate AND :endDate")
+    List<Invoice> findByIssueDateBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT i FROM Invoice i WHERE i.isDeleted = false AND i.issueDate <= :periodEnd AND i.currency <> :currency")
+    List<Invoice> findByIssueDateLessThanEqualAndCurrencyNot(@Param("periodEnd") LocalDate periodEnd,
+                                                             @Param("currency") String currency);
+
+    @Query("SELECT COALESCE(SUM(i.totalAmount), 0) FROM Invoice i WHERE i.isDeleted = false AND i.issueDate BETWEEN :startDate AND :endDate")
+    BigDecimal sumTotalAmountByIssueDateBetween(@Param("startDate") LocalDate startDate,
+                                                @Param("endDate") LocalDate endDate);
 
     @Query("SELECT i FROM Invoice i WHERE i.isDeleted = false AND i.status = :status")
     Page<Invoice> findByStatus(@Param("status") Invoice.InvoiceStatus status, Pageable pageable);

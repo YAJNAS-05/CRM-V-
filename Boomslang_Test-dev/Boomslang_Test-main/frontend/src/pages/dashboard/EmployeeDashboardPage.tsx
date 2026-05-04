@@ -1,36 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { employeeApi, leaveRequestApi, timesheetApi } from '../../api/hrApi'
+import { employeeApi, leaveRequestApi, reimbursementApi, timesheetApi } from '../../api/hrApi'
 import { useAuthStore } from '../../store/authStore'
-import { Employee, LeaveRequest, Timesheet } from '../../types/hr'
-
-const REIMBURSEMENT_STORAGE_KEY = 'everx_reimbursement_requests'
-
-type ReimbursementRequest = {
-  id: string
-  userId?: string
-  userEmail?: string
-  amount?: number
-  category?: string
-  status?: string
-  createdAt: string
-}
-
-const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase()
-
-const readLocalReimbursements = (): ReimbursementRequest[] => {
-  if (typeof window === 'undefined') return []
-
-  try {
-    const raw = window.localStorage.getItem(REIMBURSEMENT_STORAGE_KEY)
-    if (!raw) return []
-
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as ReimbursementRequest[]) : []
-  } catch {
-    return []
-  }
-}
+import { Employee, LeaveRequest, ReimbursementRequest, Timesheet } from '../../types/hr'
 
 const EmployeeDashboardPage: React.FC = () => {
   const user = useAuthStore((state) => state.user)
@@ -41,7 +13,7 @@ const EmployeeDashboardPage: React.FC = () => {
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([])
   const [myTimesheets, setMyTimesheets] = useState<Timesheet[]>([])
-  const [reimbursementCount, setReimbursementCount] = useState(0)
+  const [myReimbursements, setMyReimbursements] = useState<ReimbursementRequest[]>([])
   const [loadingHR, setLoadingHR] = useState(false)
 
   useEffect(() => {
@@ -85,9 +57,14 @@ const EmployeeDashboardPage: React.FC = () => {
         setLoadingHR(true)
 
         if (employee?.id) {
-          const [leaveResp, timesheetResp] = await Promise.allSettled([
+          const reimbursementPromise = employee.userId
+            ? reimbursementApi.getAll(0, 50, { requestedBy: employee.userId, sort: 'requestDate,desc' })
+            : reimbursementApi.getAll(0, 50, { search: employee.email, sort: 'requestDate,desc' })
+
+          const [leaveResp, timesheetResp, reimbursementResp] = await Promise.allSettled([
             leaveRequestApi.getByEmployee(employee.id),
             timesheetApi.getByEmployee(employee.id),
+            reimbursementPromise,
           ])
 
           if (leaveResp.status === 'fulfilled' && isActive) {
@@ -97,9 +74,15 @@ const EmployeeDashboardPage: React.FC = () => {
           if (timesheetResp.status === 'fulfilled' && isActive) {
             setMyTimesheets(timesheetResp.value.data.data || [])
           }
+
+          if (reimbursementResp.status === 'fulfilled' && isActive) {
+            const data = reimbursementResp.value.data.data
+            setMyReimbursements(data?.content || [])
+          }
         } else if (isActive) {
           setMyLeaves([])
           setMyTimesheets([])
+          setMyReimbursements([])
         }
       } finally {
         if (isActive) setLoadingHR(false)
@@ -113,22 +96,7 @@ const EmployeeDashboardPage: React.FC = () => {
     }
   }, [employee?.id, hasHR, user])
 
-  useEffect(() => {
-    if (!user) {
-      setReimbursementCount(0)
-      return
-    }
-
-    const records = readLocalReimbursements()
-    const userId = user.id ? String(user.id) : ''
-    const email = normalizeEmail(user.email)
-    const count = records.filter((record) => {
-      const matchesId = userId && String(record.userId || '') === userId
-      const matchesEmail = email && normalizeEmail(record.userEmail) === email
-      return matchesId || matchesEmail
-    }).length
-    setReimbursementCount(count)
-  }, [user])
+  const reimbursementCount = myReimbursements.length
 
   const quickActions = [
     { label: 'Request leave', href: '/hr/leave-requests/new', show: canSubmitHR },

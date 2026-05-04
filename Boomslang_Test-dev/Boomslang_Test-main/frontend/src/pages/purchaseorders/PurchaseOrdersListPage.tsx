@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { purchaseOrderApi } from '../../api/erpApi'
 import { PurchaseOrder } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function PurchaseOrdersListPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
@@ -74,7 +75,9 @@ export default function PurchaseOrdersListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/purchase-orders/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create PO</button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/purchase-orders/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create PO</button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -113,12 +116,14 @@ export default function PurchaseOrdersListPage() {
                   {order.totalAmount ? `${order.currency} ${order.totalAmount.toLocaleString()}` : 'N/A'}
                 </td>
                 <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={() => navigate(`/erp/purchase-orders/${order.id}/edit`)}
-                    className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition"
-                  >
-                    Edit
-                  </button>
+                  <FeatureGate requiredPermission="ERP_EDIT">
+                    <button
+                      onClick={() => navigate(`/erp/purchase-orders/${order.id}/edit`)}
+                      className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition"
+                    >
+                      Edit
+                    </button>
+                  </FeatureGate>
                 </td>
               </tr>
             ))}

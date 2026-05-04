@@ -33,8 +33,10 @@ public class PositionController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<PositionDto>>> getPositions(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(positionService.getPositions(pageable)));
+    public ResponseEntity<ApiResponse<Page<PositionDto>>> getPositions(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(positionService.getPositions(pageable, search)));
     }
 
     @PutMapping("/{id}")

@@ -1,53 +1,82 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { reimbursementApi } from '../../api/hrApi'
 import { useAuthStore } from '../../store/authStore'
+import { ReimbursementRequest, ReimbursementStatus } from '../../types/hr'
 
-const REIMBURSEMENT_STORAGE_KEY = 'everx_reimbursement_requests'
+const reimbursementCategories = ['Travel', 'Meals', 'Supplies', 'Lodging', 'Other']
+const currencyOptions = ['AUD', 'USD', 'EUR', 'GBP']
 
-type ReimbursementRequest = {
-  id: string
-  userId?: string
-  userEmail?: string
-  amount: number
-  category: string
-  requestDate: string
-  description: string
-  status: string
-  createdAt: string
+const formatCurrency = (amount: number, currency?: string | null) => {
+  const safeCurrency = currency || 'AUD'
+  return new Intl.NumberFormat('en-AU', { style: 'currency', currency: safeCurrency }).format(amount)
 }
 
-const readLocalReimbursements = (): ReimbursementRequest[] => {
-  if (typeof window === 'undefined') return []
+const formatDate = (value?: string | null) => {
+  if (!value) return 'Date TBD'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? 'Date TBD'
+    : parsed.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
-  try {
-    const raw = window.localStorage.getItem(REIMBURSEMENT_STORAGE_KEY)
-    if (!raw) return []
-
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as ReimbursementRequest[]) : []
-  } catch {
-    return []
+const statusTone = (status: ReimbursementStatus) => {
+  switch (status) {
+    case 'APPROVED':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'REJECTED':
+      return 'border-rose-200 bg-rose-50 text-rose-700'
+    case 'PAID':
+      return 'border-blue-200 bg-blue-50 text-blue-700'
+    default:
+      return 'border-amber-200 bg-amber-50 text-amber-700'
   }
 }
 
-const writeLocalReimbursements = (requests: ReimbursementRequest[]) => {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(REIMBURSEMENT_STORAGE_KEY, JSON.stringify(requests))
-}
-
-const reimbursementCategories = ['Travel', 'Meals', 'Supplies', 'Lodging', 'Other']
-
 const ReimbursementRequestPage: React.FC = () => {
   const user = useAuthStore((state) => state.user)
+  const [requests, setRequests] = useState<ReimbursementRequest[]>([])
+  const [loadingRequests, setLoadingRequests] = useState(true)
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState(reimbursementCategories[0])
+  const [currency, setCurrency] = useState(currencyOptions[0])
   const [requestDate, setRequestDate] = useState('')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const loadRequests = useCallback(async () => {
+    if (!user?.id) {
+      setLoadingRequests(false)
+      return
+    }
+
+    try {
+      setLoadingRequests(true)
+      const response = await reimbursementApi.getAll(0, 10, {
+        requestedBy: user.id,
+        sort: 'requestDate,desc',
+      })
+      setRequests(response.data.data?.content || [])
+    } catch (error) {
+      console.error('Failed to load reimbursements:', error)
+      toast.error('Failed to load reimbursements')
+    } finally {
+      setLoadingRequests(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadRequests()
+  }, [loadRequests])
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (!user?.id) {
+      toast.error('Sign in to submit a reimbursement request.')
+      return
+    }
 
     const parsedAmount = Number(amount)
     if (!requestDate || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -57,28 +86,32 @@ const ReimbursementRequestPage: React.FC = () => {
 
     setSubmitting(true)
 
-    const entry: ReimbursementRequest = {
-      id: `RMB-${Date.now()}`,
-      userId: user?.id ? String(user.id) : undefined,
-      userEmail: user?.email || undefined,
-      amount: parsedAmount,
-      category,
-      requestDate,
-      description: description.trim(),
-      status: 'SUBMITTED',
-      createdAt: new Date().toISOString(),
+    try {
+      await reimbursementApi.create({
+        requestedBy: user.id,
+        requesterEmail: user.email || undefined,
+        amount: parsedAmount,
+        currency,
+        category,
+        requestDate,
+        description: description.trim() || undefined,
+      })
+
+      setAmount('')
+      setRequestDate('')
+      setDescription('')
+
+      toast.success('Reimbursement request submitted.')
+      await loadRequests()
+    } catch (error) {
+      console.error('Failed to submit reimbursement:', error)
+      toast.error('Failed to submit reimbursement request')
+    } finally {
+      setSubmitting(false)
     }
-
-    const existing = readLocalReimbursements()
-    writeLocalReimbursements([entry, ...existing])
-
-    setAmount('')
-    setRequestDate('')
-    setDescription('')
-    setSubmitting(false)
-
-    toast.success('Reimbursement request submitted.')
   }
+
+  const hasRequests = useMemo(() => requests.length > 0, [requests])
 
   return (
     <div className="space-y-6">
@@ -86,7 +119,7 @@ const ReimbursementRequestPage: React.FC = () => {
         <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Employee</p>
         <h1 className="text-2xl font-bold text-slate-900 mt-1">Apply for reimbursement</h1>
         <p className="text-sm text-slate-600 mt-2 max-w-2xl">
-          Submit expense reimbursements for approval. Requests are stored locally until the backend is connected.
+          Submit expense reimbursements for approval. Status updates appear once HR reviews the request.
         </p>
       </div>
 
@@ -117,7 +150,7 @@ const ReimbursementRequestPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label className="text-xs font-semibold text-slate-600">Category</label>
             <select
@@ -126,6 +159,20 @@ const ReimbursementRequestPage: React.FC = () => {
               className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
             >
               {reimbursementCategories.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Currency</label>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+            >
+              {currencyOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -160,6 +207,47 @@ const ReimbursementRequestPage: React.FC = () => {
           </Link>
         </div>
       </form>
+
+      <div className="shell-card p-5 sm:p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">Recent requests</h2>
+          <button
+            type="button"
+            onClick={loadRequests}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+          >
+            Refresh
+          </button>
+        </div>
+        <div className="mt-4 space-y-3">
+          {loadingRequests && <div className="text-sm text-slate-500">Loading reimbursements...</div>}
+          {!loadingRequests && !hasRequests && (
+            <div className="text-sm text-slate-500">No reimbursement requests submitted yet.</div>
+          )}
+          {!loadingRequests && hasRequests &&
+            requests.map((request) => (
+              <div key={request.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{request.category}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatDate(request.requestDate)} · {request.description || 'No description'}
+                    </p>
+                  </div>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${statusTone(request.status)}`}>
+                    {request.status}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+                  <span>Amount</span>
+                  <span className="font-semibold text-slate-900">
+                    {formatCurrency(request.amount, request.currency)}
+                  </span>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { ArrowLeft, Edit, Trash2, Package, TrendingUp, TrendingDown, AlertTriang
 import { inventoryApi } from '../../../api/erpApi'
 import { InventoryItem, InventoryBin, InventoryLedgerEntry, StockAdjustmentType } from '../../../types/erp'
 import { toast } from 'react-hot-toast'
+import { FeatureGate } from '../../../components/rbac'
 
 const InventoryDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -234,20 +235,24 @@ const InventoryDetail: React.FC = () => {
           >
             Transfers
           </Link>
-          <Link
-            to={`/erp/inventory/${id}/edit`}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-          >
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
-          </Link>
-          <button
-            onClick={handleDelete}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </button>
+          <FeatureGate requiredPermission="ERP_EDIT">
+            <Link
+              to={`/erp/inventory/${id}/edit`}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Link>
+          </FeatureGate>
+          <FeatureGate requiredPermission="ERP_DELETE">
+            <button
+              onClick={handleDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -517,13 +522,15 @@ const InventoryDetail: React.FC = () => {
             />
           </div>
           <div className="md:col-span-6 flex justify-end">
-            <button
-              type="submit"
-              disabled={adjusting}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {adjusting ? 'Posting...' : 'Post Adjustment'}
-            </button>
+            <FeatureGate requiredPermission="ERP_EDIT">
+              <button
+                type="submit"
+                disabled={adjusting}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {adjusting ? 'Posting...' : 'Post Adjustment'}
+              </button>
+            </FeatureGate>
           </div>
         </form>
       </div>

@@ -42,6 +42,12 @@ public class InventoryItemService {
         return inventoryItemRepository.findAllActive(pageable).map(InventoryItemDto::fromEntity);
     }
 
+    public Page<InventoryItemDto> getInventoryItemsFiltered(String search, String category, String status, Pageable pageable) {
+        log.info("Fetching inventory items with filters search={}, category={}, status={}", search, category, status);
+        return inventoryItemRepository.findAllFiltered(search, category, status, pageable)
+                .map(InventoryItemDto::fromEntity);
+    }
+
     public InventoryItemDto getInventoryItemById(UUID itemId) {
         log.info("Fetching inventory item {}", itemId);
         InventoryItem item = inventoryItemRepository.findById(itemId)

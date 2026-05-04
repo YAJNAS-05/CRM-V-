@@ -9,7 +9,9 @@ import {
   Payment,
   CreatePaymentRequest,
   CurrencyRate,
-  CreateCurrencyRateRequest
+  CreateCurrencyRateRequest,
+  ThreeWayMatchException,
+  ResolveMatchExceptionRequest
 } from '../types/finance';
 import axiosInstance from './axiosInstance';
 
@@ -106,6 +108,17 @@ export const reportApi = {
   
   getCashFlow: (startDate: string, endDate: string) =>
     api.get<ApiResponse<any>>('/v1/finance/reports/cash-flow', { params: { startDate, endDate } }),
+};
+
+export const financialCloseApi = {
+  initiate: (periodEnd: string) =>
+    api.post<ApiResponse<void>>(`/v1/finance/close/initiate?periodEnd=${periodEnd}`),
+  getExceptions: (periodEnd: string) =>
+    api.get<ApiResponse<ThreeWayMatchException[]>>(`/v1/finance/close/exceptions?periodEnd=${periodEnd}`),
+  resolveException: (exceptionId: string, data: ResolveMatchExceptionRequest) =>
+    api.patch<ApiResponse<void>>(`/v1/finance/close/exceptions/${exceptionId}/resolve`, data),
+  finalize: (companyCode: string, periodEnd: string) =>
+    api.post<ApiResponse<void>>(`/v1/finance/close/finalize?companyCode=${companyCode}&periodEnd=${periodEnd}`),
 };
 
 export default api;

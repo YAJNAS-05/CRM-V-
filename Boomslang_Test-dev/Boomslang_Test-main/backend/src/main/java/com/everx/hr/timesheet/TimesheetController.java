@@ -3,15 +3,18 @@ package com.everx.hr.timesheet;
 import com.everx.hr.timesheet.dto.CreateTimesheetRequest;
 import com.everx.hr.timesheet.dto.TimesheetDto;
 import com.everx.hr.timesheet.dto.UpdateTimesheetRequest;
+import com.everx.hr.TimesheetStatus;
 import com.everx.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,8 +37,14 @@ public class TimesheetController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<TimesheetDto>>> getTimesheets(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(timesheetService.getTimesheets(pageable)));
+    public ResponseEntity<ApiResponse<Page<TimesheetDto>>> getTimesheets(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) TimesheetStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                timesheetService.getTimesheets(pageable, employeeId, status, startDate, endDate)));
     }
 
     @GetMapping("/employee/{employeeId}")
@@ -60,5 +69,12 @@ public class TimesheetController {
             @PathVariable UUID id,
             @RequestParam UUID approvedBy) {
         return ResponseEntity.ok(ApiResponse.ok(timesheetService.approveTimesheet(id, approvedBy), "Timesheet approved"));
+    }
+
+    @PatchMapping("/{id}/reject")
+    public ResponseEntity<ApiResponse<TimesheetDto>> rejectTimesheet(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String notes) {
+        return ResponseEntity.ok(ApiResponse.ok(timesheetService.rejectTimesheet(id, notes), "Timesheet rejected"));
     }
 }

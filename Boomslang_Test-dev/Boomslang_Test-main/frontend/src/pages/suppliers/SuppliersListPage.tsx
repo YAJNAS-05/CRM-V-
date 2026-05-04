@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supplierApi } from '../../api/erpApi'
 import { Supplier } from '../../types/erp'
 import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import { FeatureGate } from '../../components/rbac'
 
 export default function SuppliersListPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -62,7 +63,9 @@ export default function SuppliersListPage() {
           >
             Export
           </button>
-          <button onClick={() => navigate('/erp/suppliers/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Supplier</button>
+          <FeatureGate requiredPermission="ERP_CREATE">
+            <button onClick={() => navigate('/erp/suppliers/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Supplier</button>
+          </FeatureGate>
         </div>
       </div>
 
@@ -79,8 +82,8 @@ export default function SuppliersListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {suppliers.map((supplier) => (
-              <tr key={supplier.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{supplier.companyName}</td>
+              <tr key={supplier.id} onClick={() => navigate(`/erp/suppliers/${supplier.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                <td className="px-6 py-4 text-sm font-medium text-blue-600 hover:underline">{supplier.companyName}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{supplier.country}</td>
                 <td className="px-6 py-4 text-sm text-gray-900">{supplier.contactName}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">{supplier.email}</td>
