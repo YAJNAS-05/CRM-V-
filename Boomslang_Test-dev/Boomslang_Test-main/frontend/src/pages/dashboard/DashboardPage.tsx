@@ -65,6 +65,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
     [userPermissions]
   )
 
+  const resolvedMode = useMemo<DashboardMode>(() => {
+    if (mode !== 'AUTO') return mode
+    if (canViewTeamDashboard) return 'TEAM'
+    if (canViewUserDashboard) return 'SELF'
+    return 'AUTO'
+  }, [mode, canViewTeamDashboard, canViewUserDashboard])
+
   const userRoles = useMemo(() => {
     if (!user) return []
     return user.roles && user.roles.length > 0 ? user.roles : user.role ? [user.role] : []
@@ -77,10 +84,10 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
 
   const teamRows = (kpi?.userPerformance ?? []) as ReportUserPerformance[]
 
-  useEffect(() => { fetchData() }, [mode])
+  useEffect(() => { fetchData() }, [resolvedMode])
 
   const getReportCallsForMode = () => {
-    if (mode === 'TEAM') {
+    if (resolvedMode === 'TEAM') {
       return {
         dashboard: reportApi.getDashboardTeam,
         pipeline: reportApi.getPipelineTeam,
@@ -89,7 +96,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
       }
     }
 
-    if (mode === 'SELF') {
+    if (resolvedMode === 'SELF') {
       return {
         dashboard: reportApi.getDashboardUser,
         pipeline: reportApi.getPipelineUser,
@@ -133,8 +140,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mode = 'AUTO' }) => {
     </div>
   )
 
-  const scopeLabel = kpi?.visibilityScope ?? (mode === 'TEAM' ? 'TEAM' : mode === 'SELF' ? 'SELF' : (isManagerRole ? 'TEAM' : 'SELF'))
-  const selectedDashboardMode = mode === 'AUTO' ? scopeLabel : mode
+  const scopeLabel = kpi?.visibilityScope
+    ?? (resolvedMode === 'TEAM' ? 'TEAM' : resolvedMode === 'SELF' ? 'SELF' : (isManagerRole ? 'TEAM' : 'SELF'))
+  const selectedDashboardMode = resolvedMode === 'AUTO' ? scopeLabel : resolvedMode
   const topPerformer = teamRows.length > 0 ? teamRows[0] : null
   const trackedMembers = kpi?.teamMemberCount ?? teamRows.filter((row) => Boolean(row.userId)).length
 

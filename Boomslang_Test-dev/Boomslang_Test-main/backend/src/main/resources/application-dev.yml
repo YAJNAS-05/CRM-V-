@@ -27,6 +27,67 @@ everx:
   jwt:
     access-expiry-ms: 28800000  # 8 hours for development
 
+security:
+  password:
+    min-length: 12
+    require-uppercase: true
+    require-lowercase: true
+    require-digits: true
+    require-special-chars: true
+  
+  lockout:
+    max-attempts: 5
+    lockout-duration-minutes: 30
+  
+  mfa:
+    enabled: true
+    types:
+      - SMS
+      - EMAIL
+      - TOTP
+    grace-period-days: 7
+  
+  session:
+    max-concurrent-sessions: 5
+    timeout-minutes: 30
+    idle-timeout-minutes: 15
+    session-fixation-protection: true
+  
+  csrf:
+    enabled: true
+    header-name: X-CSRF-Token
+  
+  cors:
+    allowed-origins:
+      - "http://localhost:5173"
+      - "http://localhost:3000"
+    allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age: 3600
+
+rate-limit:
+  enabled: true
+  user:
+    requests-per-minute: 100
+  ip:
+    requests-per-minute: 300
+
+audit:
+  enabled: true
+  retention-days: 365
+  immutable-mode: true
+  log-sensitive-data: false
+  exclude-paths:
+    - "/actuator/**"
+    - "/health/**"
+    - "/swagger-ui/**"
+    - "/v3/api-docs/**"
+
+encryption:
+  algorithm: AES-256-GCM
+  key-rotation-days: 90
+
 logging:
   level:
     root: INFO
@@ -39,3 +100,4 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+

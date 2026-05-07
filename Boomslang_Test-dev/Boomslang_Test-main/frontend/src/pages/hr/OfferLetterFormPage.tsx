@@ -1,19 +1,37 @@
 import React, { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { offerLetterApi } from '../../api/hrApi'
 import { CreateOfferLetterRequest, UpdateOfferLetterRequest } from '../../types/hr'
 import { toast } from 'sonner'
 
-type FormData = CreateOfferLetterRequest & { status?: string }
+const offerLetterSchema = z.object({
+  candidateName: z.string().min(1, 'Candidate name is required'),
+  candidateEmail: z.string().email('Invalid email address'),
+  offerDate: z.string().optional(),
+  expiryDate: z.string().optional(),
+  salary: z.coerce.number().positive('Salary must be positive').optional().or(z.literal('')).transform((v) => v === '' ? undefined : Number(v)),
+  currency: z.string().optional(),
+  notes: z.string().optional(),
+  status: z.string().optional(),
+}).refine((d) => !d.offerDate || !d.expiryDate || d.expiryDate >= d.offerDate, {
+  message: 'Expiry date must be on or after offer date',
+  path: ['expiryDate'],
+})
+
+type FormData = z.infer<typeof offerLetterSchema>
 
 const OfferLetterFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>()
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(offerLetterSchema),
+  })
 
   const { data: existing } = useQuery({
     queryKey: ['offer-letter', id],
@@ -59,12 +77,12 @@ const OfferLetterFormPage: React.FC = () => {
   })
 
   const onSubmit = (data: FormData) => {
-    const clean = {
+    const clean: CreateOfferLetterRequest = {
       candidateName: data.candidateName,
       candidateEmail: data.candidateEmail,
       offerDate: data.offerDate || undefined,
       expiryDate: data.expiryDate || undefined,
-      salary: data.salary ? Number(data.salary) : undefined,
+      salary: data.salary != null ? Number(data.salary) : undefined,
       currency: data.currency || 'USD',
       notes: data.notes || undefined,
     }
@@ -89,8 +107,8 @@ const OfferLetterFormPage: React.FC = () => {
               Candidate Name <span className="text-red-500">*</span>
             </label>
             <input
-              {...register('candidateName', { required: 'Candidate name is required' })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {...register('candidateName')}
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.candidateName ? 'border-red-500' : 'border-slate-200'}`}
               placeholder="Jane Doe"
             />
             {errors.candidateName && <p className="mt-1 text-xs text-red-600">{errors.candidateName.message}</p>}
@@ -100,12 +118,9 @@ const OfferLetterFormPage: React.FC = () => {
               Candidate Email <span className="text-red-500">*</span>
             </label>
             <input
-              {...register('candidateEmail', {
-                required: 'Email is required',
-                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email' },
-              })}
+              {...register('candidateEmail')}
               type="email"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.candidateEmail ? 'border-red-500' : 'border-slate-200'}`}
               placeholder="jane@example.com"
             />
             {errors.candidateEmail && <p className="mt-1 text-xs text-red-600">{errors.candidateEmail.message}</p>}

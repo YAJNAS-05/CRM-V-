@@ -1,12 +1,29 @@
 import React, { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { trainingApi } from '../../api/hrApi'
 import { CreateTrainingRequest, UpdateTrainingRequest } from '../../types/hr'
 import { toast } from 'sonner'
 
-type FormData = CreateTrainingRequest & { status?: string }
+const trainingSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+  trainerName: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  maxParticipants: z.coerce.number().int().positive('Must be a positive number').optional().or(z.literal('')).transform((v) => v === '' ? undefined : Number(v)),
+  location: z.string().optional(),
+  departmentId: z.string().optional(),
+  status: z.string().optional(),
+}).refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
+  message: 'End date must be on or after start date',
+  path: ['endDate'],
+})
+
+type FormData = z.infer<typeof trainingSchema>
 
 const TrainingFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -14,7 +31,9 @@ const TrainingFormPage: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>()
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(trainingSchema),
+  })
 
   const { data: existing } = useQuery({
     queryKey: ['training', id],
@@ -61,13 +80,13 @@ const TrainingFormPage: React.FC = () => {
   })
 
   const onSubmit = (data: FormData) => {
-    const clean = {
+    const clean: CreateTrainingRequest = {
       title: data.title,
       description: data.description || undefined,
       trainerName: data.trainerName || undefined,
       startDate: data.startDate || undefined,
       endDate: data.endDate || undefined,
-      maxParticipants: data.maxParticipants ? Number(data.maxParticipants) : undefined,
+      maxParticipants: data.maxParticipants != null ? Number(data.maxParticipants) : undefined,
       location: data.location || undefined,
       departmentId: data.departmentId || undefined,
     }
@@ -89,8 +108,8 @@ const TrainingFormPage: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Title <span className="text-red-500">*</span></label>
           <input
-            {...register('title', { required: 'Title is required' })}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {...register('title')}
+            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.title ? 'border-red-500' : 'border-slate-200'}`}
             placeholder="e.g. Safety Induction"
           />
           {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>}

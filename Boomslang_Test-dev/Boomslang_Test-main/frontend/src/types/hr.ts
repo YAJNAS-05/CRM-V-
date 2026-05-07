@@ -54,6 +54,9 @@ export interface Employee {
   addressState?: string | null
   addressCountry?: string | null
   addressPincode?: string | null
+  // Denormalized display fields from backend joins
+  jobTitle?: string | null
+  department?: string | null
 }
 
 export interface CreateEmployeeRequest {

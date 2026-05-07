@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { adminApi } from '../../api/adminApi'
 import { CreateUserRequest, RoleDefinition, UpdateUserRequest, User } from '../../types/auth'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../utils/errorUtils'
 import { format } from 'date-fns'
 import { X, Plus, Edit2, Trash2 } from 'lucide-react'
 import { FeatureGate } from '../../components/rbac'
@@ -58,7 +59,7 @@ const UserManagementPage: React.FC = () => {
       const response = await adminApi.getUsers(page, pageSize)
       setUsers(response.data.data?.content || [])
     } catch (error) {
-      toast.error('Failed to load users')
+      toast.error(getErrorMessage(error, 'Failed to load users'))
     } finally {
       setIsLoading(false)
     }
@@ -80,7 +81,7 @@ const UserManagementPage: React.FC = () => {
         setFormData((prev) => ({ ...prev, officeLocation: fetchedLocations[0].name }))
       }
     } catch (error) {
-      toast.error('Failed to load role catalog')
+      toast.error(getErrorMessage(error, 'Failed to load role catalog'))
     }
   }
 
@@ -137,8 +138,7 @@ const UserManagementPage: React.FC = () => {
       setPage(0)
       await fetchUsers()
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to create user'
-      toast.error(message)
+      toast.error(getErrorMessage(error, 'Failed to create user'))
     }
   }
 
@@ -163,8 +163,7 @@ const UserManagementPage: React.FC = () => {
       setEditFormData({})
       await fetchUsers()
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to update user'
-      toast.error(message)
+      toast.error(getErrorMessage(error, 'Failed to update user'))
     }
   }
 
@@ -176,8 +175,7 @@ const UserManagementPage: React.FC = () => {
       toast.success('User deleted successfully')
       await fetchUsers()
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to delete user'
-      toast.error(message)
+      toast.error(getErrorMessage(error, 'Failed to delete user'))
     }
   }
 
@@ -187,7 +185,7 @@ const UserManagementPage: React.FC = () => {
       toast.success('User status updated')
       await fetchUsers()
     } catch (error) {
-      toast.error('Failed to update user status')
+      toast.error(getErrorMessage(error, 'Failed to update user status'))
     }
   }
 

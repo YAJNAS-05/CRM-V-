@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { z } from 'zod'
 import { toast } from 'react-hot-toast'
 import { acquisitionApi, equipmentApi, equipmentAssessmentApi } from '../../api/erpApi'
 import { Equipment, EquipmentAcquisition } from '../../types/erp'
+import { employeeApi } from '../../api/hrApi'
+import { Employee } from '../../types/hr'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
+
+const assessmentSchema = z.object({
+  assessmentType: z.string().min(1, 'Assessment type is required'),
+  outcome: z.string().min(1, 'Outcome is required'),
+  conditionGrade: z.string().min(1, 'Condition grade is required'),
+})
 
 const ASSESSMENT_TYPES = ['PHYSICAL', 'REMOTE']
 const OUTCOMES = ['BUY', 'REJECT', 'NEGOTIATE']
@@ -46,7 +55,9 @@ export default function EquipmentAssessmentForm() {
   const [saving, setSaving] = useState(false)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [acquisitions, setAcquisitions] = useState<EquipmentAcquisition[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [engineers, setEngineers] = useState<Employee[]>([])
 
   useEffect(() => {
     loadLookups()
@@ -61,13 +72,15 @@ export default function EquipmentAssessmentForm() {
   const loadLookups = async () => {
     try {
       setLookupLoading(true)
-      const [acquisitionResponse, equipmentResponse] = await Promise.all([
+      const [acquisitionResponse, equipmentResponse, engineerResponse] = await Promise.all([
         acquisitionApi.getAll(0, 300),
         equipmentApi.getAll(0, 300),
+        employeeApi.getAll(0, 300),
       ])
 
       setAcquisitions(acquisitionResponse.data?.data?.content || [])
       setEquipment(equipmentResponse.data?.content || [])
+      setEngineers(engineerResponse.data?.data?.content || [])
     } catch {
       toast.error('Failed to load lookup data')
     } finally {
@@ -141,8 +154,40 @@ export default function EquipmentAssessmentForm() {
     [equipment]
   )
 
+  const selectedEquipment = useMemo(
+    () => equipment.find(eq => eq.id === form.equipmentId) || null,
+    [equipment, form.equipmentId]
+  )
+
+  const engineerOptions = useMemo(
+    () =>
+      engineers.map(emp => ({
+        value: `${emp.firstName} ${emp.lastName}`,
+        label: `${emp.firstName} ${emp.lastName}`,
+        meta: emp.jobTitle || emp.department || undefined,
+      })),
+    [engineers]
+  )
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const result = assessmentSchema.safeParse({
+      assessmentType: form.assessmentType,
+      outcome: form.outcome,
+      conditionGrade: form.conditionGrade,
+    })
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
+      return
+    }
+    setFieldErrors({})
 
     try {
       setSaving(true)
@@ -241,10 +286,16 @@ export default function EquipmentAssessmentForm() {
               <label className="block text-sm font-medium mb-1">Inspection Date</label>
               <input type="date" name="inspectionDate" value={form.inspectionDate} onChange={handleChange} className="w-full border rounded px-3 py-2" />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Engineer Assigned</label>
-              <input name="engineerAssigned" value={form.engineerAssigned} onChange={handleChange} className="w-full border rounded px-3 py-2" />
-            </div>
+
+            <SearchableLookupSelect
+              label="Engineer Assigned"
+              name="engineerAssigned"
+              value={form.engineerAssigned}
+              options={engineerOptions}
+              onChange={handleLookupChange}
+              disabled={lookupLoading}
+              placeholder="Search engineer by name"
+            />
             <div>
               <label className="block text-sm font-medium mb-1">Tube Life Remaining</label>
               <input type="number" name="tubeLifeRemaining" value={form.tubeLifeRemaining} onChange={handleChange} className="w-full border rounded px-3 py-2" />
@@ -254,6 +305,24 @@ export default function EquipmentAssessmentForm() {
               <input type="number" min={1} max={5} name="imageQualityRating" value={form.imageQualityRating} onChange={handleChange} className="w-full border rounded px-3 py-2" />
             </div>
           </div>
+
+          {selectedEquipment && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
+              <p className="font-semibold text-slate-700 mb-2">Selected Equipment Details</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-slate-600">
+                <span><span className="font-medium">Internal Code:</span> {selectedEquipment.internalCode || '—'}</span>
+                <span><span className="font-medium">Make / Model:</span> {[selectedEquipment.make, selectedEquipment.model].filter(Boolean).join(' ') || '—'}</span>
+                <span><span className="font-medium">Status:</span> {selectedEquipment.status || '—'}</span>
+                <span><span className="font-medium">Category:</span> {selectedEquipment.category || '—'}</span>
+                {selectedEquipment.serialNumber && (
+                  <span><span className="font-medium">Serial No.:</span> {selectedEquipment.serialNumber}</span>
+                )}
+                {selectedEquipment.warehouseLocation && (
+                  <span><span className="font-medium">Location:</span> {selectedEquipment.warehouseLocation}</span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Notes</label>

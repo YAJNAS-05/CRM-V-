@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
+import { getErrorMessage } from '../../utils/errorUtils'
 
 const AccountListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -35,7 +36,7 @@ const AccountListPage: React.FC = () => {
       if (data?.content) { setAccounts(data.content); setTotalPages(data.totalPages || 1); setTotalItems(data.totalElements || data.content.length) }
       else if (Array.isArray(data)) { setAccounts(data); setTotalPages(1); setTotalItems(data.length) }
       else { setAccounts([]) }
-    } catch { toast.error('Failed to load accounts') } finally { setIsLoading(false) }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to load accounts')) } finally { setIsLoading(false) }
   }
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -45,14 +46,23 @@ const AccountListPage: React.FC = () => {
       return
     }
     if (!confirm('Delete this account?')) return
-    try { await accountApi.delete(id); toast.success('Account deleted'); fetchAccounts() } catch { toast.error('Failed to delete') }
+    try { await accountApi.delete(id); toast.success('Account deleted'); fetchAccounts() } catch (err) { toast.error(getErrorMessage(err, 'Failed to delete account')) }
   }
 
-  const toggleRow = (id: string) => { setSelectedRows(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
-  const toggleAll = () => { setSelectedRows(prev => prev.size === accounts.length ? new Set() : new Set(accounts.map(a => a.id))) }
+  const handleBulkDelete = async () => {
+    if (!canDelete) { toast.error('You do not have permission to delete accounts'); return }
+    if (!confirm(`Delete ${selectedRows.size} selected account(s)?`)) return
+    try {
+      await Promise.all(Array.from(selectedRows).map(id => accountApi.delete(id)))
+      toast.success(`Deleted ${selectedRows.size} account(s)`)
+      setSelectedRows(new Set())
+      fetchAccounts()
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to delete some accounts')) }
+  }
 
-  const exportToExcel = () => {
-    const data = accounts.map(a => ({
+  const exportSelected = () => {
+    const toExport = selectedRows.size > 0 ? accounts.filter(a => selectedRows.has(a.id)) : accounts
+    const data = toExport.map(a => ({
       'Account Name': a.name ?? '',
       'Industry': a.industry ?? '',
       'Type': a.accountType ?? '',
@@ -68,6 +78,9 @@ const AccountListPage: React.FC = () => {
     XLSX.writeFile(wb, `EVERX_Accounts_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  const toggleRow = (id: string) => { setSelectedRows(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  const toggleAll = () => { setSelectedRows(prev => prev.size === accounts.length ? new Set() : new Set(accounts.map(a => a.id))) }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -76,7 +89,7 @@ const AccountListPage: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">{totalItems} total records</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToExcel} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+          <button onClick={exportSelected} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export
           </button>
@@ -95,6 +108,17 @@ const AccountListPage: React.FC = () => {
           <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search accounts..." className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
       </div>
+
+      {selectedRows.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 mb-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <span className="text-sm font-medium text-indigo-700">{selectedRows.size} selected</span>
+          <button onClick={exportSelected} className="text-xs px-3 py-1.5 bg-white border border-indigo-300 rounded hover:bg-indigo-50 text-indigo-700 font-medium">Export Selected</button>
+          <FeatureGate requiredPermission="CRM_DELETE">
+            <button onClick={handleBulkDelete} className="text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 font-medium">Delete Selected</button>
+          </FeatureGate>
+          <button onClick={() => setSelectedRows(new Set())} className="ml-auto text-xs text-gray-500 hover:text-gray-700">Clear</button>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">

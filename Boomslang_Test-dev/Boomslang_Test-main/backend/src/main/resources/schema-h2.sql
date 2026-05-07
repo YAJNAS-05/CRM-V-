@@ -796,6 +796,68 @@ CREATE TABLE IF NOT EXISTS everx_shared.saga_states (
     retry_count INTEGER
 );
 
+-- Custom field definitions and values
+CREATE TABLE IF NOT EXISTS everx_shared.custom_field_definitions (
+    id UUID PRIMARY KEY,
+    module VARCHAR(50) NOT NULL,
+    entity VARCHAR(50) NOT NULL,
+    field_key VARCHAR(60) NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    data_type VARCHAR(30) NOT NULL,
+    help_text TEXT,
+    default_value TEXT,
+    options_json TEXT,
+    sort_order INT NOT NULL,
+    is_required BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_by UUID,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_custom_field_definitions UNIQUE (module, entity, field_key)
+);
+
+CREATE TABLE IF NOT EXISTS everx_shared.custom_field_values (
+    id UUID PRIMARY KEY,
+    field_definition_id UUID NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_by UUID,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_field_values_definition_entity
+    ON everx_shared.custom_field_values(field_definition_id, entity_id);
+
+-- Layout configurations
+CREATE TABLE IF NOT EXISTS everx_shared.layout_configs (
+    id UUID PRIMARY KEY,
+    module VARCHAR(50) NOT NULL,
+    entity VARCHAR(50) NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    layout_json TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    version_number INT NOT NULL DEFAULT 1,
+    applies_to_roles TEXT,
+    published_at TIMESTAMP WITH TIME ZONE,
+    published_by UUID,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_by UUID,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_layout_configs_module_entity_status
+    ON everx_shared.layout_configs(module, entity, status);
+
 -- Cryptographic audit logs
 CREATE TABLE IF NOT EXISTS everx_auth.cryptographic_audit_logs (
     id UUID PRIMARY KEY,
@@ -811,3 +873,191 @@ CREATE TABLE IF NOT EXISTS everx_auth.cryptographic_audit_logs (
     timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
     is_locked BOOLEAN NOT NULL DEFAULT TRUE
 );
+
+-- PM module tables (projects, tasks, time entries)
+CREATE TABLE IF NOT EXISTS everx_hr.projects (
+    id UUID PRIMARY KEY,
+    project_code VARCHAR(50),
+    project_name VARCHAR(255) NOT NULL,
+    owner_id UUID NOT NULL,
+    description TEXT,
+    status VARCHAR(50) NOT NULL DEFAULT 'PLANNING',
+    start_date DATE,
+    end_date DATE,
+    budget NUMERIC(15,2),
+    currency CHAR(3),
+    linked_field_job_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.project_members (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    employee_id UUID NOT NULL,
+    role VARCHAR(50),
+    added_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.tasks (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    task_title VARCHAR(255) NOT NULL,
+    description TEXT,
+    creator_id UUID NOT NULL,
+    assignee_id UUID,
+    status VARCHAR(50) NOT NULL DEFAULT 'TODO',
+    priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    estimated_hours NUMERIC(10,2),
+    due_date DATE,
+    sprint_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.time_entries (
+    id UUID PRIMARY KEY,
+    employee_id UUID NOT NULL,
+    task_id UUID,
+    project_id UUID NOT NULL,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE,
+    duration_minutes INTEGER,
+    work_date DATE,
+    description VARCHAR(255),
+    billable BOOLEAN NOT NULL DEFAULT FALSE,
+    rate_per_hour NUMERIC(10,2),
+    timesheet_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.project_costs (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    cost_type VARCHAR(50) NOT NULL,
+    amount NUMERIC(15,2) NOT NULL,
+    description VARCHAR(255),
+    recorded_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+-- PM module expansion tables
+CREATE TABLE IF NOT EXISTS everx_hr.pm_sprints (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    goal TEXT,
+    status VARCHAR(50) NOT NULL DEFAULT 'PLANNED',
+    start_date DATE,
+    end_date DATE,
+    capacity_hours NUMERIC(10,2),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.pm_milestones (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) NOT NULL DEFAULT 'OPEN',
+    due_date DATE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.pm_risks (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    severity VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    status VARCHAR(30) NOT NULL DEFAULT 'OPEN',
+    owner_id UUID,
+    mitigation_plan TEXT,
+    due_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.pm_issues (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    status VARCHAR(30) NOT NULL DEFAULT 'OPEN',
+    assignee_id UUID,
+    due_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.pm_resource_plans (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    employee_id UUID NOT NULL,
+    role VARCHAR(50),
+    allocation_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+    start_date DATE,
+    end_date DATE,
+    billable BOOLEAN NOT NULL DEFAULT FALSE,
+    notes VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_hr.pm_task_dependencies (
+    id UUID PRIMARY KEY,
+    project_id UUID NOT NULL,
+    predecessor_task_id UUID NOT NULL,
+    successor_task_id UUID NOT NULL,
+    dependency_type VARCHAR(10) NOT NULL DEFAULT 'FS',
+    lag_days INTEGER NOT NULL DEFAULT 0,
+    notes VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+ALTER TABLE everx_hr.timesheets ADD COLUMN IF NOT EXISTS week_start_date DATE;
+ALTER TABLE everx_hr.timesheets ADD COLUMN IF NOT EXISTS total_billable_hours NUMERIC(10,2);
+ALTER TABLE everx_hr.timesheets ADD COLUMN IF NOT EXISTS total_non_billable_hours NUMERIC(10,2);
+ALTER TABLE everx_hr.timesheets ADD COLUMN IF NOT EXISTS total_hours NUMERIC(10,2);

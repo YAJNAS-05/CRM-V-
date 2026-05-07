@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/hr/tasks")
+@RequestMapping("/api/v1/pm/tasks")
 @RequiredArgsConstructor
 public class TaskController {
 

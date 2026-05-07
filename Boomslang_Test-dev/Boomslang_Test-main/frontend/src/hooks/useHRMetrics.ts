@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { dashboardApi } from '../api/dashboardApi'
 import { HRDashboardMetrics } from '../types/hr'
+import { useAbortController } from './useAbortController'
 
 const defaultMetrics: HRDashboardMetrics = {
   totalEmployees: 0,
@@ -25,12 +26,13 @@ export const useHRMetrics = () => {
   const [metrics, setMetrics] = useState<HRDashboardMetrics>(defaultMetrics)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { signal } = useAbortController()
 
   const loadMetrics = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await dashboardApi.getHRMetrics()
+      const response = await dashboardApi.getHRMetrics({ signal })
       const data = response.data?.data
       const normalizedEntries = Object.entries(data ?? {}) as Array<[
         keyof HRDashboardMetrics,
@@ -41,13 +43,14 @@ export const useHRMetrics = () => {
         return acc
       }, {})
       setMetrics({ ...defaultMetrics, ...normalized })
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') return
       console.error('Failed to load HR metrics', err)
       setError('Failed to load HR metrics')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [signal])
 
   useEffect(() => {
     loadMetrics()

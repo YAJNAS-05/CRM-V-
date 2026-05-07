@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { serviceTicketApi } from '../../api/erpApi'
 import { FeatureGate } from '../../components/rbac'
+import { employeeApi } from '../../api/hrApi'
+import { Employee } from '../../types/hr'
+import { toast } from 'sonner'
 
 export default function ServiceTicketDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -10,8 +13,10 @@ export default function ServiceTicketDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState<any>(null)
+  const [employees, setEmployees] = useState<Employee[]>([])
 
   useEffect(() => {
+    loadEmployees()
     if (id) {
       (async () => {
         try {
@@ -29,6 +34,15 @@ export default function ServiceTicketDetailPage() {
     }
   }, [id])
 
+  const loadEmployees = async () => {
+    try {
+      const response = await employeeApi.getAll(0, 300)
+      setEmployees(response.data.data?.content || [])
+    } catch {
+      // silently fail
+    }
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev: any) => prev ? { ...prev, [name]: value } : null)
@@ -39,9 +53,9 @@ export default function ServiceTicketDetailPage() {
       await serviceTicketApi.update(id!, formData)
       setTicket(formData)
       setEditMode(false)
-      alert('Saved successfully')
-    } catch (err) {
-      alert('Error saving')
+      toast.success('Ticket saved successfully')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Error saving ticket')
     }
   }
 
@@ -96,6 +110,40 @@ export default function ServiceTicketDetailPage() {
                 <option value="RESOLVED">Resolved</option>
                 <option value="CLOSED">Closed</option>
               </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Technician Assignment</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium">Assigned Technician</label>
+              <select
+                name="assignedTo"
+                value={displayData?.assignedTo || ''}
+                onChange={handleInputChange}
+                disabled={!editMode}
+                className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
+              >
+                <option value="">— Unassigned —</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={String(emp.id)}>
+                    {emp.firstName} {emp.lastName}{emp.jobTitle ? ` (${emp.jobTitle})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Technician Notes</label>
+              <textarea
+                name="technicianNotes"
+                value={displayData?.technicianNotes || ''}
+                onChange={handleInputChange}
+                disabled={!editMode}
+                className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
+                rows={3}
+              />
             </div>
           </div>
         </div>

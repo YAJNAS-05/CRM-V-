@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { employeeApi, positionApi } from '../../api/hrApi'
-import { Employee, Position } from '../../types/hr'
+import { Employee, Position, CreatePositionRequest } from '../../types/hr'
+import { toast } from 'sonner'
 
 type PipelineCard = {
   id: string
@@ -16,6 +17,9 @@ const HRRecruitmentPage: React.FC = () => {
   const [openPositions, setOpenPositions] = useState<Position[]>([])
   const [recentHires, setRecentHires] = useState<Employee[]>([])
   const [loadingLists, setLoadingLists] = useState(true)
+  const [showNewPositionForm, setShowNewPositionForm] = useState(false)
+  const [newPosition, setNewPosition] = useState<CreatePositionRequest>({ title: '', grade: '', currency: 'USD' })
+  const [savingPosition, setSavingPosition] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -65,6 +69,22 @@ const HRRecruitmentPage: React.FC = () => {
       currency: currencyCode,
       maximumFractionDigits: 0,
     }).format(value)
+  }
+
+  const handleCreatePosition = async () => {
+    if (!newPosition.title.trim()) { toast.error('Position title is required'); return }
+    try {
+      setSavingPosition(true)
+      const res = await positionApi.create(newPosition)
+      if (res.data.data) setOpenPositions(prev => [res.data.data!, ...prev])
+      setShowNewPositionForm(false)
+      setNewPosition({ title: '', grade: '', currency: 'USD' })
+      toast.success('Position created')
+    } catch {
+      toast.error('Failed to create position')
+    } finally {
+      setSavingPosition(false)
+    }
   }
 
   const openRoleCards: PipelineCard[] = openPositions.map((position) => {
@@ -166,6 +186,12 @@ const HRRecruitmentPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowNewPositionForm(true)}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              + Post Position
+            </button>
             <Link
               to="/hr/positions"
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -239,6 +265,62 @@ const HRRecruitmentPage: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {showNewPositionForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl p-6 w-full max-w-md">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Post New Position</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Job Title *</label>
+                <input
+                  type="text"
+                  value={newPosition.title}
+                  onChange={e => setNewPosition(p => ({ ...p, title: e.target.value }))}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="e.g. Senior Software Engineer"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Grade</label>
+                <input type="text" value={newPosition.grade || ''}
+                  onChange={e => setNewPosition(p => ({ ...p, grade: e.target.value }))}
+                  className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="e.g. L4" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="text-xs font-semibold text-slate-600">Currency</label>
+                  <input type="text" value={newPosition.currency || 'USD'}
+                    onChange={e => setNewPosition(p => ({ ...p, currency: e.target.value }))}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Min Salary</label>
+                  <input type="number" value={newPosition.minSalary ?? ''}
+                    onChange={e => setNewPosition(p => ({ ...p, minSalary: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Max Salary</label>
+                  <input type="number" value={newPosition.maxSalary ?? ''}
+                    onChange={e => setNewPosition(p => ({ ...p, maxSalary: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setShowNewPositionForm(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Cancel
+              </button>
+              <button onClick={handleCreatePosition} disabled={savingPosition}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                {savingPosition ? 'Saving...' : 'Post Position'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

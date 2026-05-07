@@ -55,6 +55,9 @@ import {
   TimeEntry,
   StartTimerRequest,
   WeeklyTimeEntries,
+  Task,
+  TaskStatus,
+  AttendancePunch,
 } from '../types/hr'
 
 const buildQueryString = (
@@ -419,3 +422,65 @@ export const offerLetterApi = {
   delete: (id: string) =>
     axiosInstance.delete<ApiResponse<void>>(`/v1/hr/offer-letters/${id}`),
 }
+
+export const attendanceApi = {
+  checkIn: (notes?: string) => {
+    const params = notes ? `?notes=${encodeURIComponent(notes)}` : ''
+    return axiosInstance.post<ApiResponse<AttendancePunch>>(`/v1/hr/attendance/check-in${params}`)
+  },
+  checkOut: (notes?: string) => {
+    const params = notes ? `?notes=${encodeURIComponent(notes)}` : ''
+    return axiosInstance.post<ApiResponse<AttendancePunch>>(`/v1/hr/attendance/check-out${params}`)
+  },
+  getMe: (params?: { start?: string; end?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.start) searchParams.set('start', params.start)
+    if (params?.end) searchParams.set('end', params.end)
+    const suffix = searchParams.toString() ? `?${searchParams.toString()}` : ''
+    return axiosInstance.get<ApiResponse<AttendancePunch[]>>(`/v1/hr/attendance/me${suffix}`)
+  },
+  getAll: (params?: { start?: string; end?: string; employeeId?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.start) searchParams.set('start', params.start)
+    if (params?.end) searchParams.set('end', params.end)
+    if (params?.employeeId) searchParams.set('employeeId', params.employeeId)
+    const suffix = searchParams.toString() ? `?${searchParams.toString()}` : ''
+    return axiosInstance.get<ApiResponse<AttendancePunch[]>>(`/v1/hr/attendance${suffix}`)
+  },
+  correction: (punchId: string, data: { punchIn: string; punchOut?: string | null; notes?: string | null }) =>
+    axiosInstance.post<ApiResponse<AttendancePunch>>(`/v1/hr/attendance/${punchId}/correction`, data),
+}
+
+
+
+export interface PerformanceReview {
+  id: string
+  employeeId: string
+  reviewerId?: string | null
+  reviewPeriod: string
+  status: 'DRAFT' | 'SUBMITTED' | 'REVIEWED' | 'ACKNOWLEDGED'
+  overallRating?: number | null
+  goalsRating?: number | null
+  skillsRating?: number | null
+  comments?: string | null
+  reviewerNotes?: string | null
+  reviewDate?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export const performanceReviewApi = {
+  getAll: (page = 0, size = 20, params?: { employeeId?: string; reviewerId?: string }) =>
+    axiosInstance.get<ApiResponse<Page<PerformanceReview>>>(
+      `/v1/hr/performance-reviews?${buildQueryString(page, size, params)}`
+    ),
+  getById: (id: string) =>
+    axiosInstance.get<ApiResponse<PerformanceReview>>(`/v1/hr/performance-reviews/${id}`),
+  create: (data: Partial<PerformanceReview>) =>
+    axiosInstance.post<ApiResponse<PerformanceReview>>('/v1/hr/performance-reviews', data),
+  update: (id: string, data: Partial<PerformanceReview>) =>
+    axiosInstance.put<ApiResponse<PerformanceReview>>(`/v1/hr/performance-reviews/${id}`, data),
+  delete: (id: string) =>
+    axiosInstance.delete<ApiResponse<void>>(`/v1/hr/performance-reviews/${id}`),
+}
+

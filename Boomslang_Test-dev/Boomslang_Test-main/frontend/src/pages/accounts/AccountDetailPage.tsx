@@ -7,7 +7,12 @@ import { accountApi, contactApi, dealApi } from '../../api/crmApi'
 import { Account, Contact, Deal } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
 import { FeatureGate } from '../../components/rbac'
+import CustomFieldsPanel from '../../components/config/CustomFieldsPanel'
+import { useCustomFields } from '../../hooks/useCustomFields'
+import { useLayoutConfig } from '../../hooks/useLayoutConfig'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../utils/errorUtils'
+import CommunicationHistory from '../../components/common/CommunicationHistory'
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Account name is required'),
@@ -41,7 +46,15 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
   const [contacts, setContacts] = useState<Contact[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
   const [isEditing, setIsEditing] = useState(isNew)
-  const [tab, setTab] = useState<'details' | 'contacts' | 'deals'>('details')
+  const [tab, setTab] = useState<'details' | 'contacts' | 'deals' | 'communications'>('details')
+  const {
+    definitions: customFieldDefinitions,
+    values: customFieldValues,
+    setValue: setCustomFieldValue,
+    isLoading: customFieldsLoading,
+    save: saveCustomFields,
+  } = useCustomFields({ module: 'CRM', entity: 'ACCOUNT', entityId: id })
+  const { layout: accountLayout } = useLayoutConfig({ module: 'CRM', entity: 'ACCOUNT' })
   const { register, handleSubmit, formState: { errors }, reset } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
   })
@@ -57,7 +70,7 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
       if (!a) { toast.error('Account not found'); navigate('/crm/accounts'); return }
       setAccount(a)
       reset({ name: a.name, email: a.email, phone: a.phone, accountType: a.accountType, website: a.website, industry: a.industry, annualRevenue: a.annualRevenue, employees: a.employees, billingStreet: a.billingStreet, billingCity: a.billingCity, billingState: a.billingState, billingZip: a.billingZip, billingCountry: a.billingCountry, description: a.description })
-    } catch { toast.error('Failed to load account'); navigate('/crm/accounts') } finally { setIsFetching(false) }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to load account')); navigate('/crm/accounts') } finally { setIsFetching(false) }
   }
   const fetchRelated = async () => {
     try { const r = await contactApi.getByAccount(id!, 0, 50); setContacts(r.data.data?.content || []) } catch {}
@@ -67,9 +80,24 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
   const onSubmit = async (data: AccountFormData) => {
     setIsSaving(true)
     try {
-      if (isNew) { await accountApi.create(data); toast.success('Account created') } else { await accountApi.update(id!, data); toast.success('Account updated') }
+      let resolvedId = id
+      if (isNew) {
+        const response = await accountApi.create(data)
+        resolvedId = response.data.data?.id
+        toast.success('Account created')
+      } else {
+        await accountApi.update(id!, data)
+        toast.success('Account updated')
+      }
+      if (resolvedId) {
+        try {
+          await saveCustomFields(resolvedId)
+        } catch {
+          toast.error('Account saved, but custom fields failed to save')
+        }
+      }
       navigate('/crm/accounts')
-    } catch (err: any) { toast.error(err.response?.data?.message || 'Failed') } finally { setIsSaving(false) }
+    } catch (err: any) { toast.error(err.response?.data?.message || getErrorMessage(err, 'Failed to save account')) } finally { setIsSaving(false) }
   }
   const handleDelete = async () => {
     if (!canDelete) {
@@ -77,7 +105,7 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
       return
     }
     if (!confirm('Delete this account?')) return
-    try { await accountApi.delete(id!); toast.success('Deleted'); navigate('/crm/accounts') } catch { toast.error('Failed') }
+    try { await accountApi.delete(id!); toast.success('Deleted'); navigate('/crm/accounts') } catch (err) { toast.error(getErrorMessage(err, 'Failed to delete account')) }
   }
 
   if (isFetching) return <div className="flex items-center justify-center py-24"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div></div>
@@ -127,7 +155,7 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
 
       <div className="border-b border-gray-200 mb-6">
         <div className="flex gap-6">
-          {(['details', 'contacts', 'deals'] as const).map(t => (
+          {(['details', 'contacts', 'deals', 'communications'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className={`pb-3 text-sm font-medium capitalize transition ${tab === t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>
           ))}
         </div>
@@ -182,6 +210,10 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
           )}
         </div>
       )}
+
+      {tab === 'communications' && (
+        <CommunicationHistory entityName={account.name} />
+      )}
     </div>
   )
 
@@ -223,6 +255,14 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
             <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
             <textarea {...register('description')} rows={3} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
+          <CustomFieldsPanel
+            title="Custom Account Fields"
+            definitions={customFieldDefinitions}
+            values={customFieldValues}
+            onChange={setCustomFieldValue}
+            isLoading={customFieldsLoading}
+            layout={accountLayout}
+          />
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={isSaving} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">{isSaving ? 'Saving...' : 'Save'}</button>
             <button type="button" onClick={() => isNew ? navigate('/crm/accounts') : setIsEditing(false)} className="px-6 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>

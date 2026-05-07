@@ -106,8 +106,8 @@ const writeLocalCustomReports = (reports: LocalCustomReport[]) => {
 const createLocalReportId = () =>
   `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-const shouldUseCustomReportFallback = (error: any) => {
-  const status = error?.response?.status
+const shouldUseCustomReportFallback = (error: unknown) => {
+  const status = (error as { response?: { status?: number } })?.response?.status
   return !status || [400, 401, 403, 404, 500, 501, 503, 504].includes(status)
 }
 
@@ -185,6 +185,22 @@ export const reportApi = {
     axiosInstance.post(`/v1/reports/${reportId}/jasper/export-excel`, request, {
       responseType: 'blob'
     }),
+
+  // ============ SCHEDULE ENDPOINTS ============
+
+  getSchedules: (reportId: number) =>
+    axiosInstance.get(`/v1/reports/${reportId}/schedules`),
+
+  createSchedule: (reportId: number, data: {
+    scheduleName: string
+    frequency: string
+    cronExpression?: string
+    recipients: string[]
+    exportFormat: string
+  }) => axiosInstance.post(`/v1/reports/${reportId}/schedules`, data),
+
+  deleteSchedule: (reportId: number, scheduleId: number) =>
+    axiosInstance.delete(`/v1/reports/${reportId}/schedules/${scheduleId}`),
 
   // ============ CUSTOM REPORT ENDPOINTS (Widget-based) ============
 

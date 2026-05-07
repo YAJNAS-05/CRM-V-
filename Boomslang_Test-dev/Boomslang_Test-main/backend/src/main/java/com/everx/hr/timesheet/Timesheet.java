@@ -1,11 +1,8 @@
 package com.everx.hr.timesheet;
 
-import com.everx.hr.TimesheetStatus;
 import com.everx.shared.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -49,9 +46,8 @@ public class Timesheet extends BaseEntity {
     @Column(name = "total_hours", precision = 10, scale = 2)
     private BigDecimal totalHours;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private TimesheetStatus status = TimesheetStatus.DRAFT;
+    private String status = "DRAFT";
 
     @Column(name = "approved_by")
     private UUID approvedBy;

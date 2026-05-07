@@ -7,6 +7,7 @@ import {
   UpdateRolePermissionsRequest,
 } from '../../types/auth'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../utils/errorUtils'
 import { Plus, Shield, Edit2, Trash2, X } from 'lucide-react'
 import { FeatureGate } from '../../components/rbac'
 
@@ -70,7 +71,7 @@ const RoleManagementPage: React.FC = () => {
       setRoles(rolesResponse.data.data || [])
       setPermissions(permissionsResponse.data.data || [])
     } catch (error) {
-      toast.error('Failed to load roles and permissions')
+      toast.error(getErrorMessage(error, 'Failed to load roles and permissions'))
     } finally {
       setIsLoading(false)
     }
@@ -115,8 +116,7 @@ const RoleManagementPage: React.FC = () => {
       })
       await fetchData()
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to create role'
-      toast.error(message)
+      toast.error(getErrorMessage(error, 'Failed to create role'))
     }
   }
 
@@ -141,8 +141,7 @@ const RoleManagementPage: React.FC = () => {
       setEditPermissionKeys([])
       await fetchData()
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to update role permissions'
-      toast.error(message)
+      toast.error(getErrorMessage(error, 'Failed to update role permissions'))
     }
   }
 
@@ -161,8 +160,7 @@ const RoleManagementPage: React.FC = () => {
       toast.success('Role deleted successfully')
       await fetchData()
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to delete role'
-      toast.error(message)
+      toast.error(getErrorMessage(error, 'Failed to delete role'))
     }
   }
 

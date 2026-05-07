@@ -13,10 +13,11 @@ import {
   ErrorResponse
 } from '../types/fieldwork';
 import { Page } from '../types';
+import { useFieldworkPendingStore } from '../store/fieldworkPendingStore';
 
 const ENABLE_FIELD_JOBS_API = import.meta.env.VITE_ENABLE_FIELD_JOBS_API !== 'false';
 
-let preferFieldJobsTestEndpoint = true;
+let preferFieldJobsTestEndpoint = false;
 let fieldJobsNetworkUnavailable = !ENABLE_FIELD_JOBS_API;
 
 const markFieldJobsNetworkAvailable = () => {
@@ -121,7 +122,7 @@ const normalizeFieldJobsPage = (
   page: number,
   size: number
 ): Page<FieldJobDto> => {
-  const raw = payload?.data ?? payload;
+  const raw = payload?.data ?? payload
 
   const toPage = (content: FieldJobDto[]): Page<FieldJobDto> => {
     const safeContent = Array.isArray(content) ? content : [];
@@ -175,6 +176,12 @@ export const fieldworkApi = {
     if (isFieldJobsNetworkBlocked()) {
       const localJob = createLocalFieldJob(fieldJob);
       upsertLocalFieldJob(localJob);
+      // Track as pending change
+      useFieldworkPendingStore.getState().addPendingChange({
+        operation: 'CREATE',
+        jobId: localJob.fieldJobId ?? localJob.jobNumber ?? 'unknown',
+        data: localJob,
+      });
       return localJob;
     }
 
@@ -198,6 +205,12 @@ export const fieldworkApi = {
         console.warn('Both create endpoints failed, using local fallback:', testError);
         const localJob = createLocalFieldJob(fieldJob);
         upsertLocalFieldJob(localJob);
+        // Track as pending change
+        useFieldworkPendingStore.getState().addPendingChange({
+          operation: 'CREATE',
+          jobId: localJob.fieldJobId ?? localJob.jobNumber ?? 'unknown',
+          data: localJob,
+        });
         return localJob;
       }
     }
@@ -317,6 +330,12 @@ export const fieldworkApi = {
         updatedAt: new Date().toISOString(),
       };
       upsertLocalFieldJob(localJob);
+      // Track as pending change
+      useFieldworkPendingStore.getState().addPendingChange({
+        operation: 'UPDATE',
+        jobId: id,
+        data: localJob,
+      });
       return localJob;
     }
 
@@ -332,6 +351,12 @@ export const fieldworkApi = {
         updatedAt: new Date().toISOString(),
       };
       upsertLocalFieldJob(localJob);
+      // Track as pending change
+      useFieldworkPendingStore.getState().addPendingChange({
+        operation: 'UPDATE',
+        jobId: id,
+        data: localJob,
+      });
       return localJob;
     }
   },
@@ -343,6 +368,12 @@ export const fieldworkApi = {
   deleteFieldJob: async (id: number | string): Promise<void> => {
     if (isFieldJobsNetworkBlocked()) {
       removeLocalFieldJob(id);
+      // Track as pending change
+      useFieldworkPendingStore.getState().addPendingChange({
+        operation: 'DELETE',
+        jobId: id,
+        data: null,
+      });
       return;
     }
 
@@ -352,6 +383,12 @@ export const fieldworkApi = {
     } catch (error) {
       markFieldJobsNetworkUnavailable();
       removeLocalFieldJob(id);
+      // Track as pending change
+      useFieldworkPendingStore.getState().addPendingChange({
+        operation: 'DELETE',
+        jobId: id,
+        data: null,
+      });
     }
   },
 
@@ -597,14 +634,15 @@ export const fieldworkApi = {
   /**
    * Parse API error response
    */
-  parseError: (error: any): string => {
-    if (error.response?.data?.error) {
-      return error.response.data.error;
+  parseError: (error: unknown): string => {
+    const e = error as { response?: { data?: { error?: string } }; message?: string }
+    if (e.response?.data?.error) {
+      return e.response.data.error
     }
-    if (error.message) {
-      return error.message;
+    if (e.message) {
+      return e.message
     }
-    return 'An unexpected error occurred';
+    return 'An unexpected error occurred'
   }
 };
 

@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { departmentApi, employeeApi } from '../../api/hrApi'
 import { CreateDepartmentRequest, Department, Employee } from '../../types/hr'
+
+const departmentSchema = z.object({
+  code: z.string().min(1, 'Department code is required').max(50, 'Code must be under 50 characters'),
+  name: z.string().min(1, 'Department name is required').max(100, 'Name must be under 100 characters'),
+  parentDepartmentId: z.string().optional().nullable(),
+  managerEmployeeId: z.string().optional().nullable(),
+})
 
 const DepartmentFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -17,6 +25,7 @@ const DepartmentFormPage: React.FC = () => {
     parentDepartmentId: '',
     managerEmployeeId: '',
   })
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(isEditing)
 
@@ -71,6 +80,9 @@ const DepartmentFormPage: React.FC = () => {
       ...prev,
       [name]: value,
     }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
   }
 
   const normalizeOptionalId = (value?: string | null) => (value ? value : null)
@@ -78,10 +90,18 @@ const DepartmentFormPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.code.trim() || !formData.name.trim()) {
-      toast.error('Please fill all required fields')
+    const result = departmentSchema.safeParse(formData)
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -137,9 +157,10 @@ const DepartmentFormPage: React.FC = () => {
               name="code"
               value={formData.code}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.code ? 'border-red-500' : 'border-gray-300'}`}
               required
             />
+            {fieldErrors.code && <p className="mt-1 text-xs text-red-600">{fieldErrors.code}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Department Name *</label>
@@ -148,9 +169,10 @@ const DepartmentFormPage: React.FC = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
               required
             />
+            {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Parent Department</label>

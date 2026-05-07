@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
 import useEmployeeWorkspace from '../../hooks/useEmployeeWorkspace'
-import { useEmployeeWorkspaceStore } from '../../store/employeeWorkspaceStore'
+import { attendanceApi } from '../../api/hrApi'
 import { useNotificationStore } from '../../store/notificationStore'
 
 const getPageContext = (pathname: string) => {
@@ -30,6 +31,7 @@ const getPageContext = (pathname: string) => {
   if (pathname.startsWith('/crm/activities')) return { title: 'Activities', subtitle: 'Plan and track customer follow-ups' }
   if (pathname.startsWith('/crm/quotes')) return { title: 'Quotes', subtitle: 'Proposals, pricing, and approvals' }
   if (pathname.startsWith('/finance/close')) return { title: 'Financial Close', subtitle: 'Month-end controls and exception resolution' }
+  if (pathname.startsWith('/finance/reconciliation')) return { title: 'Payment Reconciliation', subtitle: 'Match payments to invoices and track outstanding balances' }
   if (pathname === '/hr') return { title: 'HR Home', subtitle: 'People operations command center' }
   if (pathname.startsWith('/hr/people')) return { title: 'People', subtitle: 'Employee records and profiles' }
   if (pathname.startsWith('/hr/payroll/wizard')) return { title: 'Payroll Wizard', subtitle: 'Run payroll in three steps' }
@@ -77,14 +79,9 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
-  const { workspaceUser, isEmployee } = useEmployeeWorkspace()
+  const { workspaceUser, canAccessWorkspace } = useEmployeeWorkspace()
   const { unreadCount, markAllRead, notifications } = useNotificationStore()
-  const attendanceRecords = useEmployeeWorkspaceStore((state) => state.attendanceRecords)
-  const punchIn = useEmployeeWorkspaceStore((state) => state.punchIn)
-  const punchOut = useEmployeeWorkspaceStore((state) => state.punchOut)
-  const taskTimer = useEmployeeWorkspaceStore((state) => state.taskTimer)
-  const tasks = useEmployeeWorkspaceStore((state) => state.tasks)
-  const projects = useEmployeeWorkspaceStore((state) => state.projects)
+  const queryClient = useQueryClient()
   const canCreate = user?.permissions?.includes('CRM_CREATE') ?? false
   const [showQuickCreate, setShowQuickCreate] = useState(false)
   const [showAvatar, setShowAvatar] = useState(false)
@@ -92,36 +89,32 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
   const [showAttendancePanel, setShowAttendancePanel] = useState(false)
   const [attendanceNote, setAttendanceNote] = useState('')
   const [attendanceNow, setAttendanceNow] = useState(Date.now())
-  const [taskTimerNow, setTaskTimerNow] = useState(Date.now())
   const quickRef = useRef<HTMLDivElement>(null)
   const avatarRef = useRef<HTMLDivElement>(null)
   const bellRef = useRef<HTMLDivElement>(null)
   const attendanceRef = useRef<HTMLDivElement>(null)
   const pageContext = useMemo(() => getPageContext(location.pathname), [location.pathname])
   const userRoles = useMemo(() => resolveRoles(user?.roles, user?.role), [user?.role, user?.roles])
-  const showEmployeeAttendance = isEmployee && userRoles.includes('EMPLOYEE') && !!workspaceUser
+  const showEmployeeAttendance = canAccessWorkspace && !!workspaceUser
+  const today = useMemo(() => new Date().toISOString().split('T')[0], [])
+
+  const { data: attendanceToday } = useQuery({
+    queryKey: ['attendance', 'me', 'today', today],
+    queryFn: async () => {
+      const res = await attendanceApi.getMe({ start: today, end: today })
+      return res.data.data || []
+    },
+    enabled: showEmployeeAttendance,
+    refetchInterval: showAttendancePanel ? 10_000 : 60_000,
+  })
+
   const currentPunch = useMemo(
-    () =>
-      workspaceUser
-        ? attendanceRecords.find((record) => record.employeeId === workspaceUser.id && !record.punchOut) || null
-        : null,
-    [attendanceRecords, workspaceUser],
+    () => (attendanceToday || []).find((record) => !record.punchOut) || null,
+    [attendanceToday],
   )
   const attendanceDuration = useMemo(
     () => (currentPunch ? formatAttendanceDuration(currentPunch.punchIn, attendanceNow) : null),
     [attendanceNow, currentPunch],
-  )
-  const activeTask = useMemo(
-    () => (taskTimer ? tasks.find((task) => task.id === taskTimer.taskId) || null : null),
-    [taskTimer, tasks],
-  )
-  const activeProject = useMemo(
-    () => (taskTimer ? projects.find((project) => project.id === taskTimer.projectId) || null : null),
-    [projects, taskTimer],
-  )
-  const taskTimerDuration = useMemo(
-    () => (taskTimer ? formatTaskTimerDuration(taskTimer.startedAt, taskTimerNow) : null),
-    [taskTimer, taskTimerNow],
   )
 
   const isDashboard =
@@ -175,17 +168,6 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
     return () => window.clearInterval(interval)
   }, [currentPunch])
 
-  useEffect(() => {
-    setTaskTimerNow(Date.now())
-
-    if (!taskTimer) {
-      return
-    }
-
-    const interval = window.setInterval(() => setTaskTimerNow(Date.now()), 1000)
-    return () => window.clearInterval(interval)
-  }, [taskTimer])
-
   const quickCreateItems = [
     { label: 'Lead', href: '/crm/leads/new', iconPath: 'M15 7a3 3 0 11-6 0 3 3 0 016 0zM5 20a7 7 0 0114 0' },
     { label: 'Contact', href: '/crm/contacts/new', iconPath: 'M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M16 7a4 4 0 11-8 0 4 4 0 018 0z' },
@@ -199,20 +181,40 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
     navigate('/login')
   }
 
+  const checkInMutation = useMutation({
+    mutationFn: (notes?: string) => attendanceApi.checkIn(notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'me', 'today'] })
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'me', 'last30'] })
+      setAttendanceNote('')
+      setShowAttendancePanel(false)
+      toast.success('Checked in successfully')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to check in')
+    },
+  })
+
   const handlePunchIn = () => {
-    if (!workspaceUser) return
-    punchIn(workspaceUser.id, workspaceUser.fullName, attendanceNote)
-    setAttendanceNote('')
-    setShowAttendancePanel(false)
-    toast.success('Checked in successfully')
+    checkInMutation.mutate(attendanceNote || undefined)
   }
 
   const handlePunchOut = () => {
-    if (!workspaceUser) return
-    punchOut(workspaceUser.id)
-    setShowAttendancePanel(false)
-    toast.success('Checked out successfully')
+    checkOutMutation.mutate()
   }
+
+  const checkOutMutation = useMutation({
+    mutationFn: () => attendanceApi.checkOut(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'me', 'today'] })
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'me', 'last30'] })
+      setShowAttendancePanel(false)
+      toast.success('Checked out successfully')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to check out')
+    },
+  })
 
   const initials = user ? `${(user.fullName || 'U')[0]}` : 'U'
 
@@ -248,18 +250,6 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-          {taskTimer && activeTask && activeProject && (
-            <button
-              type="button"
-              onClick={() => navigate(`/employee/projects/${activeProject.id}`)}
-              className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 sm:text-sm"
-            >
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-              <span className="hidden max-w-[160px] truncate sm:inline">{activeTask.title}</span>
-              <span className="sm:hidden">Task</span>
-              {taskTimerDuration && <span className="text-xs font-semibold">{taskTimerDuration}</span>}
-            </button>
-          )}
           {showEmployeeAttendance && (
             <div className="relative" ref={attendanceRef}>
               <button
@@ -305,8 +295,8 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
                     )}
                   </div>
 
-                  {currentPunch?.note ? (
-                    <p className="mt-3 text-xs text-slate-500">Note: {currentPunch.note}</p>
+                  {currentPunch?.notes ? (
+                    <p className="mt-3 text-xs text-slate-500">Note: {currentPunch.notes}</p>
                   ) : !currentPunch ? (
                     <textarea
                       value={attendanceNote}
@@ -329,17 +319,19 @@ const TopHeader: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar 
                       <button
                         type="button"
                         onClick={handlePunchOut}
+                        disabled={checkOutMutation.isPending}
                         className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
                       >
-                        Punch Out
+                        {checkOutMutation.isPending ? 'Punching out...' : 'Punch Out'}
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={handlePunchIn}
+                        disabled={checkInMutation.isPending}
                         className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                       >
-                        Punch In
+                        {checkInMutation.isPending ? 'Punching in...' : 'Punch In'}
                       </button>
                     )}
                   </div>

@@ -6,6 +6,9 @@ import { useAuthStore } from '../../store/authStore'
 import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
+import { getErrorMessage } from '../../utils/errorUtils'
+import { useOptionSet } from '../../hooks/useOptionSet'
+import { getOptionLabel } from '../../utils/optionSet'
 
 const STATUS_COLORS: Record<string, string> = {
   NEW: 'bg-blue-100 text-blue-800',
@@ -15,8 +18,8 @@ const STATUS_COLORS: Record<string, string> = {
   CONVERTED: 'bg-purple-100 text-purple-800',
 }
 
-const STATUSES = ['', 'NEW', 'CONTACTED', 'QUALIFIED', 'UNQUALIFIED', 'CONVERTED']
-const SOURCES = ['', 'WEB', 'REFERRAL', 'COLD_CALL', 'EMAIL_CAMPAIGN', 'SOCIAL_MEDIA', 'OTHER']
+const FALLBACK_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'UNQUALIFIED', 'CONVERTED']
+const FALLBACK_SOURCES = ['WEB', 'REFERRAL', 'COLD_CALL', 'EMAIL_CAMPAIGN', 'SOCIAL_MEDIA', 'OTHER']
 
 const LeadListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -36,6 +39,19 @@ const LeadListPage: React.FC = () => {
   const [sortField, setSortField] = useState('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
+  const [editingCell, setEditingCell] = useState<{ id: string; field: 'status' } | null>(null)
+  const { options: statusOptions } = useOptionSet({
+    module: 'CRM',
+    entity: 'LEAD',
+    field: 'status',
+    fallbackValues: FALLBACK_STATUSES,
+  })
+  const { options: sourceOptions } = useOptionSet({
+    module: 'CRM',
+    entity: 'LEAD',
+    field: 'leadSource',
+    fallbackValues: FALLBACK_SOURCES,
+  })
 
   useEffect(() => { fetchLeads() }, [page, pageSize, statusFilter, sourceFilter, searchQuery, sortField, sortDir])
   useEffect(() => { setPage(0); setSelectedRows(new Set()) }, [statusFilter, sourceFilter, searchQuery])
@@ -63,11 +79,20 @@ const LeadListPage: React.FC = () => {
       } else {
         setLeads([])
       }
-    } catch { toast.error('Failed to load leads') } finally { setIsLoading(false) }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to load leads')) } finally { setIsLoading(false) }
   }
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleInlineStatusChange = async (id: string, newStatus: string) => {
+    setEditingCell(null)
+    if (!canEdit) { toast.error('No permission to edit'); return }
+    try {
+      await leadApi.update(id, { status: newStatus })
+      setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l))
+      toast.success('Status updated')
+    } catch { toast.error('Failed to update status') }
+  }
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {    e.stopPropagation()
     if (!canDelete) {
       toast.error('You do not have permission to delete leads')
       return
@@ -131,7 +156,7 @@ const LeadListPage: React.FC = () => {
     }
     if (selectedLeadIds.length === 0) return
 
-    const allowedStatuses = STATUSES.filter(Boolean)
+    const allowedStatuses = statusOptions.map((option) => option.value)
     const nextStatus = prompt(`Enter new status (${allowedStatuses.join(', ')}):`)?.trim().toUpperCase()
     if (!nextStatus) return
 
@@ -231,11 +256,15 @@ const LeadListPage: React.FC = () => {
           </div>
           <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }} className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All Status</option>
-            {STATUSES.filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
+            {statusOptions.map((option) => (
+              <option key={option.id} value={option.value}>{option.label || option.value}</option>
+            ))}
           </select>
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All Sources</option>
-            {SOURCES.filter(Boolean).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            {sourceOptions.map((option) => (
+              <option key={option.id} value={option.value}>{option.label || option.value}</option>
+            ))}
           </select>
           {(searchQuery || statusFilter || sourceFilter) && (
             <button onClick={() => { setSearchQuery(''); setStatusFilter(''); setSourceFilter('') }} className="text-sm text-gray-500 hover:text-gray-700">Clear Filters</button>
@@ -273,6 +302,7 @@ const LeadListPage: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Score</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Source</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:text-gray-900" onClick={() => { setSortField('createdAt'); setSortDir(d => d === 'asc' ? 'desc' : 'asc') }}>Created</th>
                 <th className="w-16 px-4 py-3"></th>
@@ -280,11 +310,11 @@ const LeadListPage: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
-                <tr><td colSpan={9} className="px-4 py-16 text-center text-gray-400">
+                <tr><td colSpan={10} className="px-4 py-16 text-center text-gray-400">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
                 </td></tr>
               ) : leads.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-16 text-center">
+                <tr><td colSpan={10} className="px-4 py-16 text-center">
                   <div className="text-gray-400">
                     <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     <p className="text-sm font-medium">No Leads Found</p>
@@ -309,12 +339,38 @@ const LeadListPage: React.FC = () => {
                     {lead.email ? <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} className="text-gray-600 hover:text-indigo-600">{lead.email}</a> : '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{lead.phone || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[lead.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {lead.status}
-                    </span>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    {editingCell?.id === lead.id && editingCell.field === 'status' ? (
+                      <select
+                        autoFocus
+                        value={lead.status}
+                        onBlur={() => setEditingCell(null)}
+                        onChange={e => handleInlineStatusChange(lead.id, e.target.value)}
+                        className="text-xs border border-indigo-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm"
+                      >
+                        {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label || o.value}</option>)}
+                      </select>
+                    ) : (
+                      <span
+                        title={canEdit ? 'Click to edit status' : undefined}
+                        onClick={canEdit ? () => setEditingCell({ id: lead.id, field: 'status' }) : undefined}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[lead.status] || 'bg-gray-100 text-gray-800'} ${canEdit ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300' : ''}`}
+                      >
+                        {getOptionLabel(statusOptions, lead.status)}
+                        {canEdit && <svg className="ml-1 w-2.5 h-2.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{lead.leadSource?.replace('_', ' ') || '—'}</td>
+                  <td className="px-4 py-3">
+                    {lead.rating ? (
+                      <div className="flex items-center gap-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <svg key={s} className={`w-3.5 h-3.5 ${s <= lead.rating! ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                        ))}
+                      </div>
+                    ) : <span className="text-gray-300 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{getOptionLabel(sourceOptions, lead.leadSource) || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{new Date(lead.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <FeatureGate requiredPermission="CRM_DELETE">

@@ -1,150 +1,93 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { attendanceApi } from '../../api/hrApi'
 import { AttendancePunch } from '../../types/hr'
 
-const today = () => new Date().toISOString().split('T')[0]
-const nowStr = () => new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-
-const SAMPLE_HISTORY: AttendancePunch[] = [
-  { id: '1', employeeId: 'me', punchIn: '2026-04-14T08:58:00Z', punchOut: '2026-04-14T17:02:00Z', workDate: '2026-04-14', totalHours: 8.07 },
-  { id: '2', employeeId: 'me', punchIn: '2026-04-13T09:01:00Z', punchOut: '2026-04-13T17:30:00Z', workDate: '2026-04-13', totalHours: 8.48 },
-  { id: '3', employeeId: 'me', punchIn: '2026-04-12T08:45:00Z', punchOut: '2026-04-12T17:00:00Z', workDate: '2026-04-12', totalHours: 8.25 },
-  { id: '4', employeeId: 'me', punchIn: '2026-04-11T09:15:00Z', punchOut: '2026-04-11T18:00:00Z', workDate: '2026-04-11', totalHours: 8.75 },
-  { id: '5', employeeId: 'me', punchIn: '2026-04-10T08:55:00Z', punchOut: '2026-04-10T17:05:00Z', workDate: '2026-04-10', totalHours: 8.17 },
-]
+const formatDate = (value: Date) => value.toISOString().split('T')[0]
 
 const AttendancePage: React.FC = () => {
-  const [punchHistory, setPunchHistory] = useState<AttendancePunch[]>(SAMPLE_HISTORY)
-  const [currentPunch, setCurrentPunch] = useState<AttendancePunch | null>(null)
-  const [currentTime, setCurrentTime] = useState(nowStr())
-  const [notes, setNotes] = useState('')
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const queryClient = useQueryClient()
+  const [employeeId, setEmployeeId] = useState('')
+  const [start, setStart] = useState(() => formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)))
+  const [end, setEnd] = useState(() => formatDate(new Date()))
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(nowStr())
-      if (currentPunch) {
-        const inTime = new Date(currentPunch.punchIn).getTime()
-        const elapsed = Math.floor((Date.now() - inTime) / 1000)
-        setElapsedSeconds(elapsed)
-      }
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [currentPunch])
+  const [editingPunch, setEditingPunch] = useState<AttendancePunch | null>(null)
+  const [correctionIn, setCorrectionIn] = useState('')
+  const [correctionOut, setCorrectionOut] = useState('')
+  const [correctionNotes, setCorrectionNotes] = useState('')
 
-  const formatElapsed = (secs: number) => {
-    const h = Math.floor(secs / 3600)
-    const m = Math.floor((secs % 3600) / 60)
-    const s = secs % 60
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
+  const { data: punches, isLoading } = useQuery({
+    queryKey: ['hr-attendance', start, end, employeeId],
+    queryFn: async () => {
+      const res = await attendanceApi.getAll({ start, end, employeeId: employeeId || undefined })
+      return res.data.data || []
+    },
+  })
 
-  const handlePunchIn = () => {
-    const newPunch: AttendancePunch = {
-      id: String(Date.now()),
-      employeeId: 'me',
-      punchIn: new Date().toISOString(),
-      workDate: today(),
-      notes: notes || null,
-    }
-    setCurrentPunch(newPunch)
-    setElapsedSeconds(0)
-    toast.success(`Punched in at ${currentTime}`)
-    setNotes('')
-  }
+  const correctionMutation = useMutation({
+    mutationFn: (payload: { punchId: string; punchIn: string; punchOut?: string | null; notes?: string | null }) =>
+      attendanceApi.correction(payload.punchId, { punchIn: payload.punchIn, punchOut: payload.punchOut, notes: payload.notes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendance'] })
+      toast.success('Correction saved')
+      setEditingPunch(null)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to save correction')
+    },
+  })
 
-  const handlePunchOut = () => {
-    if (!currentPunch) return
-    const punchOut = new Date().toISOString()
-    const inTime = new Date(currentPunch.punchIn).getTime()
-    const totalMs = Date.now() - inTime
-    const totalHours = Math.round((totalMs / 3_600_000) * 100) / 100
-    const completed: AttendancePunch = { ...currentPunch, punchOut, totalHours }
-    setPunchHistory((prev) => [completed, ...prev])
-    setCurrentPunch(null)
-    setElapsedSeconds(0)
-    toast.success(`Punched out at ${currentTime}. ${totalHours}h recorded.`)
-  }
-
-  const isPunchedIn = currentPunch !== null
-  const weekHours = punchHistory.slice(0, 5).reduce((sum, p) => sum + (p.totalHours || 0), 0)
+  const weekHours = useMemo(() => {
+    const values = punches || []
+    const last5 = values.slice(0, 5)
+    return last5.reduce((sum, p) => sum + (p.totalHours || 0), 0)
+  }, [punches])
 
   return (
     <div className="space-y-6">
       <div className="shell-card p-6">
         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 font-semibold">Time & Attendance</p>
         <h1 className="text-2xl font-bold text-slate-900 mt-2">Attendance</h1>
-        <p className="text-sm text-slate-600 mt-1">Track your daily punch-in and punch-out times.</p>
+        <p className="text-sm text-slate-600 mt-1">Review punch history and apply corrections when needed.</p>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="shell-card p-4 text-center">
           <p className="text-2xl font-bold text-slate-900">{weekHours.toFixed(1)}h</p>
-          <p className="text-xs text-slate-500 mt-1">This Week</p>
+          <p className="text-xs text-slate-500 mt-1">This Week (loaded)</p>
         </div>
         <div className="shell-card p-4 text-center">
-          <p className="text-2xl font-bold text-slate-900">{punchHistory.length}</p>
-          <p className="text-xs text-slate-500 mt-1">Days Recorded</p>
+          <p className="text-2xl font-bold text-slate-900">{punches?.length || 0}</p>
+          <p className="text-xs text-slate-500 mt-1">Records Loaded</p>
         </div>
         <div className="shell-card p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-600">{isPunchedIn ? 'IN' : 'OUT'}</p>
-          <p className="text-xs text-slate-500 mt-1">Current Status</p>
+          <p className="text-2xl font-bold text-slate-900">{start}</p>
+          <p className="text-xs text-slate-500 mt-1">Start</p>
         </div>
         <div className="shell-card p-4 text-center">
-          <p className="text-2xl font-bold text-slate-900">{isPunchedIn ? formatElapsed(elapsedSeconds) : '--:--:--'}</p>
-          <p className="text-xs text-slate-500 mt-1">Session Time</p>
+          <p className="text-2xl font-bold text-slate-900">{end}</p>
+          <p className="text-xs text-slate-500 mt-1">End</p>
         </div>
       </div>
 
-      {/* Punch card */}
-      <div className="shell-card p-8 text-center">
-        <p className="text-5xl font-mono font-bold text-slate-900">{currentTime}</p>
-        <p className="text-sm text-slate-500 mt-1">{new Date().toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-
-        {isPunchedIn && (
-          <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 inline-block">
-            <p className="text-sm font-semibold text-emerald-700">
-              Punched in at {new Date(currentPunch!.punchIn).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <p className="text-xs text-emerald-600">Session: {formatElapsed(elapsedSeconds)}</p>
+      <div className="shell-card p-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Start</label>
+            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
-        )}
-
-        {!isPunchedIn && (
-          <div className="mt-4">
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional note (e.g. WFH, client site)"
-              className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm text-center"
-            />
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">End</label>
+            <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
           </div>
-        )}
-
-        <div className="mt-6">
-          {isPunchedIn ? (
-            <button
-              type="button"
-              onClick={handlePunchOut}
-              className="rounded-2xl bg-rose-600 px-12 py-4 text-xl font-bold text-white shadow-lg hover:bg-rose-700 active:scale-95 transition"
-            >
-              Punch Out
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePunchIn}
-              className="rounded-2xl bg-emerald-600 px-12 py-4 text-xl font-bold text-white shadow-lg hover:bg-emerald-700 active:scale-95 transition"
-            >
-              Punch In
-            </button>
-          )}
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Employee ID (optional)</label>
+            <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="Filter by employee UUID" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+          </div>
         </div>
       </div>
 
-      {/* History */}
       <div className="shell-card p-6">
         <h2 className="text-base font-semibold text-slate-900 mb-4">Attendance History</h2>
         <div className="overflow-x-auto">
@@ -156,10 +99,19 @@ const AttendancePage: React.FC = () => {
                 <th className="pb-3 text-left text-xs font-semibold text-slate-500 uppercase">Punch Out</th>
                 <th className="pb-3 text-right text-xs font-semibold text-slate-500 uppercase">Hours</th>
                 <th className="pb-3 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
+                <th className="pb-3 text-right text-xs font-semibold text-slate-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {punchHistory.map((p) => (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-slate-500">Loading attendance...</td>
+                </tr>
+              ) : (punches || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-slate-500">No records found for selected range.</td>
+                </tr>
+              ) : (punches || []).map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50">
                   <td className="py-3 font-medium text-slate-900">{p.workDate}</td>
                   <td className="py-3 text-slate-700">
@@ -184,12 +136,77 @@ const AttendancePage: React.FC = () => {
                       {p.totalHours != null ? (p.totalHours >= 8 ? 'Full Day' : 'Partial') : 'Active'}
                     </span>
                   </td>
+                  <td className="py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPunch(p)
+                        setCorrectionIn(p.punchIn)
+                        setCorrectionOut(p.punchOut || '')
+                        setCorrectionNotes(p.notes || '')
+                      }}
+                      className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Correct
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {editingPunch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Attendance correction</h2>
+            <p className="mt-1 text-sm text-slate-600">Update punch-in/out times and notes.</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Punch in (ISO)</label>
+                <input value={correctionIn} onChange={(e) => setCorrectionIn(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Punch out (ISO)</label>
+                <input value={correctionOut} onChange={(e) => setCorrectionOut(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Notes</label>
+                <textarea value={correctionNotes} onChange={(e) => setCorrectionNotes(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingPunch(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={correctionMutation.isPending}
+                onClick={() => {
+                  if (!correctionIn.trim()) {
+                    toast.error('Punch in is required')
+                    return
+                  }
+                  correctionMutation.mutate({
+                    punchId: editingPunch.id,
+                    punchIn: correctionIn.trim(),
+                    punchOut: correctionOut.trim() ? correctionOut.trim() : null,
+                    notes: correctionNotes.trim() ? correctionNotes.trim() : null,
+                  })
+                }}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {correctionMutation.isPending ? 'Saving...' : 'Save correction'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

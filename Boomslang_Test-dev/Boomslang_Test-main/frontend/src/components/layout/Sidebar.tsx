@@ -38,7 +38,6 @@ const HR_PAYROLL_ROLES = ['PAYROLL', ...HR_ADMIN_ROLES]
 const HR_EXECUTIVE_ROLES = ['EXECUTIVE', ...HR_ADMIN_ROLES]
 const HR_SELF_SERVICE_ROLES = ['EMPLOYEE', ...HR_MANAGER_ROLES]
 const HR_ACCESS_ROLES = ['EMPLOYEE', 'MANAGER', 'RECRUITER', 'PAYROLL', 'EXECUTIVE', ...HR_ADMIN_ROLES]
-const WORKSPACE_ACCESS_ROLES = ['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN']
 
 const isItemActive = (pathname: string, itemPath: string) =>
   pathname === itemPath || pathname.startsWith(`${itemPath}/`)
@@ -51,6 +50,7 @@ const inferRequiredPermissionsForPath = (path: string): string[] => {
     'DASHBOARD_HR_VIEW',
     'DASHBOARD_TECH_VIEW',
     'DASHBOARD_OPERATIONS_VIEW',
+    'DASHBOARD_PM_VIEW',
     'FIELDWORK_VIEW',
     'HR_VIEW'
   ]
@@ -61,15 +61,19 @@ const inferRequiredPermissionsForPath = (path: string): string[] => {
   if (path === '/dashboard/finance') return ['DASHBOARD_FINANCE_VIEW']
   if (path === '/dashboard/hr') return ['DASHBOARD_HR_VIEW']
   if (path === '/dashboard/technician') return ['DASHBOARD_TECH_VIEW']
+  if (path === '/dashboard/pm') return ['DASHBOARD_PM_VIEW']
   if (path === '/dashboard/fieldwork') return ['FIELDWORK_VIEW']
   if (path === '/dashboard/employee') return ['HR_VIEW']
   if (path === '/employee' || path.startsWith('/employee/')) return ['HR_VIEW']
+  if (path === '/employee/attendance') return ['ATTENDANCE_SELF_VIEW', 'HR_VIEW']
   if (path === '/crm/dashboard/team') return ['DASHBOARD_TEAM_VIEW']
   if (path === '/crm/dashboard/user') return ['DASHBOARD_SELF_VIEW']
   if (path === '/crm/dashboard') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
   if (path.startsWith('/crm/')) return ['CRM_VIEW']
   if (path.startsWith('/erp/')) return ['ERP_VIEW']
-  if (path === '/hr' || path.startsWith('/hr/')) return ['HR_VIEW']
+  if (path === '/hr/attendance') return ['ATTENDANCE_MANAGE_VIEW', 'HR_VIEW']
+  if (path.startsWith('/hr/')) return ['HR_VIEW']
+  if (path === '/pm' || path.startsWith('/pm/')) return ['PM_VIEW']
   if (path.startsWith('/finance/')) return ['FINANCE_VIEW']
   if (path.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
   if (path.startsWith('/reports')) return ['REPORT_VIEW']
@@ -87,7 +91,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
   const [activeFlyout, setActiveFlyout] = useState<string | null>(null)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     DASHBOARDS: true,
-    'MY WORK': true,
     CRM: true,
     ERP: false,
     HR: false,
@@ -109,6 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
       'DASHBOARD_HR_VIEW',
       'DASHBOARD_TECH_VIEW',
       'DASHBOARD_OPERATIONS_VIEW',
+      'DASHBOARD_PM_VIEW',
       'FIELDWORK_VIEW',
       'HR_VIEW'
     ],
@@ -117,6 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
     HR: ['HR_VIEW'],
     FINANCE: ['FINANCE_VIEW'],
     FIELDWORK: ['FIELDWORK_VIEW'],
+    PM: ['PM_VIEW', 'HR_VIEW', 'ATTENDANCE_SELF_VIEW'],
     REPORTING: ['REPORT_VIEW'],
   }
 
@@ -126,12 +131,12 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
 
   const groupIcons: Record<string, string> = {
     DASHBOARDS: 'M3 3h18v18H3V3zm4 4h4v4H7V7zm6 0h4v10h-4V7zm-6 6h4v4H7v-4z',
-    'MY WORK': 'M3 5h18M3 12h12M3 19h18',
     CRM: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
     ERP: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
     HR: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
     FINANCE: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     FIELDWORK: 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0',
+    PM: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
     REPORTING: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     SETTINGS: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
   }
@@ -144,20 +149,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
         { name: 'CRM Dashboard', path: '/dashboard/crm', icon: 'M3 3v18h18M7 14l3-3 3 2 4-5' },
         { name: 'Finance Dashboard', path: '/dashboard/finance', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
         { name: 'HR Dashboard', path: '/dashboard/hr', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+        { name: 'PM Dashboard', path: '/dashboard/pm', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
         { name: 'Field Work Dashboard', path: '/dashboard/fieldwork', icon: 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0' },
         { name: 'Technician Dashboard', path: '/dashboard/technician', icon: 'M9 11l3 3L22 4M2 20h20M7 20V9m10 11V9' },
       ]
-    },
-    {
-      title: 'MY WORK',
-      requiredRoles: WORKSPACE_ACCESS_ROLES,
-      items: [
-        { name: 'Workspace', path: '/employee', icon: 'M3 4h18v5H3V4zm0 7h11v9H3v-9zm13 0h5v9h-5v-9', requiredRoles: WORKSPACE_ACCESS_ROLES },
-        { name: 'Projects', path: '/employee/projects', icon: 'M4 7h16M4 12h10M4 17h16', requiredRoles: WORKSPACE_ACCESS_ROLES },
-        { name: 'My Tasks', path: '/employee/tasks', icon: 'M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01', requiredRoles: WORKSPACE_ACCESS_ROLES },
-        { name: 'Timesheets', path: '/employee/timesheets', icon: 'M8 7V3m8 4V3m-9 8h10m-10 4h6m5 2H6a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2z', requiredRoles: WORKSPACE_ACCESS_ROLES },
-        { name: 'Attendance', path: '/employee/attendance', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', requiredRoles: WORKSPACE_ACCESS_ROLES },
-      ],
     },
     {
       title: 'CRM',
@@ -288,6 +283,16 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
       ],
     },
     {
+      title: 'PM',
+      items: [
+        { name: 'Projects', path: '/pm/projects', icon: 'M4 7h16M4 12h10M4 17h16' },
+        { name: 'Tasks', path: '/pm/tasks', icon: 'M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01' },
+        { name: 'Workspace', path: '/employee', icon: 'M3 4h18v5H3V4zm0 7h11v9H3v-9zm13 0h5v9h-5v-9' },
+        { name: 'Timesheets', path: '/employee/timesheets', icon: 'M8 7V3m8 4V3m-9 8h10m-10 4h6m5 2H6a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2z' },
+        { name: 'Attendance', path: '/employee/attendance', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+      ]
+    },
+    {
       title: 'FINANCE',
       items: [
         { name: 'Invoices', path: '/finance/invoices', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
@@ -295,6 +300,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
         { name: 'Currency Rates', path: '/finance/currency', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
         { name: 'Reports', path: '/finance/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
         { name: 'Financial Close', path: '/finance/close', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+        { name: 'Reconciliation', path: '/finance/reconciliation', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
       ]
     },
     {
@@ -314,6 +320,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
       title: 'SETTINGS',
       items: [
         { name: 'Roles & Permissions', path: '/admin/roles', icon: 'M9 12h6m-6 4h6M7 7h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H9l-4 3v-3H5a2 2 0 01-2-2V5a2 2 0 012-2z', requiredPermission: 'ROLE_VIEW' },
+        { name: 'Configuration Studio', path: '/admin/config', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m9-6a9 9 0 11-18 0 9 9 0 0118 0z', requiredPermission: 'ROLE_VIEW' },
         { name: 'Users', path: '/admin/users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', requiredPermission: 'USER_VIEW' },
       ]
     }

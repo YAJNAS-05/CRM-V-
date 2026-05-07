@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning'
 import { invoiceApi } from '../../api/financeApi'
 import { InvoiceEntity, InvoiceType, CreateInvoiceRequest } from '../../types/finance'
 import { toast } from 'react-hot-toast'
+
+const invoiceSchema = z.object({
+  issueDate: z.string().min(1, 'Issue date is required'),
+  entity: z.string().min(1, 'Entity is required'),
+  type: z.string().min(1, 'Invoice type is required'),
+  currency: z.string().min(1, 'Currency is required'),
+  subtotal: z.string().refine((v) => v === '' || !isNaN(parseFloat(v)), { message: 'Subtotal must be a number' }),
+  taxAmount: z.string().refine((v) => v === '' || !isNaN(parseFloat(v)), { message: 'Tax amount must be a number' }),
+  totalAmount: z.string().refine((v) => v === '' || !isNaN(parseFloat(v)), { message: 'Total amount must be a number' }),
+})
 
 interface FormData {
   invoiceNumber: string
@@ -52,8 +63,7 @@ export default function InvoiceFormWithDirtyTracking() {
   const [originalForm, setOriginalForm] = useState<FormData>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  // Track if form is dirty (has unsaved changes)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
   const isDirty = JSON.stringify(form) !== JSON.stringify(originalForm)
 
   // Apply unsaved changes warning hook
@@ -106,7 +116,28 @@ export default function InvoiceFormWithDirtyTracking() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    const result = invoiceSchema.safeParse({
+      issueDate: form.issueDate,
+      entity: form.entity,
+      type: form.type,
+      currency: form.currency,
+      subtotal: form.subtotal,
+      taxAmount: form.taxAmount,
+      totalAmount: form.totalAmount,
+    })
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
+      return
+    }
+    setFieldErrors({})
+
     if (!isDirty) {
       return
     }
@@ -215,14 +246,15 @@ export default function InvoiceFormWithDirtyTracking() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Issue Date</label>
+              <label className="block text-sm font-medium text-gray-700">Issue Date *</label>
               <input
                 type="date"
                 name="issueDate"
                 value={form.issueDate}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                className={`mt-1 block w-full px-3 py-2 border rounded-md ${fieldErrors.issueDate ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {fieldErrors.issueDate && <p className="mt-1 text-xs text-red-600">{fieldErrors.issueDate}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Due Date</label>

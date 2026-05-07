@@ -4,6 +4,7 @@ import com.everx.finance.fx.FxRateLock;
 import com.everx.finance.fx.FxRateLockingService;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
+import com.everx.finance.journal.GlPostingService;
 import com.everx.finance.period.PostingPeriodEnforcer;
 import com.everx.finance.payment.dto.CreatePaymentRequest;
 import com.everx.finance.payment.dto.PaymentResponse;
@@ -30,6 +31,7 @@ public class PaymentService {
     private final InvoiceRepository invoiceRepository;
     private final PostingPeriodEnforcer postingPeriodEnforcer;
     private final FxRateLockingService fxRateLockingService;
+    private final GlPostingService glPostingService;
 
     @Transactional(readOnly = true)
     public Page<PaymentResponse> getAllPayments(Pageable pageable) {
@@ -111,6 +113,15 @@ public class PaymentService {
 
         invoice.setUpdatedAt(OffsetDateTime.now());
         invoiceRepository.save(invoice);
+
+        // Post payment to GL: Debit Accounts Payable, Credit Cash/Bank
+        glPostingService.postInvoicePayment(
+            saved.getId(),
+            "PAY-" + saved.getId().toString().substring(0, 8).toUpperCase(),
+            request.getAmount(),
+            request.getCurrency(),
+            "Payment for invoice " + invoice.getInvoiceNumber()
+        );
 
         return toResponse(saved);
     }

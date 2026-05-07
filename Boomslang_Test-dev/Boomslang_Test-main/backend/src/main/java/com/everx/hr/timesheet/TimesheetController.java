@@ -3,7 +3,6 @@ package com.everx.hr.timesheet;
 import com.everx.hr.timesheet.dto.CreateTimesheetRequest;
 import com.everx.hr.timesheet.dto.TimesheetDto;
 import com.everx.hr.timesheet.dto.UpdateTimesheetRequest;
-import com.everx.hr.TimesheetStatus;
 import com.everx.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +38,7 @@ public class TimesheetController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<TimesheetDto>>> getTimesheets(
             @RequestParam(required = false) UUID employeeId,
-            @RequestParam(required = false) TimesheetStatus status,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Pageable pageable) {

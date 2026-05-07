@@ -2,13 +2,17 @@ package com.everx.crm.lead;
 
 import com.everx.crm.account.Account;
 import com.everx.crm.account.AccountRepository;
+import com.everx.crm.account.dto.AccountDto;
 import com.everx.crm.contact.Contact;
 import com.everx.crm.contact.ContactRepository;
+import com.everx.crm.contact.dto.ContactDto;
 import com.everx.crm.deal.Deal;
 import com.everx.crm.deal.DealRepository;
-import com.everx.crm.deal.DealStage;
+import com.everx.crm.deal.dto.DealDto;
+import com.everx.platform.config.service.OptionSetService;
 import com.everx.crm.lead.dto.LeadConvertRequest;
 import com.everx.crm.lead.dto.LeadDto;
+import com.everx.crm.webhook.CrmWebhookPublisher;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.util.SecurityUserContext;
 import lombok.extern.slf4j.Slf4j;
@@ -20,11 +24,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @Transactional
 @Slf4j
 public class LeadConversionService {
+
+    private static final String MODULE_CRM = "CRM";
+    private static final String ENTITY_DEAL = "DEAL";
+    private static final String FIELD_STAGE = "stage";
+    private static final String ENTITY_LEAD = "LEAD";
+    private static final String ENTITY_ACCOUNT = "ACCOUNT";
+    private static final String ENTITY_CONTACT = "CONTACT";
+    private static final String EVENT_CREATED = "created";
+    private static final String EVENT_CONVERTED = "converted";
 
     @Autowired
     private LeadRepository leadRepository;
@@ -37,6 +51,12 @@ public class LeadConversionService {
 
     @Autowired
     private DealRepository dealRepository;
+
+    @Autowired
+    private OptionSetService optionSetService;
+
+    @Autowired
+    private CrmWebhookPublisher crmWebhookPublisher;
 
     public LeadDto convertLead(UUID leadId, LeadConvertRequest request) {
         log.info("Converting lead {}", leadId);
@@ -70,6 +90,8 @@ public class LeadConversionService {
                 .build();
         Contact savedContact = contactRepository.save(contact);
         lead.setConvertedContactId(savedContact.getId());
+        crmWebhookPublisher.publish(ENTITY_CONTACT, EVENT_CREATED, savedContact.getId(),
+            ContactDto.fromEntity(savedContact), Map.of("leadId", lead.getId()));
 
         // 2. Create or link Account
         if (Boolean.TRUE.equals(request.getCreateAccount())) {
@@ -101,13 +123,16 @@ public class LeadConversionService {
             lead.setConvertedAccountId(savedAccount.getId());
             savedContact.setAccountId(savedAccount.getId());
             contactRepository.save(savedContact);
+                crmWebhookPublisher.publish(ENTITY_ACCOUNT, EVENT_CREATED, savedAccount.getId(),
+                    AccountDto.fromEntity(savedAccount), Map.of("leadId", lead.getId()));
         }
 
         // 3. Create Deal (optional)
         if (Boolean.TRUE.equals(request.getCreateDeal())) {
+            String defaultStage = optionSetService.resolveDefaultValue(MODULE_CRM, ENTITY_DEAL, FIELD_STAGE, "PROSPECTING");
             Deal deal = Deal.builder()
                     .name(request.getDealName() != null ? request.getDealName() : lead.getFirstName() + " " + lead.getLastName() + " - Deal")
-                    .stage(DealStage.PROSPECTING)
+                .stage(defaultStage)
                     .amount(request.getDealAmount())
                     .expectedCloseDate(request.getExpectedCloseDate())
                     .leadSource(lead.getLeadSource())
@@ -117,13 +142,17 @@ public class LeadConversionService {
                     .build();
             Deal savedDeal = dealRepository.save(deal);
             lead.setConvertedDealId(savedDeal.getId());
+                crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_CREATED, savedDeal.getId(),
+                    DealDto.fromEntity(savedDeal), Map.of("leadId", lead.getId()));
         }
 
         // 4. Mark lead as converted
         lead.setIsConverted(true);
         lead.setConvertedAt(OffsetDateTime.now());
         lead.setStatus("CONVERTED");
-
-        return LeadDto.fromEntity(leadRepository.save(lead));
+        Lead savedLead = leadRepository.save(lead);
+        LeadDto dto = LeadDto.fromEntity(savedLead);
+        crmWebhookPublisher.publish(ENTITY_LEAD, EVENT_CONVERTED, savedLead.getId(), dto);
+        return dto;
     }
 }

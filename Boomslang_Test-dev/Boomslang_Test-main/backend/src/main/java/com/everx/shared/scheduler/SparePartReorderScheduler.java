@@ -2,9 +2,11 @@ package com.everx.shared.scheduler;
 
 import com.everx.erp.spareparts.SparePart;
 import com.everx.erp.spareparts.SparePartRepository;
+import com.everx.shared.service.MailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +26,10 @@ import java.util.List;
 public class SparePartReorderScheduler {
 
     private final SparePartRepository sparePartRepository;
-    // TODO: Inject EmailService to send alerts
-    // private final EmailService emailService;
+    private final MailService mailService;
+
+    @Value("${everx.procurement.alert-email:procurement@everx.com}")
+    private String procurementEmail;
 
     /**
      * Daily check for low stock spare parts
@@ -69,22 +73,24 @@ public class SparePartReorderScheduler {
                 part.getId(), part.getName(), part.getStockQty(), part.getReorderPoint());
 
         try {
-            // TODO: Send email alert to procurement team
-            // String subject = "LOW STOCK ALERT: " + part.getPartName();
-            // String body = String.format(
-            //     "Spare part %s (ID: %s) has fallen below reorder threshold.\n" +
-            //     "Current Stock: %d\n" +
-            //     "Reorder Threshold: %d\n" +
-            //     "Warehouse: %s\n" +
-            //     "Supplier: %s\n" +
-            //     "Lead Time: %d days\n\n" +
-            //     "Please consider placing a reorder.",
-            //     part.getPartName(), part.getId(), part.getStockQuantity(),
-            //     part.getReorderThreshold(), part.getWarehouseLocation(),
-            //     part.getSupplier() != null ? part.getSupplier().getSupplierName() : "N/A",
-            //     part.getLeadTimeDays() != null ? part.getLeadTimeDays() : 0
-            // );
-            // emailService.sendAlert("procurement@everx.com", subject, body);
+            String subject = "LOW STOCK ALERT: " + part.getName() + " (" + part.getPartNumber() + ")";
+            String body = String.format(
+                "Spare part '%s' (Part No: %s) has fallen below its reorder threshold.\n\n" +
+                "Current Stock: %d\n" +
+                "Reorder Threshold: %d\n" +
+                "Category: %s\n" +
+                "Warehouse: %s\n" +
+                "Manufacturer: %s\n\n" +
+                "Please consider placing a reorder to avoid stockout.",
+                part.getName(),
+                part.getPartNumber(),
+                part.getStockQty() != null ? part.getStockQty() : 0,
+                part.getReorderPoint() != null ? part.getReorderPoint() : 0,
+                part.getCategory() != null ? part.getCategory() : "N/A",
+                part.getWarehouseLocation() != null ? part.getWarehouseLocation() : "N/A",
+                part.getManufacturer() != null ? part.getManufacturer() : "N/A"
+            );
+            mailService.sendSimpleMessage(procurementEmail, subject, body);
 
             log.info("Processed low stock alert for part: {}", part.getName());
 

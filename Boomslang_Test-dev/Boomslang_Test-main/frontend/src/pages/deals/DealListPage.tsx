@@ -7,6 +7,8 @@ import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import DealsViewHeader from './components/DealsViewHeader'
+import { useOptionSet } from '../../hooks/useOptionSet'
+import { getOptionColor, getOptionLabel } from '../../utils/optionSet'
 
 const STAGE_COLORS: Record<string, string> = {
   PROSPECTING: 'bg-gray-100 text-gray-800',
@@ -16,7 +18,7 @@ const STAGE_COLORS: Record<string, string> = {
   CLOSED_WON: 'bg-green-100 text-green-800',
   CLOSED_LOST: 'bg-red-100 text-red-800',
 }
-const STAGES = ['', 'PROSPECTING', 'QUALIFICATION', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST']
+const FALLBACK_STAGES = ['PROSPECTING', 'QUALIFICATION', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST']
 
 const DealListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -32,6 +34,12 @@ const DealListPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [stageFilter, setStageFilter] = useState('')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
+  const { options: stageOptions } = useOptionSet({
+    module: 'CRM',
+    entity: 'DEAL',
+    field: 'stage',
+    fallbackValues: FALLBACK_STAGES,
+  })
 
   useEffect(() => { fetchDeals() }, [page, pageSize, stageFilter, searchQuery])
   useEffect(() => { setPage(0); setSelectedRows(new Set()) }, [stageFilter, searchQuery])
@@ -121,7 +129,9 @@ const DealListPage: React.FC = () => {
           </div>
           <select value={stageFilter} onChange={e => { setStageFilter(e.target.value); setPage(0) }} className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All Stages</option>
-            {STAGES.filter(Boolean).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            {stageOptions.map((option) => (
+              <option key={option.id} value={option.value}>{option.label || option.value}</option>
+            ))}
           </select>
           <button onClick={exportToExcel} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -167,7 +177,18 @@ const DealListPage: React.FC = () => {
                     <Link to={`/crm/deals/${deal.id}`} onClick={e => e.stopPropagation()} className="font-medium text-indigo-600 hover:text-indigo-800">{deal.name}</Link>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[deal.stage] || 'bg-gray-100 text-gray-800'}`}>{deal.stage?.replace('_', ' ')}</span>
+                    {(() => {
+                      const stageColor = getOptionColor(stageOptions, deal.stage)
+                      const badgeClass = stageColor ? 'text-slate-900' : (STAGE_COLORS[deal.stage] || 'bg-gray-100 text-gray-800')
+                      return (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}
+                          style={stageColor ? { backgroundColor: stageColor } : undefined}
+                        >
+                          {getOptionLabel(stageOptions, deal.stage)}
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-gray-700 font-medium">{fmt(deal.amount)}</td>
                   <td className="px-4 py-3">

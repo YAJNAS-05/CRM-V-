@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { positionApi } from '../../api/hrApi'
 import { CreatePositionRequest } from '../../types/hr'
+
+const positionSchema = z.object({
+  title: z.string().min(1, 'Position title is required').max(100, 'Title must be under 100 characters'),
+  grade: z.string().max(20, 'Grade must be under 20 characters').optional(),
+  minSalary: z.number().positive('Minimum salary must be positive').optional(),
+  maxSalary: z.number().positive('Maximum salary must be positive').optional(),
+  currency: z.string().min(1, 'Currency is required'),
+}).refine((data) => !data.minSalary || !data.maxSalary || data.minSalary <= data.maxSalary, {
+  message: 'Minimum salary cannot be greater than maximum salary',
+  path: ['maxSalary'],
+})
 
 const PositionFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +28,7 @@ const PositionFormPage: React.FC = () => {
     maxSalary: undefined,
     currency: 'USD',
   })
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(isEditing)
 
@@ -53,6 +66,9 @@ const PositionFormPage: React.FC = () => {
       ...prev,
       [name]: value,
     }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
   }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,15 +77,26 @@ const PositionFormPage: React.FC = () => {
       ...prev,
       [name]: value === '' ? undefined : Number(value),
     }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.title.trim()) {
-      toast.error('Title is required')
+    const result = positionSchema.safeParse(formData)
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -118,9 +145,10 @@ const PositionFormPage: React.FC = () => {
               name="title"
               value={formData.title}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.title ? 'border-red-500' : 'border-gray-300'}`}
               required
             />
+            {fieldErrors.title && <p className="mt-1 text-xs text-red-600">{fieldErrors.title}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Grade</label>
@@ -129,8 +157,9 @@ const PositionFormPage: React.FC = () => {
               name="grade"
               value={formData.grade || ''}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.grade ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {fieldErrors.grade && <p className="mt-1 text-xs text-red-600">{fieldErrors.grade}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Min Salary</label>
@@ -139,8 +168,9 @@ const PositionFormPage: React.FC = () => {
               name="minSalary"
               value={formData.minSalary ?? ''}
               onChange={handleNumberChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.minSalary ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {fieldErrors.minSalary && <p className="mt-1 text-xs text-red-600">{fieldErrors.minSalary}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Max Salary</label>
@@ -149,8 +179,9 @@ const PositionFormPage: React.FC = () => {
               name="maxSalary"
               value={formData.maxSalary ?? ''}
               onChange={handleNumberChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.maxSalary ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {fieldErrors.maxSalary && <p className="mt-1 text-xs text-red-600">{fieldErrors.maxSalary}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Currency</label>
@@ -159,8 +190,9 @@ const PositionFormPage: React.FC = () => {
               name="currency"
               value={formData.currency || ''}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.currency ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {fieldErrors.currency && <p className="mt-1 text-xs text-red-600">{fieldErrors.currency}</p>}
           </div>
         </div>
 

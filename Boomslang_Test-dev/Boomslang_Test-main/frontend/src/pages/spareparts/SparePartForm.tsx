@@ -1,9 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
 import { sparePartApi, supplierApi } from '../../api/erpApi'
 import { Supplier } from '../../types/erp'
 import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
+
+const sparePartSchema = z.object({
+  partNumber: z.string().min(1, 'Part number is required'),
+  name: z.string().min(1, 'Name is required'),
+  category: z.string().min(1, 'Category is required'),
+})
 
 const SPARE_PART_CATEGORIES = ['Probes', 'Injectors', 'Coils', 'CR/DR']
 
@@ -54,6 +61,7 @@ export default function SparePartForm() {
   const [saving, setSaving] = useState(false)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
 
   useEffect(() => {
     loadSuppliers()
@@ -123,7 +131,18 @@ export default function SparePartForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.partNumber || !form.name || !form.category) { toast.error('Part Number, Name, and Category are required'); return }
+    const result = sparePartSchema.safeParse({ partNumber: form.partNumber, name: form.name, category: form.category })
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
+      return
+    }
+    setFieldErrors({})
     try {
       setSaving(true)
       const payload = {
@@ -257,11 +276,13 @@ export default function SparePartForm() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className={labelClass}>Part Number *</label>
-                    <input type="text" name="partNumber" value={form.partNumber} onChange={handleChange} required className={inputClass} placeholder="e.g. SP-4553" />
+                    <input type="text" name="partNumber" value={form.partNumber} onChange={handleChange} className={`${inputClass} ${fieldErrors.partNumber ? 'border-red-500' : ''}`} placeholder="e.g. SP-4553" />
+                    {fieldErrors.partNumber && <p className="mt-1 text-xs text-red-600">{fieldErrors.partNumber}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Name *</label>
-                    <input type="text" name="name" value={form.name} onChange={handleChange} required className={inputClass} placeholder="e.g. 6Tc TEE Probe" />
+                    <input type="text" name="name" value={form.name} onChange={handleChange} className={`${inputClass} ${fieldErrors.name ? 'border-red-500' : ''}`} placeholder="e.g. 6Tc TEE Probe" />
+                    {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Manufacturer</label>

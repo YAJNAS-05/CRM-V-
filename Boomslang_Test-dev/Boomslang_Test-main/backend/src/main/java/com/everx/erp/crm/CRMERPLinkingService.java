@@ -8,6 +8,7 @@ import com.everx.crm.deal.Deal;
 import com.everx.crm.deal.DealRepository;
 import com.everx.erp.salesorder.SalesOrder;
 import com.everx.erp.salesorder.SalesOrderRepository;
+import com.everx.platform.config.service.OptionSetService;
 import com.everx.shared.exception.ValidationException;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +26,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CRMERPLinkingService {
 
+    private static final String MODULE_CRM = "CRM";
+    private static final String ENTITY_DEAL = "DEAL";
+    private static final String FIELD_STAGE = "stage";
+
     private final DealRepository dealRepository;
     private final AccountRepository accountRepository;
     private final ContactRepository contactRepository;
     private final SalesOrderRepository salesOrderRepository;
+    private final OptionSetService optionSetService;
 
     /**
      * Converts a CRM Deal into an ERP Sales Order
@@ -83,8 +89,11 @@ public class CRMERPLinkingService {
 
         // Map SO status to CRM deal status/stage
         String newDealStage = mapSOStatusToDealStage(soStatus);
-        if (!deal.getStage().toString().equals(newDealStage)) {
-            deal.setStage(com.everx.crm.deal.DealStage.valueOf(newDealStage));
+        if (!optionSetService.isValidOptionValue(MODULE_CRM, ENTITY_DEAL, FIELD_STAGE, newDealStage)) {
+            newDealStage = optionSetService.resolveDefaultValue(MODULE_CRM, ENTITY_DEAL, FIELD_STAGE, deal.getStage());
+        }
+        if (deal.getStage() == null || !deal.getStage().equalsIgnoreCase(newDealStage)) {
+            deal.setStage(newDealStage);
             deal.setUpdatedAt(java.time.OffsetDateTime.now());
             dealRepository.save(deal);
         }

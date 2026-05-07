@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, AlertCircle } from 'lucide-react'
 import { erpMappingApi } from '../../api/erpMappingApi'
 import toast from 'react-hot-toast'
+import { getErrorMessage } from '../../utils/errorUtils'
 
 interface FieldMapping {
   id: string
@@ -51,7 +52,7 @@ const ERPFieldMappingPage: React.FC = () => {
         setMappings(response.data.content || [])
       }
     } catch (error) {
-      toast.error('Failed to load mappings')
+      toast.error(getErrorMessage(error, 'Failed to load mappings'))
       console.error(error)
     } finally {
       setLoading(false)
@@ -86,7 +87,7 @@ const ERPFieldMappingPage: React.FC = () => {
       resetForm()
       loadMappings()
     } catch (error) {
-      toast.error('Failed to save mapping')
+      toast.error(getErrorMessage(error, 'Failed to save mapping'))
       console.error(error)
     }
   }

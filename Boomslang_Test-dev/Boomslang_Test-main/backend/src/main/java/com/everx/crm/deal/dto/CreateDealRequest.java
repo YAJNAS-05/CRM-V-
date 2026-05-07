@@ -1,6 +1,5 @@
 package com.everx.crm.deal.dto;
 
-import com.everx.crm.deal.DealStage;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +19,7 @@ public class CreateDealRequest {
     @NotBlank(message = "Deal name is required")
     private String name;
 
-    private DealStage stage;
+    private String stage;
     private BigDecimal amount;
     private Integer probability;
     private LocalDate expectedCloseDate;

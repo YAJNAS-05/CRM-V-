@@ -64,7 +64,7 @@ public class DealController {
     @GetMapping("/stage/{stage}")
     @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<DealDto>>> getDealsByStage(
-            @PathVariable DealStage stage,
+            @PathVariable String stage,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/deals/stage/{}", stage);
         Page<DealDto> deals = dealService.getDealsByStage(stage, Objects.requireNonNull(pageable));
@@ -75,7 +75,7 @@ public class DealController {
     @PreAuthorize("hasAuthority('CRM_VIEW')")
     public ResponseEntity<ApiResponse<Page<DealDto>>> searchDeals(
             @RequestParam("q") String query,
-            @RequestParam(value = "stage", required = false) DealStage stage,
+            @RequestParam(value = "stage", required = false) String stage,
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("GET /api/v1/crm/deals/search?q={}&stage={}", query, stage);
         Page<DealDto> deals = dealService.searchDeals(query, stage, Objects.requireNonNull(pageable));

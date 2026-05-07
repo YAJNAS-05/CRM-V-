@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import useEmployeeWorkspace from '../../hooks/useEmployeeWorkspace'
-import { useEmployeeWorkspaceStore } from '../../store/employeeWorkspaceStore'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { attendanceApi } from '../../api/hrApi'
+import type { AttendancePunch } from '../../types/hr'
 
 const nowLabel = () =>
   new Date().toLocaleTimeString('en-AU', {
@@ -19,23 +21,29 @@ const formatElapsed = (seconds: number) => {
 
 const EmployeeAttendancePage: React.FC = () => {
   const { workspaceUser } = useEmployeeWorkspace()
-  const attendanceRecords = useEmployeeWorkspaceStore((state) => state.attendanceRecords)
-  const getCurrentPunch = useEmployeeWorkspaceStore((state) => state.getCurrentPunch)
-  const punchIn = useEmployeeWorkspaceStore((state) => state.punchIn)
-  const punchOut = useEmployeeWorkspaceStore((state) => state.punchOut)
+  const queryClient = useQueryClient()
 
   const [currentTime, setCurrentTime] = useState(nowLabel())
   const [note, setNote] = useState('')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
-  const myRecords = useMemo(() => {
-    if (!workspaceUser) return []
-    return attendanceRecords
-      .filter((record) => record.employeeId === workspaceUser.id)
-      .sort((left, right) => new Date(right.punchIn).getTime() - new Date(left.punchIn).getTime())
-  }, [attendanceRecords, workspaceUser])
+  const today = useMemo(() => new Date().toISOString().split('T')[0], [])
 
-  const currentPunch = workspaceUser ? getCurrentPunch(workspaceUser.id) : null
+  const { data: punchesData, isLoading: isLoadingPunches } = useQuery({
+    queryKey: ['attendance', 'me', 'last30'],
+    queryFn: async () => {
+      const response = await attendanceApi.getMe()
+      return response.data.data || []
+    },
+  })
+
+  const myRecords: AttendancePunch[] = useMemo(() => {
+    return (punchesData || [])
+      .slice()
+      .sort((left, right) => new Date(right.punchIn).getTime() - new Date(left.punchIn).getTime())
+  }, [punchesData])
+
+  const currentPunch = useMemo(() => myRecords.find((record) => !record.punchOut) || null, [myRecords])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -47,6 +55,29 @@ const EmployeeAttendancePage: React.FC = () => {
 
     return () => window.clearInterval(interval)
   }, [currentPunch])
+
+  const checkInMutation = useMutation({
+    mutationFn: (notes?: string) => attendanceApi.checkIn(notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'me', 'last30'] })
+      toast.success('Checked in successfully')
+      setNote('')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to check in')
+    },
+  })
+
+  const checkOutMutation = useMutation({
+    mutationFn: () => attendanceApi.checkOut(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'me', 'last30'] })
+      toast.success('Checked out successfully')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to check out')
+    },
+  })
 
   const weekHours = useMemo(() => {
     const start = new Date()
@@ -96,24 +127,23 @@ const EmployeeAttendancePage: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                punchOut(workspaceUser.id)
-                toast.success('Checked out successfully')
+                checkOutMutation.mutate()
               }}
-              className="rounded-2xl bg-rose-600 px-10 py-4 text-lg font-bold text-white shadow-lg hover:bg-rose-700"
+              disabled={checkOutMutation.isPending}
+              className="rounded-2xl bg-rose-600 px-10 py-4 text-lg font-bold text-white shadow-lg hover:bg-rose-700 disabled:opacity-50"
             >
-              Punch Out
+              {checkOutMutation.isPending ? 'Punching out...' : 'Punch Out'}
             </button>
           ) : (
             <button
               type="button"
               onClick={() => {
-                punchIn(workspaceUser.id, workspaceUser.fullName, note)
-                setNote('')
-                toast.success('Checked in successfully')
+                checkInMutation.mutate(note || undefined)
               }}
-              className="rounded-2xl bg-emerald-600 px-10 py-4 text-lg font-bold text-white shadow-lg hover:bg-emerald-700"
+              disabled={checkInMutation.isPending}
+              className="rounded-2xl bg-emerald-600 px-10 py-4 text-lg font-bold text-white shadow-lg hover:bg-emerald-700 disabled:opacity-50"
             >
-              Punch In
+              {checkInMutation.isPending ? 'Punching in...' : 'Punch In'}
             </button>
           )}
         </div>
@@ -135,13 +165,21 @@ const EmployeeAttendancePage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {myRecords.map((record) => (
+              {isLoadingPunches ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">Loading attendance...</td>
+                </tr>
+              ) : myRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">No attendance records yet.</td>
+                </tr>
+              ) : myRecords.map((record) => (
                 <tr key={record.id}>
-                  <td className="px-4 py-4 text-slate-900">{record.workDate}</td>
+                  <td className="px-4 py-4 text-slate-900">{record.workDate || today}</td>
                   <td className="px-4 py-4 text-slate-600">{new Date(record.punchIn).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="px-4 py-4 text-slate-600">{record.punchOut ? new Date(record.punchOut).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) : 'Active'}</td>
                   <td className="px-4 py-4 font-semibold text-slate-900">{record.totalHours != null ? `${record.totalHours.toFixed(2)}h` : '—'}</td>
-                  <td className="px-4 py-4 text-slate-600">{record.note || '—'}</td>
+                  <td className="px-4 py-4 text-slate-600">{record.notes || '—'}</td>
                 </tr>
               ))}
             </tbody>

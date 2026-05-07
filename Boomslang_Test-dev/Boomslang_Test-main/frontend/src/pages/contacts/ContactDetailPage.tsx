@@ -6,7 +6,11 @@ import { z } from 'zod'
 import { contactApi, accountApi } from '../../api/crmApi'
 import { Contact, Account } from '../../types/crm'
 import { FeatureGate } from '../../components/rbac'
+import CustomFieldsPanel from '../../components/config/CustomFieldsPanel'
+import { useCustomFields } from '../../hooks/useCustomFields'
+import { useLayoutConfig } from '../../hooks/useLayoutConfig'
 import { toast } from 'sonner'
+import CommunicationHistory from '../../components/common/CommunicationHistory'
 
 const contactSchema = z.object({
   accountId: z.string().optional(),
@@ -39,6 +43,14 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
   const [contact, setContact] = useState<Contact | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [isEditing, setIsEditing] = useState(isNew)
+  const {
+    definitions: customFieldDefinitions,
+    values: customFieldValues,
+    setValue: setCustomFieldValue,
+    isLoading: customFieldsLoading,
+    save: saveCustomFields,
+  } = useCustomFields({ module: 'CRM', entity: 'CONTACT', entityId: id })
+  const { layout: contactLayout } = useLayoutConfig({ module: 'CRM', entity: 'CONTACT' })
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
   })
@@ -63,7 +75,22 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
   const onSubmit = async (data: ContactFormData) => {
     setIsLoading(true)
     try {
-      if (isNew) { await contactApi.create(data); toast.success('Contact created') } else { await contactApi.update(id!, data); toast.success('Contact updated') }
+      let resolvedId = id
+      if (isNew) {
+        const response = await contactApi.create(data)
+        resolvedId = response.data.data?.id
+        toast.success('Contact created')
+      } else {
+        await contactApi.update(id!, data)
+        toast.success('Contact updated')
+      }
+      if (resolvedId) {
+        try {
+          await saveCustomFields(resolvedId)
+        } catch {
+          toast.error('Contact saved, but custom fields failed to save')
+        }
+      }
       navigate('/crm/contacts')
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Operation failed'
@@ -130,6 +157,9 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
         </div>
         {contact.description && <><h3 className="text-sm font-semibold text-gray-900 mt-6 mb-2">Notes</h3><p className="text-sm text-gray-600">{contact.description}</p></>}
       </div>
+      <div className="mt-6">
+        <CommunicationHistory entityName={`${contact.firstName} ${contact.lastName}`} />
+      </div>
     </div>
   )
 
@@ -184,6 +214,14 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
             <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
             <textarea {...register('description')} rows={3} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
+          <CustomFieldsPanel
+            title="Custom Contact Fields"
+            definitions={customFieldDefinitions}
+            values={customFieldValues}
+            onChange={setCustomFieldValue}
+            isLoading={customFieldsLoading}
+            layout={contactLayout}
+          />
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={isLoading} className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">{isLoading ? 'Saving...' : 'Save'}</button>
             <button type="button" onClick={() => isNew ? navigate('/crm/contacts') : setIsEditing(false)} className="px-6 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>

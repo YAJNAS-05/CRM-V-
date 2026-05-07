@@ -168,6 +168,10 @@ export const purchaseOrderApi = {
     axiosInstance.post('/v1/erp/purchase-orders', data),
   update: async (id: string, data: any) =>
     axiosInstance.put(`/v1/erp/purchase-orders/${id}`, data),
+  updateStatus: async (id: string, status: string) =>
+    axiosInstance.patch(`/v1/erp/purchase-orders/${id}/status?status=${status}`),
+  receive: async (id: string) =>
+    axiosInstance.post(`/v1/erp/purchase-orders/${id}/receive`),
   delete: async (id: string) =>
     axiosInstance.delete(`/v1/erp/purchase-orders/${id}`),
 }

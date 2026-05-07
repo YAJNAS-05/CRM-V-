@@ -6,6 +6,9 @@ import com.everx.crm.deal.dto.CreateDealRequest;
 import com.everx.crm.deal.dto.DealDto;
 import com.everx.crm.deal.dto.UpdateDealRequest;
 import com.everx.crm.quote.QuoteRepository;
+import com.everx.crm.webhook.CrmWebhookPublisher;
+import com.everx.platform.config.service.OptionSetService;
+import com.everx.platform.config.service.WorkflowEngineService;
 import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
@@ -21,15 +24,24 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @Transactional
 @Slf4j
 public class DealService {
+
+    private static final String MODULE_CRM = "CRM";
+    private static final String ENTITY_DEAL = "DEAL";
+    private static final String FIELD_STAGE = "stage";
+    private static final String FIELD_LEAD_SOURCE = "leadSource";
+    private static final String DEFAULT_STAGE = "PROSPECTING";
+    private static final String EVENT_CREATED = "created";
+    private static final String EVENT_UPDATED = "updated";
+    private static final String EVENT_DELETED = "deleted";
+    private static final String EVENT_STAGE_CHANGED = "stage_changed";
 
     @Autowired
     private DealRepository dealRepository;
@@ -40,15 +52,25 @@ public class DealService {
     @Autowired
     private ActivityService activityService;
 
+    @Autowired
+    private WorkflowEngineService workflowEngineService;
+
+    @Autowired
+    private OptionSetService optionSetService;
+
+    @Autowired
+    private CrmWebhookPublisher crmWebhookPublisher;
+
     public Page<DealDto> getAllDeals(@NonNull Pageable pageable) {
         log.info("Fetching deals page {} size {}", pageable.getPageNumber(), pageable.getPageSize());
         return dealRepository.findAllActive(pageable).map(DealDto::fromEntity);
     }
 
-    public Page<DealDto> searchDeals(String query, DealStage stage, Pageable pageable) {
+    public Page<DealDto> searchDeals(String query, String stage, Pageable pageable) {
         String normalizedQuery = query != null ? query.trim() : null;
+        String normalizedStage = normalizeStage(stage);
         log.info("Searching deals with query {} stage {}", normalizedQuery, stage);
-        return dealRepository.search(normalizedQuery, stage, pageable).map(DealDto::fromEntity);
+        return dealRepository.search(normalizedQuery, normalizedStage, pageable).map(DealDto::fromEntity);
     }
 
     /**
@@ -64,10 +86,14 @@ public class DealService {
     public DealDto createDeal(@NonNull CreateDealRequest request) {
         log.info("Creating deal {}", request.getName());
         UUID ownerId = request.getOwnerId() != null ? request.getOwnerId() : SecurityUserContext.getCurrentUserIdOrNull();
+        String stage = resolveStage(request.getStage());
+
+        validateOptionValue(MODULE_CRM, ENTITY_DEAL, FIELD_STAGE, stage, "Stage");
+        validateOptionValue(MODULE_CRM, ENTITY_DEAL, FIELD_LEAD_SOURCE, request.getLeadSource(), "Lead source");
 
         Deal deal = Deal.builder()
                 .name(request.getName())
-                .stage(request.getStage() != null ? request.getStage() : DealStage.PROSPECTING)
+            .stage(stage)
                 .amount(request.getAmount())
             .probability(request.getProbability() != null ? request.getProbability() : 50)
                 .expectedCloseDate(request.getExpectedCloseDate())
@@ -81,7 +107,9 @@ public class DealService {
                 .build();
         updateWeightedRevenue(deal);
         Deal savedDeal = dealRepository.save(deal);
-        return DealDto.fromEntity(Objects.requireNonNull(savedDeal, "Saved deal is null"));
+        DealDto dto = DealDto.fromEntity(Objects.requireNonNull(savedDeal, "Saved deal is null"));
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_CREATED, savedDeal.getId(), dto);
+        return dto;
     }
 
     /**
@@ -92,17 +120,24 @@ public class DealService {
         Deal deal = dealRepository.findByIdActive(dealId)
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + dealId));
 
+        String previousStage = deal.getStage();
+
         if (request.getName() != null) deal.setName(request.getName());
-        if (request.getStage() != null && request.getStage() != deal.getStage()) {
-            validateStageChange(deal, request.getStage());
-            deal.setStage(request.getStage());
+        String requestedStage = normalizeStage(request.getStage());
+        boolean stageChanged = requestedStage != null && !requestedStage.equalsIgnoreCase(previousStage);
+        if (stageChanged) {
+            validateStageChange(deal, requestedStage);
+            deal.setStage(requestedStage);
             deal.setDaysInStage(0);
         }
         if (request.getAmount() != null) deal.setAmount(request.getAmount());
         if (request.getProbability() != null) deal.setProbability(request.getProbability());
         if (request.getExpectedCloseDate() != null) deal.setExpectedCloseDate(request.getExpectedCloseDate());
         if (request.getActualCloseDate() != null) deal.setActualCloseDate(request.getActualCloseDate());
-        if (request.getLeadSource() != null) deal.setLeadSource(request.getLeadSource());
+        if (request.getLeadSource() != null) {
+            validateOptionValue(MODULE_CRM, ENTITY_DEAL, FIELD_LEAD_SOURCE, request.getLeadSource(), "Lead source");
+            deal.setLeadSource(request.getLeadSource());
+        }
         if (request.getAccountId() != null) deal.setAccountId(request.getAccountId());
         if (request.getPrimaryContactId() != null) deal.setPrimaryContactId(request.getPrimaryContactId());
         if (request.getDescription() != null) deal.setDescription(request.getDescription());
@@ -113,26 +148,38 @@ public class DealService {
 
         updateWeightedRevenue(deal);
         refreshPipelineMetrics(deal);
-
         Deal updatedDeal = dealRepository.save(deal);
-        return DealDto.fromEntity(Objects.requireNonNull(updatedDeal, "Updated deal is null"));
+        DealDto dto = DealDto.fromEntity(Objects.requireNonNull(updatedDeal, "Updated deal is null"));
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_UPDATED, updatedDeal.getId(), dto);
+        if (stageChanged) {
+            crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_STAGE_CHANGED, updatedDeal.getId(), dto,
+                    Map.of("fromStage", previousStage, "toStage", updatedDeal.getStage()));
+        }
+        return dto;
     }
 
-    public DealDto updateStage(@NonNull UUID dealId, @NonNull DealStage newStage) {
+    public DealDto updateStage(@NonNull UUID dealId, @NonNull String newStage) {
         Deal deal = dealRepository.findByIdActive(dealId)
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + dealId));
 
-        validateStageChange(deal, newStage);
+        String requestedStage = normalizeStage(newStage);
+        if (requestedStage == null) {
+            throw new ValidationException("Stage is required");
+        }
+        validateStageChange(deal, requestedStage);
 
-        DealStage oldStage = deal.getStage();
-        deal.setStage(newStage);
+        String oldStage = deal.getStage();
+        deal.setStage(requestedStage);
         deal.setDaysInStage(0);
         refreshPipelineMetrics(deal);
-
         Deal updatedDeal = dealRepository.save(deal);
         logAutoActivity(deal.getId(), "STAGE_CHANGED",
                 "Deal stage updated", oldStage + " -> " + newStage);
-        return DealDto.fromEntity(updatedDeal);
+        DealDto dto = DealDto.fromEntity(updatedDeal);
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_UPDATED, updatedDeal.getId(), dto);
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_STAGE_CHANGED, updatedDeal.getId(), dto,
+            Map.of("fromStage", oldStage, "toStage", updatedDeal.getStage()));
+        return dto;
     }
 
     public BigDecimal calculateWeightedRevenue(@NonNull UUID dealId) {
@@ -148,7 +195,9 @@ public class DealService {
         Deal deal = dealRepository.findByIdActive(dealId)
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + dealId));
         deal.softDelete();
-        dealRepository.save(deal);
+        Deal saved = dealRepository.save(deal);
+        DealDto dto = DealDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_DELETED, saved.getId(), dto, Map.of("deleted", true));
     }
 
     public Page<DealDto> getDealsByAccount(@NonNull UUID accountId, @NonNull Pageable pageable) {
@@ -156,30 +205,61 @@ public class DealService {
         return dealRepository.findByAccountId(accountId, pageable).map(DealDto::fromEntity);
     }
 
-    public Page<DealDto> getDealsByStage(@NonNull DealStage stage, @NonNull Pageable pageable) {
+    public Page<DealDto> getDealsByStage(@NonNull String stage, @NonNull Pageable pageable) {
         log.info("Fetching deals by stage {}", stage);
         return dealRepository.findByStage(stage, pageable).map(DealDto::fromEntity);
     }
 
-    private void validateStageChange(Deal deal, DealStage newStage) {
-        DealStage currentStage = deal.getStage();
-        Map<DealStage, List<DealStage>> allowedTransitions = Map.of(
-                DealStage.PROSPECTING, List.of(DealStage.QUALIFICATION, DealStage.CLOSED_LOST),
-                DealStage.QUALIFICATION, List.of(DealStage.PROSPECTING, DealStage.PROPOSAL, DealStage.CLOSED_LOST),
-                DealStage.PROPOSAL, List.of(DealStage.NEGOTIATION, DealStage.QUALIFICATION, DealStage.CLOSED_LOST),
-                DealStage.NEGOTIATION, List.of(DealStage.CLOSED_WON, DealStage.PROPOSAL, DealStage.CLOSED_LOST),
-                DealStage.CLOSED_WON, List.of(),
-                DealStage.CLOSED_LOST, List.of(DealStage.PROSPECTING)
-        );
+    private void validateStageChange(Deal deal, String newStage) {
+        if (newStage == null || newStage.isBlank()) {
+            throw new ValidationException("Stage is required");
+        }
+        validateOptionValue(MODULE_CRM, ENTITY_DEAL, FIELD_STAGE, newStage, "Stage");
+        String currentStage = deal.getStage();
 
-        List<DealStage> allowed = allowedTransitions.getOrDefault(currentStage, List.of());
-        if (!allowed.contains(newStage)) {
-            throw new ValidationException("Cannot move from " + currentStage + " to " + newStage);
+        if (workflowEngineService.hasWorkflow(MODULE_CRM, ENTITY_DEAL)) {
+            boolean transitionDefined = workflowEngineService
+                .findTransition(MODULE_CRM, ENTITY_DEAL, currentStage, newStage)
+                    .isPresent();
+
+            if (!transitionDefined) {
+                throw new ValidationException("Cannot move from " + currentStage + " to " + newStage);
+            }
+
+            workflowEngineService.enforceTransition(
+                    MODULE_CRM,
+                    ENTITY_DEAL,
+                    deal.getId().toString(),
+                    currentStage,
+                    newStage);
+            return;
         }
 
-        if (newStage == DealStage.PROPOSAL && quoteRepository.findAllByDealId(deal.getId()).isEmpty()) {
+        if ("PROPOSAL".equalsIgnoreCase(newStage) && quoteRepository.findAllByDealId(deal.getId()).isEmpty()) {
             throw new ValidationException("Cannot move to PROPOSAL without at least one quote");
         }
+    }
+
+    private void validateOptionValue(String module, String entity, String field, String value, String label) {
+        if (!optionSetService.isValidOptionValue(module, entity, field, value)) {
+            throw new ValidationException(label + " value is not configured");
+        }
+    }
+
+    private String normalizeStage(String stage) {
+        if (stage == null) {
+            return null;
+        }
+        String trimmed = stage.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String resolveStage(String stage) {
+        String normalized = normalizeStage(stage);
+        if (normalized != null) {
+            return normalized;
+        }
+        return optionSetService.resolveDefaultValue(MODULE_CRM, ENTITY_DEAL, FIELD_STAGE, DEFAULT_STAGE);
     }
 
     private void updateWeightedRevenue(Deal deal) {

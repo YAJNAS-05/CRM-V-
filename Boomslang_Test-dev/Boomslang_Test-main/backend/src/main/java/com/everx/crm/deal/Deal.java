@@ -22,8 +22,7 @@ public class Deal extends BaseEntity {
     private String name;
 
     @Column(name = "stage", nullable = false)
-    @Enumerated(EnumType.STRING)
-    private DealStage stage;
+    private String stage;
 
     @Column(name = "amount")
     private BigDecimal amount;

@@ -13,6 +13,15 @@ const axiosInstance: AxiosInstance = axios.create({
   },
 })
 
+// Retry configuration
+const RETRY_STATUS_CODES = new Set([429, 503, 502, 504])
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 800
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 // Request interceptor to add JWT token to all requests
 axiosInstance.interceptors.request.use(
   (config) => {
@@ -87,6 +96,20 @@ axiosInstance.interceptors.response.use(
         toast.error('Session expired. Please log in again.')
         window.location.href = '/login'
       }
+    }
+
+    // Retry on network errors and specific status codes (rate-limit / service unavailable)
+    const retryCount = originalRequest._retryCount ?? 0
+    const isNetworkError = !error.response && error.code !== 'ECONNABORTED'
+    const isRetryableStatus = error.response && RETRY_STATUS_CODES.has(error.response.status)
+
+    if ((isNetworkError || isRetryableStatus) && retryCount < MAX_RETRIES && !originalRequest._noRetry) {
+      originalRequest._retryCount = retryCount + 1
+      const delay = isRetryableStatus && error.response?.status === 429
+        ? (parseInt(error.response.headers['retry-after'] ?? '0', 10) * 1000) || RETRY_DELAY_MS * (retryCount + 1)
+        : RETRY_DELAY_MS * (retryCount + 1)
+      await sleep(delay)
+      return axiosInstance(originalRequest)
     }
 
     // Global Error Toasts for other errors

@@ -30,6 +30,7 @@ const PaymentListPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const pageSize = 20
   const [form, setForm] = useState({
@@ -104,6 +105,20 @@ const PaymentListPage: React.FC = () => {
   const closeCreateModal = () => {
     setShowCreateModal(false)
     resetCreateForm()
+  }
+
+  const handleDeletePayment = async (id: string) => {
+    if (!window.confirm('Delete this payment record? This cannot be undone.')) return
+    try {
+      setDeletingId(id)
+      await paymentApi.delete(id)
+      toast.success('Payment deleted')
+      setPayments((prev) => prev.filter((p) => p.id !== id))
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to delete payment')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const handleCreatePayment = async (e: React.FormEvent) => {
@@ -207,6 +222,7 @@ const PaymentListPage: React.FC = () => {
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Reference</th>
               <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Amount</th>
               <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">AUD Equiv.</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -246,6 +262,16 @@ const PaymentListPage: React.FC = () => {
                         Rate: {payment.exchangeRate} AUD/{payment.currency}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => handleDeletePayment(payment.id)}
+                      disabled={deletingId === payment.id}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded text-xs font-medium transition disabled:opacity-40"
+                      title="Delete payment"
+                    >
+                      {deletingId === payment.id ? '...' : 'Delete'}
+                    </button>
                   </td>
                 </tr>
               ))

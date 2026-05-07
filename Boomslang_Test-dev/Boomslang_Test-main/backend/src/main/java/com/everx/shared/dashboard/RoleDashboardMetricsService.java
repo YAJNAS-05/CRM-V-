@@ -7,7 +7,6 @@ import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.hr.EmployeeStatus;
 import com.everx.hr.LeaveStatus;
 import com.everx.hr.ReimbursementStatus;
-import com.everx.hr.TimesheetStatus;
 import com.everx.hr.employee.EmployeeRepository;
 import com.everx.hr.leave.LeaveRequestRepository;
 import com.everx.hr.payroll.PayrollItemRepository;
@@ -101,7 +100,7 @@ public class RoleDashboardMetricsService {
         long upcomingLeaves = leaveRequestRepository.countByStatusAndStartDateBetweenAndIsDeletedFalse(
                 LeaveStatus.APPROVED, today, today.plusDays(30)
         );
-        long pendingTimesheets = timesheetRepository.countByStatusAndIsDeletedFalse(TimesheetStatus.SUBMITTED);
+        long pendingTimesheets = timesheetRepository.countByStatusAndIsDeletedFalse("SUBMITTED");
 
         long openPositions = positionRepository.countByIsDeletedFalse();
         long pendingReimbursements = reimbursementRepository.countByStatusAndIsDeletedFalse(ReimbursementStatus.SUBMITTED);

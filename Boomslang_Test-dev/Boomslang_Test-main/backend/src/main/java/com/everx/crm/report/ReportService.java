@@ -145,7 +145,7 @@ public class ReportService {
                                 continue;
                         }
 
-            String stage = d.getStage() != null ? d.getStage().name() : "UNKNOWN";
+            String stage = d.getStage() != null ? d.getStage() : "UNKNOWN";
             dealCountByStage.merge(stage, 1L, Long::sum);
             if (d.getAmount() != null) {
                 dealValueByStage.merge(stage, d.getAmount(), BigDecimal::add);
@@ -413,11 +413,11 @@ public class ReportService {
         }
 
         private boolean isWonDeal(Deal deal) {
-                return deal.getStage() != null && "CLOSED_WON".equals(deal.getStage().name());
+                return deal.getStage() != null && "CLOSED_WON".equals(deal.getStage());
         }
 
         private boolean isLostDeal(Deal deal) {
-                return deal.getStage() != null && "CLOSED_LOST".equals(deal.getStage().name());
+                return deal.getStage() != null && "CLOSED_LOST".equals(deal.getStage());
         }
 
         private boolean isOpenDeal(Deal deal) {

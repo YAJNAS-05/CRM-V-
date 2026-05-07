@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
 import {
   shipmentApi,
   salesOrderApi,
@@ -11,6 +12,24 @@ import {
 import { Equipment, PurchaseOrder, SalesOrder, Subcontractor, Supplier } from '../../types/erp'
 import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
+
+const shipmentSchema = z.object({
+  status: z.string().min(1, 'Status is required'),
+  soId: z.string().optional(),
+  poId: z.string().optional(),
+  shippedDate: z.string().optional(),
+  estimatedArrival: z.string().optional(),
+  actualArrival: z.string().optional(),
+}).refine(
+  (d) => !!d.soId || !!d.poId,
+  { message: 'Select either a Sales Order or a Purchase Order', path: ['soId'] }
+).refine(
+  (d) => !d.shippedDate || !d.estimatedArrival || d.estimatedArrival >= d.shippedDate,
+  { message: 'Estimated arrival must be on or after shipped date', path: ['estimatedArrival'] }
+).refine(
+  (d) => !d.shippedDate || !d.actualArrival || d.actualArrival >= d.shippedDate,
+  { message: 'Actual arrival must be on or after shipped date', path: ['actualArrival'] }
+)
 
 const SHIPMENT_STATUSES = ['PREPARING', 'BOOKED', 'IN_TRANSIT', 'CUSTOMS_CLEARANCE', 'DELIVERED', 'RETURNED', 'CANCELLED']
 const SHIPMENT_TYPES = ['SEA', 'AIR', 'ROAD']
@@ -70,6 +89,7 @@ export default function ShipmentForm() {
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
 
   useEffect(() => {
     loadLookups()
@@ -225,25 +245,26 @@ export default function ShipmentForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.status) {
-      toast.error('Status is required')
-      return
-    }
 
-    if (!form.soId && !form.poId) {
-      toast.error('Select either a Sales Order or a Purchase Order')
+    const result = shipmentSchema.safeParse({
+      status: form.status,
+      soId: form.soId,
+      poId: form.poId,
+      shippedDate: form.shippedDate,
+      estimatedArrival: form.estimatedArrival,
+      actualArrival: form.actualArrival,
+    })
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
-
-    if (form.shippedDate && form.estimatedArrival && form.estimatedArrival < form.shippedDate) {
-      toast.error('Estimated arrival must be on or after shipped date')
-      return
-    }
-
-    if (form.shippedDate && form.actualArrival && form.actualArrival < form.shippedDate) {
-      toast.error('Actual arrival must be on or after shipped date')
-      return
-    }
+    setFieldErrors({})
 
     try {
       setSaving(true)
@@ -378,15 +399,18 @@ export default function ShipmentForm() {
           <div>
             <h2 className="text-lg font-semibold mb-3 text-gray-700">Linked Orders</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SearchableLookupSelect
-                label="Sales Order"
-                name="soId"
-                value={form.soId}
-                options={salesOrderOptions}
-                onChange={handleLookupChange}
-                disabled={lookupLoading}
-                placeholder="Search sales orders by SO number"
-              />
+              <div>
+                <SearchableLookupSelect
+                  label="Sales Order"
+                  name="soId"
+                  value={form.soId}
+                  options={salesOrderOptions}
+                  onChange={handleLookupChange}
+                  disabled={lookupLoading}
+                  placeholder="Search sales orders by SO number"
+                />
+                {fieldErrors.soId && <p className="mt-1 text-xs text-red-600">{fieldErrors.soId}</p>}
+              </div>
               <SearchableLookupSelect
                 label="Purchase Order"
                 name="poId"

@@ -5,6 +5,8 @@ import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
 import { authApi } from './api/authApi'
 import useEmployeeWorkspaceSync from './hooks/useEmployeeWorkspaceSync'
+import { useFieldworkPendingSync } from './hooks/useFieldworkPendingSync'
+import useNotificationPolling from './hooks/useNotificationPolling'
 import LoginPage from './pages/auth/LoginPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
 import NotificationPanel from './components/NotificationPanel'
@@ -50,6 +52,7 @@ import WarrantyForm from './pages/warranties/WarrantyForm'
 import SubcontractorForm from './pages/subcontractors/SubcontractorForm'
 import AcquisitionsListPage from './pages/acquisitions/AcquisitionsListPage'
 import AcquisitionForm from './pages/acquisitions/AcquisitionForm'
+import AcquisitionDetailPage from './pages/acquisitions/AcquisitionDetailPage'
 import EquipmentAssessmentsListPage from './pages/equipmentassessments/EquipmentAssessmentsListPage'
 import EquipmentAssessmentForm from './pages/equipmentassessments/EquipmentAssessmentForm'
 import SiteAssessmentsListPage from './pages/siteassessments/SiteAssessmentsListPage'
@@ -68,6 +71,7 @@ import PaymentListPage from './pages/finance/PaymentListPage'
 import CurrencyRatePage from './pages/finance/CurrencyRatePage'
 import ReportPage from './pages/finance/ReportPage'
 import FinancialClosePage from './pages/finance/FinancialClosePage'
+import PaymentReconciliationPage from './pages/finance/PaymentReconciliationPage'
 
 // Field Work Pages
 import { FieldWorkListPage } from './pages/fieldwork/FieldWorkListPage'
@@ -81,11 +85,16 @@ import HrDashboardPage from './pages/dashboard/HRDashboardPage'
 import HRManagerDashboardPage from './pages/dashboard/HRManagerDashboardPage'
 import OperationsDashboardPage from './pages/dashboard/OperationsDashboardPage'
 import TechnicianDashboardPage from './pages/fieldwork/TechnicianDashboardPage'
+import PMDashboardPage from './pages/dashboard/PMDashboardPage'
 import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage'
 import { ReportListPage } from './pages/reports/ReportListPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
 import UserManagementPage from './pages/admin/UserManagementPage'
 import RoleManagementPage from './pages/admin/RoleManagementPage'
+import ConfigStudioPage from './pages/admin/ConfigStudioPage'
+import TenantWorkspacePage from './pages/admin/TenantWorkspacePage'
+import BackupRestorePage from './pages/admin/BackupRestorePage'
+import ModuleLicensingPage from './pages/admin/ModuleLicensingPage'
 
 // Inventory Pages
 import InventoryList from './pages/erp/inventory/InventoryList'
@@ -106,6 +115,7 @@ import HROnboardingPage from './pages/hr/HROnboardingPage'
 import HRPerformancePage from './pages/hr/HRPerformancePage'
 import HRCompliancePage from './pages/hr/HRCompliancePage'
 import HRAnalyticsPage from './pages/hr/HRAnalyticsPage'
+import BenefitEnrollmentPage from './pages/hr/BenefitEnrollmentPage'
 import EmployeeListPage from './pages/hr/EmployeeListPage'
 import EmployeeDetailPage from './pages/hr/EmployeeDetailPage'
 import EmployeeFormPage from './pages/hr/EmployeeFormPage'
@@ -177,7 +187,6 @@ const HR_RECRUITER_ROLES = ['RECRUITER', ...HR_ADMIN_ROLES]
 const HR_PAYROLL_ROLES = ['PAYROLL', ...HR_ADMIN_ROLES]
 const HR_EXECUTIVE_ROLES = ['EXECUTIVE', ...HR_ADMIN_ROLES]
 const HR_SELF_SERVICE_ROLES = ['EMPLOYEE', ...HR_MANAGER_ROLES]
-const WORKSPACE_MODULE_ROLES = ['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN']
 
 const resolveUserRoles = (user?: { roles?: string[]; role?: string } | null) => {
   if (!user) return []
@@ -194,6 +203,7 @@ const inferRoutePermissions = (pathname: string): string[] => {
     'DASHBOARD_HR_VIEW',
     'DASHBOARD_TECH_VIEW',
     'DASHBOARD_OPERATIONS_VIEW',
+    'DASHBOARD_PM_VIEW',
     'FIELDWORK_VIEW',
     'HR_VIEW'
   ]
@@ -205,15 +215,19 @@ const inferRoutePermissions = (pathname: string): string[] => {
   if (pathname === '/dashboard/hr') return ['DASHBOARD_HR_VIEW']
   if (pathname === '/dashboard/hr/manager' || pathname === '/dashboard/manager') return ['DASHBOARD_HR_VIEW', 'HR_VIEW']
   if (pathname === '/dashboard/technician') return ['DASHBOARD_TECH_VIEW']
+  if (pathname === '/dashboard/pm') return ['DASHBOARD_PM_VIEW']
   if (pathname === '/dashboard/fieldwork') return ['FIELDWORK_VIEW']
   if (pathname === '/dashboard/employee') return ['HR_VIEW']
   if (pathname === '/employee' || pathname.startsWith('/employee/')) return ['HR_VIEW']
+  if (pathname === '/employee/attendance') return ['ATTENDANCE_SELF_VIEW', 'HR_VIEW']
   if (pathname === '/crm/dashboard/team') return ['DASHBOARD_TEAM_VIEW']
   if (pathname === '/crm/dashboard/user') return ['DASHBOARD_SELF_VIEW']
   if (pathname === '/crm/dashboard') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
   if (pathname.startsWith('/crm/')) return ['CRM_VIEW']
   if (pathname.startsWith('/erp/')) return ['ERP_VIEW']
+  if (pathname === '/hr/attendance') return ['ATTENDANCE_MANAGE_VIEW', 'HR_VIEW']
   if (pathname === '/hr' || pathname.startsWith('/hr/')) return ['HR_VIEW']
+  if (pathname === '/pm' || pathname.startsWith('/pm/')) return ['PM_VIEW']
   if (pathname.startsWith('/finance/')) return ['FINANCE_VIEW']
   if (pathname.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
   if (pathname.startsWith('/reports')) return ['REPORT_VIEW']
@@ -229,6 +243,7 @@ const getFirstDashboardPath = (permissions: string[], roles: string[] = []): str
   if (permissions.includes('DASHBOARD_HR_VIEW')) return '/dashboard/hr'
   if (permissions.includes('DASHBOARD_TECH_VIEW')) return '/dashboard/technician'
   if (permissions.includes('DASHBOARD_TEAM_VIEW') || permissions.includes('DASHBOARD_SELF_VIEW')) return '/dashboard/crm'
+  if (permissions.includes('DASHBOARD_PM_VIEW')) return '/dashboard/pm'
   if (permissions.includes('FIELDWORK_VIEW')) return '/dashboard/fieldwork'
   if (permissions.includes('HR_VIEW')) return '/dashboard/employee'
   return '/profile'
@@ -253,6 +268,7 @@ const getFirstAuthorizedPath = (permissions: string[], roles: string[] = []): st
   }
   if (permissions.includes('CRM_VIEW')) return '/crm/accounts'
   if (permissions.includes('ERP_VIEW')) return '/erp/equipment'
+  if (permissions.includes('PM_VIEW')) return '/pm/projects'
   if (permissions.includes('HR_VIEW')) return '/hr'
   if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
   if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
@@ -312,6 +328,16 @@ const EmployeeModuleBoundary: React.FC<{ children: React.ReactNode }> = ({ child
   useEmployeeWorkspaceSync()
 
   return <Suspense fallback={<EmployeeModuleFallback />}>{children}</Suspense>
+}
+
+const FieldworkSyncProvider: React.FC = () => {
+  useFieldworkPendingSync()
+  return null
+}
+
+const NotificationPoller: React.FC = () => {
+  useNotificationPolling(30_000)
+  return null
 }
 
 const AuthSessionSync: React.FC = () => {
@@ -460,11 +486,15 @@ const NotFoundPage: React.FC = () => {
 }
 
 function App() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <NotificationPanel />
         <AuthSessionSync />
+        {isAuthenticated && <FieldworkSyncProvider />}
+        {isAuthenticated && <NotificationPoller />}
         <Toaster richColors position="top-right" />
         <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -491,6 +521,7 @@ function App() {
                 'DASHBOARD_HR_VIEW',
                 'DASHBOARD_TECH_VIEW',
                 'DASHBOARD_OPERATIONS_VIEW',
+                'DASHBOARD_PM_VIEW',
                 'FIELDWORK_VIEW',
                 'HR_VIEW'
               ]}
@@ -557,6 +588,14 @@ function App() {
           }
         />
         <Route
+          path="/dashboard/pm"
+          element={
+            <ProtectedRoute requiredPermissions={['DASHBOARD_PM_VIEW']}>
+              <PMDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/crm"
           element={
             <ProtectedRoute requiredPermissions={['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']}>
@@ -593,7 +632,6 @@ function App() {
           element={
             <ProtectedRoute
               requiredPermissions={['HR_VIEW']}
-              requiredRoles={WORKSPACE_MODULE_ROLES}
             >
               <Navigate to="/employee" replace />
             </ProtectedRoute>
@@ -602,7 +640,7 @@ function App() {
         <Route
           path="/employee"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
               <EmployeeModuleBoundary>
                 <EmployeeWorkspaceDashboardPage />
               </EmployeeModuleBoundary>
@@ -611,38 +649,44 @@ function App() {
         />
         <Route
           path="/employee/projects"
-          element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
-              <EmployeeModuleBoundary>
-                <ProjectsPage />
-              </EmployeeModuleBoundary>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/pm/projects" replace />}
         />
         <Route
           path="/employee/projects/:id"
+          element={<Navigate to="/pm/projects" replace />}
+        />
+        <Route
+          path="/employee/tasks"
+          element={<Navigate to="/pm/tasks" replace />}
+        />
+        <Route
+          path="/pm/projects"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
-              <EmployeeModuleBoundary>
-                <ProjectDetailPage />
-              </EmployeeModuleBoundary>
+            <ProtectedRoute requiredPermissions={['PM_VIEW']}>
+              <ProjectsPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/employee/tasks"
+          path="/pm/projects/:id"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
-              <EmployeeModuleBoundary>
-                <MyTasksPage />
-              </EmployeeModuleBoundary>
+            <ProtectedRoute requiredPermissions={['PM_VIEW']}>
+              <ProjectDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pm/tasks"
+          element={
+            <ProtectedRoute requiredPermissions={['PM_VIEW']}>
+              <MyTasksPage />
             </ProtectedRoute>
           }
         />
         <Route
           path="/employee/timesheets"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
               <EmployeeModuleBoundary>
                 <EmployeeTimesheetsPage />
               </EmployeeModuleBoundary>
@@ -652,7 +696,7 @@ function App() {
         <Route
           path="/employee/attendance"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
               <EmployeeModuleBoundary>
                 <EmployeeAttendancePage />
               </EmployeeModuleBoundary>
@@ -950,6 +994,14 @@ function App() {
           element={
             <ProtectedRoute>
               <AcquisitionsListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/acquisitions/:id"
+          element={
+            <ProtectedRoute>
+              <AcquisitionDetailPage />
             </ProtectedRoute>
           }
         />
@@ -1438,6 +1490,14 @@ function App() {
           element={
             <ProtectedRoute requiredRoles={HR_EXECUTIVE_ROLES}>
               <HRAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/benefits"
+          element={
+            <ProtectedRoute requiredRoles={HR_SELF_SERVICE_ROLES}>
+              <BenefitEnrollmentPage />
             </ProtectedRoute>
           }
         />
@@ -1938,6 +1998,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/finance/reconciliation"
+          element={
+            <ProtectedRoute>
+              <PaymentReconciliationPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Field Work Routes */}
         <Route
@@ -1967,6 +2035,14 @@ function App() {
 
         {/* Admin Routes */}
         <Route
+          path="/admin/config"
+          element={
+            <ProtectedRoute requiredPermissions={['ROLE_VIEW']}>
+              <ConfigStudioPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/users"
           element={
             <ProtectedRoute requiredPermissions={['USER_VIEW']}>
@@ -1995,6 +2071,30 @@ function App() {
           element={
             <ProtectedRoute>
               <Navigate to="/admin/users" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/workspaces"
+          element={
+            <ProtectedRoute>
+              <TenantWorkspacePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/backup"
+          element={
+            <ProtectedRoute>
+              <BackupRestorePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/modules"
+          element={
+            <ProtectedRoute>
+              <ModuleLicensingPage />
             </ProtectedRoute>
           }
         />

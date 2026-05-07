@@ -5,6 +5,7 @@ import { accountApi } from '../../api/crmApi'
 import { Account } from '../../types/crm'
 import { Equipment, SalesOrder } from '../../types/erp'
 import { toast } from 'react-hot-toast'
+import { getErrorMessage } from '../../utils/errorUtils'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
 
 const WARRANTY_TYPES = ['STANDARD', 'EXTENDED', 'LIMITED', 'COMPREHENSIVE', 'PARTS_ONLY', 'LABOR_ONLY', 'AMC']
@@ -149,8 +150,8 @@ export default function WarrantyForm() {
       setAccounts(accountsResponse.data?.data?.content || [])
       setEquipment(equipmentResponse.data?.content || [])
       setSalesOrders(salesOrdersResponse.data?.data?.content || [])
-    } catch {
-      toast.error('Failed to load warranty lookups')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to load warranty lookups'))
     } finally {
       setLookupLoading(false)
     }
@@ -182,8 +183,8 @@ export default function WarrantyForm() {
           notes: metadata.cleanedNotes,
         })
       }
-    } catch {
-      toast.error('Failed to load warranty')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to load warranty'))
     } finally {
       setLoading(false)
     }
@@ -306,7 +307,7 @@ export default function WarrantyForm() {
         }
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to save warranty')
+      toast.error(getErrorMessage(error, 'Failed to save warranty'))
     } finally {
       setSaving(false)
     }

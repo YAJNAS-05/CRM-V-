@@ -6,6 +6,10 @@ import { z } from 'zod'
 import { quoteApi, dealApi } from '../../api/crmApi'
 import { Quote, Deal, CreateQuoteLineItemRequest } from '../../types/crm'
 import { toast } from 'sonner'
+import { useOptionSet } from '../../hooks/useOptionSet'
+import CustomFieldsPanel from '../../components/config/CustomFieldsPanel'
+import { useCustomFields } from '../../hooks/useCustomFields'
+import { useLayoutConfig } from '../../hooks/useLayoutConfig'
 
 const quoteLineItemSchema = z.object({
   equipmentId: z.string().optional(),
@@ -46,6 +50,20 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
   const [isConverting, setIsConverting] = useState(false)
   const [isFetching, setIsFetching] = useState(!isNew)
   const [deals, setDeals] = useState<Deal[]>([])
+  const {
+    definitions: customFieldDefinitions,
+    values: customFieldValues,
+    setValue: setCustomFieldValue,
+    isLoading: customFieldsLoading,
+    save: saveCustomFields,
+  } = useCustomFields({ module: 'CRM', entity: 'QUOTE', entityId: id })
+  const { layout: quoteLayout } = useLayoutConfig({ module: 'CRM', entity: 'QUOTE' })
+  const { options: statusOptions } = useOptionSet({
+    module: 'CRM',
+    entity: 'QUOTE',
+    field: 'status',
+    fallbackValues: ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED'],
+  })
   
   const { register, handleSubmit, formState: { errors }, reset, control, watch } = useForm<QuoteFormData>({
     resolver: zodResolver(quoteSchema),
@@ -125,12 +143,21 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
   const onSubmit = async (data: QuoteFormData) => {
     setIsLoading(true)
     try {
+      let resolvedId = id
       if (isNew) {
-        await quoteApi.create(data)
+        const response = await quoteApi.create(data)
+        resolvedId = response.data.data?.id
         toast.success('Quote created successfully')
       } else {
         await quoteApi.update(id!, data)
         toast.success('Quote updated successfully')
+      }
+      if (resolvedId) {
+        try {
+          await saveCustomFields(resolvedId)
+        } catch {
+          toast.error('Quote saved, but custom fields failed to save')
+        }
       }
       navigate('/crm/quotes')
     } catch (error: any) {
@@ -170,7 +197,20 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-3xl font-bold mb-6">{isNew ? 'New Quote' : 'Edit Quote'}</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">{isNew ? 'New Quote' : 'Edit Quote'}</h1>
+          {!isNew && id && (
+            <a
+              href={`${import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8080/api`}/v1/crm/quotes/${id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Download PDF
+            </a>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Quote Header Info */}
@@ -213,10 +253,9 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
                   {...register('status')}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="DRAFT">Draft</option>
-                  <option value="SENT">Sent</option>
-                  <option value="ACCEPTED">Accepted</option>
-                  <option value="REJECTED">Rejected</option>
+                  {statusOptions.map((option) => (
+                    <option key={option.id} value={option.value}>{option.label || option.value}</option>
+                  ))}
                 </select>
               </div>
 
@@ -396,6 +435,15 @@ const QuoteDetailPage: React.FC<QuoteDetailPageProps> = ({ isNew = false }) => {
               ></textarea>
             </div>
           </div>
+
+          <CustomFieldsPanel
+            title="Custom Quote Fields"
+            definitions={customFieldDefinitions}
+            values={customFieldValues}
+            onChange={setCustomFieldValue}
+            isLoading={customFieldsLoading}
+            layout={quoteLayout}
+          />
 
           {/* Actions */}
           <div className="flex flex-wrap gap-4 mt-8">

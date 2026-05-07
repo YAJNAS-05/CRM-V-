@@ -2,10 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { timesheetApi } from '../api/hrApi'
 import useEmployeeWorkspace from './useEmployeeWorkspace'
 import useEmployeeWorkspaceSync from './useEmployeeWorkspaceSync'
-import { useEmployeeWorkspaceStore, type WorkspaceProject } from '../store/employeeWorkspaceStore'
+import { useEmployeeWorkspaceStore } from '../store/employeeWorkspaceStore'
+import { Project } from '../types/pm'
 
 export interface EmployeeTimeLogInput {
-  project: WorkspaceProject
+  project: Project
   taskId?: string
   workDate: string
   hours: number
@@ -22,7 +23,6 @@ export interface EmployeeTimeLogResult {
 export const useEmployeeTimeLogger = () => {
   const { workspaceUser } = useEmployeeWorkspace()
   const { currentEmployee } = useEmployeeWorkspaceSync()
-  const logTime = useEmployeeWorkspaceStore((state) => state.logTime)
   const queryClient = useQueryClient()
 
   const logEmployeeTime = async ({ project, taskId, workDate, hours, note }: EmployeeTimeLogInput): Promise<EmployeeTimeLogResult> => {
@@ -39,19 +39,6 @@ export const useEmployeeTimeLogger = () => {
       localLogged: false,
       apiSynced: false,
       backendUnavailable: false,
-    }
-
-    if (taskId) {
-      logTime({
-        projectId: project.id,
-        taskId,
-        employeeId: workspaceUser.id,
-        employeeName: workspaceUser.fullName,
-        workDate,
-        hours,
-        note,
-      })
-      result.localLogged = true
     }
 
     if (!project.linkedFieldJobId) {

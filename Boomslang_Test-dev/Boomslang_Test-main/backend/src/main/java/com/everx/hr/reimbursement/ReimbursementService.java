@@ -1,5 +1,6 @@
 package com.everx.hr.reimbursement;
 
+import com.everx.finance.journal.GlPostingService;
 import com.everx.hr.ReimbursementStatus;
 import com.everx.hr.reimbursement.dto.CreateReimbursementRequest;
 import com.everx.hr.reimbursement.dto.ReimbursementRequestDto;
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class ReimbursementService {
 
     private final ReimbursementRepository reimbursementRepository;
+    private final GlPostingService glPostingService;
 
     @Transactional
     public ReimbursementRequestDto createReimbursement(CreateReimbursementRequest request) {
@@ -85,7 +87,20 @@ public class ReimbursementService {
         reimbursement.setStatus(ReimbursementStatus.APPROVED);
         reimbursement.setApprovedBy(approvedBy);
         reimbursement.setApprovedAt(OffsetDateTime.now());
-        return toDto(reimbursementRepository.save(reimbursement));
+
+        ReimbursementRequest savedReimbursement = reimbursementRepository.save(reimbursement);
+
+        // Post to GL: Debit Expense, Credit Cash/Bank
+        glPostingService.postReimbursementExpense(
+            savedReimbursement.getId(),
+            "RMB-" + savedReimbursement.getId().toString().substring(0, 8).toUpperCase(),
+            savedReimbursement.getAmount(),
+            savedReimbursement.getCurrency(),
+            savedReimbursement.getCategory(),
+            "Reimbursement approved: " + savedReimbursement.getDescription()
+        );
+
+        return toDto(savedReimbursement);
     }
 
     private ReimbursementRequestDto toDto(ReimbursementRequest reimbursement) {

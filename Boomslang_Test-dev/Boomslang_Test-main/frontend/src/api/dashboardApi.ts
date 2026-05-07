@@ -172,8 +172,8 @@ export const dashboardApi = {
   getFinanceMetrics: () =>
     axiosInstance.get<{ data: any }>('/v1/dashboards/finance/metrics'),
 
-  getHRMetrics: () =>
-    axiosInstance.get<{ data: any }>('/v1/dashboards/hr/metrics'),
+  getHRMetrics: (config?: { signal?: AbortSignal }) =>
+    axiosInstance.get<{ data: any }>('/v1/dashboards/hr/metrics', config),
 
   getOperationsMetrics: () =>
     axiosInstance.get<{ data: any }>('/v1/dashboards/operations/metrics'),

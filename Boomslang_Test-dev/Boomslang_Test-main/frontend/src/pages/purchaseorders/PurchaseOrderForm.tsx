@@ -4,6 +4,22 @@ import { purchaseOrderApi, supplierApi, equipmentApi } from '../../api/erpApi'
 import { Supplier, Equipment } from '../../types/erp'
 import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
+import { z } from 'zod'
+
+const poSchema = z.object({
+  supplierId: z.string().min(1, 'Supplier is required'),
+  status: z.string().min(1, 'Status is required'),
+  poType: z.string().min(1, 'PO Type is required'),
+  orderDate: z.string().optional(),
+  expectedDelivery: z.string().optional(),
+  currency: z.string().optional(),
+  totalAmount: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  notes: z.string().optional(),
+}).refine(data => {
+  if (data.orderDate && data.expectedDelivery && data.expectedDelivery < data.orderDate) return false
+  return true
+}, { message: 'Expected delivery cannot be before order date', path: ['expectedDelivery'] })
 
 const PO_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SHIPPED', 'DELIVERED', 'CANCELLED']
 const CURRENCIES = ['AUD', 'USD', 'JPY', 'EUR', 'GBP']
@@ -214,13 +230,9 @@ export default function PurchaseOrderForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.supplierId || !form.status) {
-      toast.error('Supplier and Status are required')
-      return
-    }
-
-    if (form.orderDate && form.expectedDelivery && form.expectedDelivery < form.orderDate) {
-      toast.error('Expected delivery cannot be before order date')
+    const result = poSchema.safeParse(form)
+    if (!result.success) {
+      toast.error(result.error.errors[0]?.message || 'Please fix validation errors')
       return
     }
 

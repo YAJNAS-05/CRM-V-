@@ -57,6 +57,25 @@ const ReportPage: React.FC = () => {
     { name: 'Profit', amount: pnlData.netProfit }
   ] : []
 
+  // Build cash flow forecast: last 3-month average projected 6 months forward
+  const forecastData = (() => {
+    const entries = cashFlow?.entries || []
+    if (entries.length === 0) return []
+    const recentN = entries.slice(-3)
+    const avgInflow = recentN.reduce((s, e) => s + (e.inflow || 0), 0) / recentN.length
+    const avgOutflow = recentN.reduce((s, e) => s + (e.outflow || 0), 0) / recentN.length
+    const lastDate = new Date(entries[entries.length - 1]?.date || new Date())
+    type DataPoint = { date: string; inflow: number | null; outflow: number | null; net: number | null; forecastInflow: number | null; forecastOutflow: number | null; forecastNet: number | null }
+    const actuals: DataPoint[] = entries.map(e => ({ date: e.date?.slice(0, 7) || e.date, inflow: e.inflow, outflow: e.outflow, net: e.net, forecastInflow: null, forecastOutflow: null, forecastNet: null }))
+    const projections: DataPoint[] = []
+    for (let i = 1; i <= 6; i++) {
+      const d = new Date(lastDate)
+      d.setMonth(d.getMonth() + i)
+      projections.push({ date: d.toISOString().slice(0, 7), inflow: null, outflow: null, net: null, forecastInflow: Math.round(avgInflow), forecastOutflow: Math.round(avgOutflow), forecastNet: Math.round(avgInflow - avgOutflow) })
+    }
+    return [...actuals, ...projections]
+  })()
+
   return (
     <div className="container mx-auto px-4 py-8 bg-gray-50/50 min-h-screen">
       <div className="flex justify-between items-center mb-10">
@@ -181,6 +200,57 @@ const ReportPage: React.FC = () => {
             </div>
          </div>
       </div>
+
+      {/* Cash Flow Forecast */}
+      {forecastData.length > 0 && (
+        <div className="mt-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-gray-800">Cash Flow Forecast</h3>
+              <p className="text-xs text-gray-400 mt-1">Actuals + 6-month forward projection (based on 3-month trailing average)</p>
+            </div>
+            <div className="flex gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><span className="inline-block w-6 h-0.5 bg-indigo-600"></span> Actual</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-6 border-t-2 border-dashed border-amber-500"></span> Forecast</span>
+            </div>
+          </div>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={forecastData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  formatter={(val: number, name: string) => [`$${val.toLocaleString()}`, name]}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="inflow" name="Actual Inflow" stroke="#4f46e5" strokeWidth={2} dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="outflow" name="Actual Outflow" stroke="#ef4444" strokeWidth={2} dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="forecastInflow" name="Forecast Inflow" stroke="#a5b4fc" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="forecastOutflow" name="Forecast Outflow" stroke="#fca5a5" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="forecastNet" name="Forecast Net" stroke="#34d399" strokeWidth={2} strokeDasharray="4 4" dot={false} connectNulls={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Forecast summary */}
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            {(['forecastInflow','forecastOutflow','forecastNet'] as const).map(key => {
+              const projected = forecastData.filter(d => d[key] !== null)
+              const avg = projected.length > 0 ? projected.reduce((s, d) => s + (d[key] as number || 0), 0) / projected.length : 0
+              const total = projected.reduce((s, d) => s + (d[key] as number || 0), 0)
+              const label = key === 'forecastInflow' ? 'Inflow' : key === 'forecastOutflow' ? 'Outflow' : 'Net'
+              return (
+                <div key={key} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+                  <p className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">{label} Forecast (6mo)</p>
+                  <p className="text-lg font-black text-gray-800 mt-1">${total.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">avg ${Math.round(avg).toLocaleString()} / mo</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

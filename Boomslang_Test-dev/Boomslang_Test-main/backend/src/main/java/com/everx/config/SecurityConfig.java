@@ -1,8 +1,10 @@
 package com.everx.config;
 
 import com.everx.auth.service.UserService;
+import com.everx.backend.auth.filter.RateLimitingFilter;
 import com.everx.shared.util.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,6 +34,9 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    
+    @Autowired(required = false)
+    private RateLimitingFilter rateLimitingFilter;
 
     public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
         this.jwtTokenProvider = jwtTokenProvider;
@@ -59,6 +64,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                         .requestMatchers("/api/v1/auth/health").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/**").hasAuthority("INSIGHTS_VIEW")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/hr/attendance/me").hasAnyAuthority("ATTENDANCE_SELF_VIEW", "HR_VIEW", "HR_EDIT", "HR_CREATE", "HR_DELETE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/hr/attendance/check-in").hasAnyAuthority("ATTENDANCE_SELF_PUNCH", "HR_CREATE", "HR_EDIT")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/hr/attendance/check-out").hasAnyAuthority("ATTENDANCE_SELF_PUNCH", "HR_CREATE", "HR_EDIT")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/hr/attendance/**").hasAnyAuthority("ATTENDANCE_MANAGE_VIEW", "HR_VIEW", "HR_EDIT", "HR_CREATE", "HR_DELETE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/hr/attendance/**").hasAnyAuthority("ATTENDANCE_MANAGE_CORRECT", "HR_EDIT")
                     .requestMatchers("/api/v1/crm/reports/**").hasAnyAuthority(
                         "DASHBOARD_SELF_VIEW",
                         "DASHBOARD_TEAM_VIEW",
@@ -85,6 +95,26 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.PUT, "/api/v1/finance/**").hasAnyAuthority("FINANCE_EDIT")
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/finance/**").hasAnyAuthority("FINANCE_EDIT")
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/finance/**").hasAnyAuthority("FINANCE_DELETE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pm/projects/**").hasAnyAuthority("PM_PROJECT_VIEW", "PM_VIEW", "PM_CREATE", "PM_EDIT", "PM_DELETE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pm/projects/*/members").hasAnyAuthority("PM_PROJECT_MEMBER_ADD", "PM_PROJECT_EDIT", "PM_EDIT", "PM_CREATE")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/pm/projects/*/members/*").hasAnyAuthority("PM_PROJECT_MEMBER_REMOVE", "PM_PROJECT_EDIT", "PM_EDIT", "PM_DELETE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pm/projects/*/costs").hasAnyAuthority("PM_PROJECT_COST_ADD", "PM_PROJECT_EDIT", "PM_EDIT", "PM_CREATE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pm/projects/**").hasAnyAuthority("PM_PROJECT_CREATE", "PM_PROJECT_EDIT", "PM_CREATE", "PM_EDIT")
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/pm/projects/**").hasAnyAuthority("PM_PROJECT_EDIT", "PM_EDIT")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/pm/projects/**").hasAnyAuthority("PM_PROJECT_EDIT", "PM_EDIT")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/pm/projects/**").hasAnyAuthority("PM_PROJECT_DELETE", "PM_DELETE")
+
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pm/tasks/**").hasAnyAuthority("PM_TASK_VIEW", "PM_VIEW", "PM_CREATE", "PM_EDIT", "PM_DELETE")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pm/tasks/**").hasAnyAuthority("PM_TASK_CREATE", "PM_CREATE", "PM_EDIT")
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/pm/tasks/**").hasAnyAuthority("PM_TASK_EDIT", "PM_EDIT", "PM_TASK_ASSIGN")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/pm/tasks/**").hasAnyAuthority("PM_TASK_EDIT", "PM_EDIT", "PM_TASK_ASSIGN")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/pm/tasks/**").hasAnyAuthority("PM_TASK_DELETE", "PM_DELETE")
+
+                    .requestMatchers(HttpMethod.GET, "/api/v1/pm/**").hasAnyAuthority("PM_VIEW", "PM_CREATE", "PM_EDIT", "PM_DELETE", "PM_PROJECT_VIEW", "PM_TASK_VIEW")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/pm/**").hasAnyAuthority("PM_CREATE", "PM_EDIT", "PM_PROJECT_CREATE", "PM_TASK_CREATE")
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/pm/**").hasAnyAuthority("PM_EDIT", "PM_PROJECT_EDIT", "PM_TASK_EDIT")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/pm/**").hasAnyAuthority("PM_EDIT", "PM_PROJECT_EDIT", "PM_TASK_EDIT")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/pm/**").hasAnyAuthority("PM_DELETE", "PM_PROJECT_DELETE", "PM_TASK_DELETE")
                     .requestMatchers(HttpMethod.GET, "/api/v1/fieldwork/**").hasAnyAuthority("FIELDWORK_VIEW", "FIELDWORK_CREATE", "FIELDWORK_EDIT")
                     .requestMatchers(HttpMethod.POST, "/api/v1/fieldwork/**").hasAnyAuthority("FIELDWORK_CREATE", "FIELDWORK_EDIT")
                     .requestMatchers(HttpMethod.PUT, "/api/v1/fieldwork/**").hasAnyAuthority("FIELDWORK_EDIT")
@@ -104,6 +134,11 @@ public class SecurityConfig {
                         })
                 )
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        
+        // Add rate limiting filter if available
+        if (rateLimitingFilter != null) {
+            http.addFilterBefore(rateLimitingFilter, JwtAuthenticationFilter.class);
+        }
 
         return http.build();
     }

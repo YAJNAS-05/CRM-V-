@@ -8,7 +8,6 @@ const resolveRoles = (roles?: string[], role?: string | null) => {
   return []
 }
 
-const WORKSPACE_ACCESS_ROLES = new Set(['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'])
 
 export const useEmployeeWorkspace = () => {
   const user = useAuthStore((state) => state.user)
@@ -29,9 +28,9 @@ export const useEmployeeWorkspace = () => {
   }, [user?.role, user?.roles])
 
   const canAccessWorkspace = useMemo(() => {
-    const roles = resolveRoles(user?.roles, user?.role)
-    return roles.some((role) => WORKSPACE_ACCESS_ROLES.has(role))
-  }, [user?.role, user?.roles])
+    const permissions = user?.permissions || []
+    return permissions.includes('HR_VIEW')
+  }, [user?.permissions])
 
   useEffect(() => {
     if (!workspaceUser || !canAccessWorkspace) {

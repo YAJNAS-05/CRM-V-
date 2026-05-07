@@ -37,7 +37,7 @@ public class Task extends BaseEntity {
     private UUID assigneeId;
 
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "TO_DO";
+    private String status = "TODO";
 
     @Column(name = "priority", nullable = false, length = 20)
     private String priority = "MEDIUM";

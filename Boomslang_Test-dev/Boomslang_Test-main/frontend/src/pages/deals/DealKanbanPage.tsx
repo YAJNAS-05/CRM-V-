@@ -1,10 +1,11 @@
-import { useEffect, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { dealApi } from '../../api/crmApi'
 import { Deal } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
 import DealsViewHeader from './components/DealsViewHeader'
+import { useOptionSet } from '../../hooks/useOptionSet'
 
 type StageConfig = {
   key: string
@@ -16,7 +17,7 @@ type StageConfig = {
   dot: string
 }
 
-const DEAL_STAGES: StageConfig[] = [
+const FALLBACK_STAGE_CONFIGS: StageConfig[] = [
   {
     key: 'PROSPECTING',
     label: 'Prospecting',
@@ -77,69 +78,100 @@ export default function DealKanbanPage() {
   const permissions = useAuthStore((state) => state.user?.permissions)
   const canCreate = permissions?.includes('CRM_CREATE') ?? false
   const canEdit = permissions?.includes('CRM_EDIT') ?? false
+  const { options: stageOptions } = useOptionSet({
+    module: 'CRM',
+    entity: 'DEAL',
+    field: 'stage',
+    fallbackValues: FALLBACK_STAGE_CONFIGS.map((stage) => stage.key),
+  })
+  const stageConfigs = useMemo(() => {
+    const fallbackMap = new Map(FALLBACK_STAGE_CONFIGS.map((stage) => [stage.key, stage]))
+    return stageOptions.map((option) => {
+      const fallback = fallbackMap.get(option.value)
+      if (fallback) {
+        return { ...fallback, label: option.label || fallback.label }
+      }
+      return {
+        key: option.value,
+        label: option.label || option.value.replace(/_/g, ' '),
+        border: 'border-slate-200',
+        columnBg: 'from-slate-50 via-white to-white',
+        headerBg: 'from-slate-100 to-slate-50',
+        badgeBg: 'bg-slate-100 text-slate-700',
+        dot: 'bg-slate-500',
+      }
+    })
+  }, [stageOptions])
   const [dealsByStage, setDealsByStage] = useState<Record<string, Deal[]>>({})
   const [loading, setLoading] = useState(true)
   const [draggedDeal, setDraggedDeal] = useState<Deal | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
+  const [stageMeta, setStageMeta] = useState<Record<string, { page: number; hasMore: boolean; loadingMore: boolean }>>({})
   const navigate = useNavigate()
+
+  const PAGE_SIZE = 20
 
   useEffect(() => {
     fetchDeals()
-  }, [])
+  }, [stageConfigs])
 
   const fetchStageDeals = async (stageKey: string) => {
-    const pageSize = 100
-    let pageIndex = 0
-    let totalPages = 1
-    const allDeals: Deal[] = []
+    const response = await dealApi.getByStage(stageKey, 0, PAGE_SIZE)
+    const data = response.data.data
 
-    while (pageIndex < totalPages) {
-      const response = await dealApi.getByStage(stageKey, pageIndex, pageSize)
-      const data = response.data.data
-
-      if (Array.isArray(data)) {
-        return data
-      }
-
-      const content = data?.content || []
-      allDeals.push(...content)
-
-      if (typeof data?.totalPages === 'number') {
-        totalPages = data.totalPages
-      } else if (content.length < pageSize) {
-        totalPages = pageIndex + 1
-      } else {
-        totalPages = pageIndex + 2
-      }
-
-      if (content.length === 0) {
-        break
-      }
-
-      pageIndex += 1
+    if (Array.isArray(data)) {
+      return { deals: data, hasMore: false }
     }
 
-    return allDeals
+    const content = data?.content || []
+    const totalPages = typeof data?.totalPages === 'number' ? data.totalPages : (content.length < PAGE_SIZE ? 1 : 2)
+    return { deals: content, hasMore: totalPages > 1 }
   }
 
   const fetchDeals = async () => {
     try {
       setLoading(true)
       const stageDeals: Record<string, Deal[]> = {}
+      const meta: Record<string, { page: number; hasMore: boolean; loadingMore: boolean }> = {}
 
-      await Promise.all(DEAL_STAGES.map(async (stage) => {
+      await Promise.all(stageConfigs.map(async (stage) => {
         try {
-          stageDeals[stage.key] = await fetchStageDeals(stage.key)
+          const { deals, hasMore } = await fetchStageDeals(stage.key)
+          stageDeals[stage.key] = deals
+          meta[stage.key] = { page: 0, hasMore, loadingMore: false }
         } catch {
           stageDeals[stage.key] = []
+          meta[stage.key] = { page: 0, hasMore: false, loadingMore: false }
         }
       }))
 
       setDealsByStage(stageDeals)
+      setStageMeta(meta)
     } catch {
       toast.error('Failed to load pipeline')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMoreForStage = async (stageKey: string) => {
+    const meta = stageMeta[stageKey]
+    if (!meta || meta.loadingMore || !meta.hasMore) return
+
+    setStageMeta((prev) => ({ ...prev, [stageKey]: { ...prev[stageKey], loadingMore: true } }))
+    try {
+      const nextPage = meta.page + 1
+      const response = await dealApi.getByStage(stageKey, nextPage, PAGE_SIZE)
+      const data = response.data.data
+      const content = Array.isArray(data) ? data : (data?.content || [])
+      const totalPages = typeof data?.totalPages === 'number' ? data.totalPages : (content.length < PAGE_SIZE ? nextPage + 1 : nextPage + 2)
+      const hasMore = nextPage + 1 < totalPages
+
+      setDealsByStage((prev) => ({ ...prev, [stageKey]: [...(prev[stageKey] || []), ...content] }))
+      setStageMeta((prev) => ({ ...prev, [stageKey]: { page: nextPage, hasMore, loadingMore: false } }))
+    } catch {
+      toast.error(`Failed to load more ${stageKey} deals`)
+      setStageMeta((prev) => ({ ...prev, [stageKey]: { ...prev[stageKey], loadingMore: false } }))
     }
   }
 
@@ -172,7 +204,7 @@ export default function DealKanbanPage() {
     }
 
     const sourceStage = draggedDeal.stage
-    const targetLabel = DEAL_STAGES.find((stage) => stage.key === targetStage)?.label || targetStage.replace('_', ' ')
+    const targetLabel = stageConfigs.find((stage) => stage.key === targetStage)?.label || targetStage.replace('_', ' ')
     const previousState = { ...dealsByStage }
 
     setDealsByStage((state) => {
@@ -247,7 +279,7 @@ export default function DealKanbanPage() {
 
       <div className="overflow-x-auto pb-4">
         <div className="flex min-w-max gap-4" style={{ minHeight: 'calc(100vh - 300px)' }}>
-          {DEAL_STAGES.map((stage) => {
+          {stageConfigs.map((stage) => {
             const deals = dealsByStage[stage.key] || []
             const isDragOver = dragOverStage === stage.key
             const value = stageTotal(stage.key)
@@ -332,6 +364,19 @@ export default function DealKanbanPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Load more */}
+                {stageMeta[stage.key]?.hasMore && (
+                  <div className="px-3 pb-3">
+                    <button
+                      onClick={() => loadMoreForStage(stage.key)}
+                      disabled={stageMeta[stage.key]?.loadingMore}
+                      className="w-full rounded-lg border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                    >
+                      {stageMeta[stage.key]?.loadingMore ? 'Loading…' : `Load more`}
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

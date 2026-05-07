@@ -4,11 +4,13 @@ import com.everx.crm.activity.ActivityService;
 import com.everx.crm.activity.dto.CreateActivityRequest;
 import com.everx.crm.deal.Deal;
 import com.everx.crm.deal.DealRepository;
+import com.everx.crm.deal.dto.DealDto;
 import com.everx.crm.quote.dto.ConvertQuoteRequest;
 import com.everx.crm.quote.dto.CreateQuoteLineItemRequest;
 import com.everx.crm.quote.dto.CreateQuoteRequest;
 import com.everx.crm.quote.dto.QuoteDto;
 import com.everx.crm.quote.dto.UpdateQuoteRequest;
+import com.everx.crm.webhook.CrmWebhookPublisher;
 import com.everx.erp.salesorder.SalesOrderService;
 import com.everx.erp.salesorder.dto.CreateSalesOrderItemRequest;
 import com.everx.erp.salesorder.dto.CreateSalesOrderRequest;
@@ -27,12 +29,21 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
 @Slf4j
 public class QuoteService {
+
+    private static final String ENTITY_QUOTE = "QUOTE";
+    private static final String ENTITY_DEAL = "DEAL";
+    private static final String EVENT_CREATED = "created";
+    private static final String EVENT_UPDATED = "updated";
+    private static final String EVENT_DELETED = "deleted";
+    private static final String EVENT_CONVERTED = "converted";
+    private static final String EVENT_STAGE_CHANGED = "stage_changed";
 
     @Autowired
     private QuoteRepository quoteRepository;
@@ -48,6 +59,9 @@ public class QuoteService {
 
     @Autowired
     private ActivityService activityService;
+
+    @Autowired
+    private CrmWebhookPublisher crmWebhookPublisher;
 
     public Page<QuoteDto> getAllQuotes(Pageable pageable) {
         log.info("Fetching quotes page {} size {}", pageable.getPageNumber(), pageable.getPageSize());
@@ -84,7 +98,10 @@ public class QuoteService {
                 .collect(Collectors.toList());
 
         quote.setLineItems(lineItems);
-        return QuoteDto.fromEntity(quoteRepository.save(quote));
+        Quote saved = quoteRepository.save(quote);
+        QuoteDto dto = QuoteDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_QUOTE, EVENT_CREATED, saved.getId(), dto);
+        return dto;
     }
 
     public QuoteDto updateQuote(UUID quoteId, UpdateQuoteRequest request) {
@@ -142,8 +159,10 @@ public class QuoteService {
                     .collect(Collectors.toList());
             quote.setLineItems(lineItems);
         }
-
-        return QuoteDto.fromEntity(quoteRepository.save(quote));
+        Quote saved = quoteRepository.save(quote);
+        QuoteDto dto = QuoteDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_QUOTE, EVENT_UPDATED, saved.getId(), dto);
+        return dto;
     }
 
     public void deleteQuote(UUID quoteId) {
@@ -151,7 +170,9 @@ public class QuoteService {
         Quote quote = quoteRepository.findByIdActive(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found with id: " + quoteId));
         quote.softDelete();
-        quoteRepository.save(quote);
+        Quote saved = quoteRepository.save(quote);
+        QuoteDto dto = QuoteDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_QUOTE, EVENT_DELETED, saved.getId(), dto, Map.of("deleted", true));
     }
 
     public Page<QuoteDto> getQuotesByDeal(UUID dealId, Pageable pageable) {
@@ -173,6 +194,8 @@ public class QuoteService {
 
         Deal deal = dealRepository.findByIdActive(quote.getDealId())
                 .orElseThrow(() -> new EntityNotFoundException("Deal not found with id: " + quote.getDealId()));
+
+        String previousStage = deal.getStage();
 
         if (deal.getAccountId() == null) {
             throw new ValidationException("Deal must have an account before conversion");
@@ -209,13 +232,22 @@ public class QuoteService {
         quoteConversionRepository.save(conversion);
 
         quote.setStatus("CONVERTED");
-        quoteRepository.save(quote);
+        Quote savedQuote = quoteRepository.save(quote);
 
-        deal.setStage(com.everx.crm.deal.DealStage.CLOSED_WON);
+        deal.setStage("CLOSED_WON");
         deal.setActualCloseDate(LocalDate.now());
-        dealRepository.save(deal);
+        Deal savedDeal = dealRepository.save(deal);
 
         logAutoActivity(deal.getId(), "QUOTE_CONVERTED", "Quote converted to sales order", quote.getQuoteNumber());
+
+        QuoteDto quoteDto = QuoteDto.fromEntity(savedQuote);
+        crmWebhookPublisher.publish(ENTITY_QUOTE, EVENT_CONVERTED, savedQuote.getId(), quoteDto,
+            Map.of("salesOrderId", salesOrder.getId(), "dealId", deal.getId()));
+
+        DealDto dealDto = DealDto.fromEntity(savedDeal);
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_UPDATED, savedDeal.getId(), dealDto);
+        crmWebhookPublisher.publish(ENTITY_DEAL, EVENT_STAGE_CHANGED, savedDeal.getId(), dealDto,
+            Map.of("fromStage", previousStage, "toStage", savedDeal.getStage()));
 
         return salesOrder;
     }

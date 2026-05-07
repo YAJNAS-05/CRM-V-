@@ -61,6 +61,17 @@ const ContactListPage: React.FC = () => {
     setSelectedRows(prev => prev.size === contacts.length ? new Set() : new Set(contacts.map(c => c.id)))
   }
 
+  const handleBulkDelete = async () => {
+    if (!canDelete) { toast.error('You do not have permission to delete contacts'); return }
+    if (!confirm(`Delete ${selectedRows.size} selected contact(s)?`)) return
+    try {
+      await Promise.all(Array.from(selectedRows).map(id => contactApi.delete(id)))
+      toast.success(`Deleted ${selectedRows.size} contact(s)`)
+      setSelectedRows(new Set())
+      fetchContacts()
+    } catch { toast.error('Failed to delete some contacts') }
+  }
+
   const exportToExcel = () => {
     const data = contacts.map(c => ({
       'Name': `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
@@ -112,8 +123,8 @@ const ContactListPage: React.FC = () => {
         <div className="bg-indigo-50 rounded-lg p-3 mb-4 flex items-center justify-between">
           <span className="text-sm text-indigo-700 font-medium">{selectedRows.size} selected</span>
           <div className="flex gap-2">
-            <button className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 rounded border hover:bg-gray-50">Export</button>
-            {canDelete && <button className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">Delete</button>}
+            <button onClick={exportToExcel} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-700 rounded border hover:bg-gray-50">Export Selected</button>
+            {canDelete && <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">Delete</button>}
           </div>
         </div>
       )}

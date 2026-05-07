@@ -34,7 +34,7 @@ public class Project extends BaseEntity {
     private String description;
 
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "IN_PROGRESS";
+    private String status = "PLANNING";
 
     @Column(name = "start_date")
     private LocalDate startDate;

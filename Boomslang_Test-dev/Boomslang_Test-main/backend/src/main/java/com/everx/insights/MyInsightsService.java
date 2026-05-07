@@ -13,7 +13,6 @@ import com.everx.erp.purchaseorder.PurchaseOrderRepository;
 import com.everx.erp.salesorder.SalesOrderRepository;
 import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.hr.LeaveStatus;
-import com.everx.hr.TimesheetStatus;
 import com.everx.hr.employee.Employee;
 import com.everx.hr.employee.EmployeeRepository;
 import com.everx.hr.leave.LeaveRequestRepository;
@@ -124,7 +123,7 @@ public class MyInsightsService {
                     );
                     pendingTimesheetApprovals = timesheetRepository.countByEmployeeIdInAndStatusAndIsDeletedFalse(
                             reportIds,
-                            TimesheetStatus.SUBMITTED
+                            "SUBMITTED"
                     );
                 }
             }

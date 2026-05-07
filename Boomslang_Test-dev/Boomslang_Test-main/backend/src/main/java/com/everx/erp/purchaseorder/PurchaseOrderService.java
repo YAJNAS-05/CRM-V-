@@ -6,6 +6,7 @@ import com.everx.erp.equipment.EquipmentStatus;
 import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.erp.suppliers.SupplierRepository;
 import com.everx.erp.purchaseorder.dto.*;
+import com.everx.finance.journal.GlPostingService;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class PurchaseOrderService {
     private final SupplierRepository supplierRepository;
     private final PurchaseReceiptRepository purchaseReceiptRepository;
     private final DocumentNumberGenerator documentNumberGenerator;
+    private final GlPostingService glPostingService;
 
     @Transactional
     public PurchaseOrderDto createPurchaseOrder(CreatePurchaseOrderRequest request) {
@@ -203,7 +205,17 @@ public class PurchaseOrderService {
                 .totalAmount(totalAmount)
                 .currency(po.getCurrency())
                 .build();
-            purchaseReceiptRepository.save(receipt);
+            PurchaseReceipt savedReceipt = purchaseReceiptRepository.save(receipt);
+
+            // Post to GL: Debit Inventory, Credit Accounts Payable
+            glPostingService.postGoodsReceipt(
+                savedReceipt.getId(),
+                po.getPoNumber(),
+                totalAmount,
+                po.getCurrency(),
+                null, // entity - could be determined from PO in future
+                "Goods receipt for PO " + po.getPoNumber()
+            );
 
         return toDto(purchaseOrderRepository.save(po));
     }

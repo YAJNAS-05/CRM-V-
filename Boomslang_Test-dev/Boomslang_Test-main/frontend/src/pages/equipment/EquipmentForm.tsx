@@ -2,6 +2,31 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { equipmentApi } from '../../api/erpApi'
 import { toast } from 'react-hot-toast'
+import { z } from 'zod'
+
+const equipmentSchema = z.object({
+  internalCode: z.string().min(1, 'SKU / Internal Code is required'),
+  make: z.string().min(1, 'Manufacturer is required'),
+  model: z.string().min(1, 'Model is required'),
+  category: z.string().min(1, 'Category is required'),
+  acquisitionCost: z.union([
+    z.literal(''),
+    z.string().refine(v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, 'Acquisition cost must be a positive number'),
+  ]),
+  askingPrice: z.union([
+    z.literal(''),
+    z.string().refine(v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, 'Asking price must be a positive number'),
+  ]),
+  yearOfManufacture: z.union([
+    z.literal(''),
+    z.string().refine(v => {
+      const n = parseInt(v)
+      return !isNaN(n) && n >= 1900 && n <= new Date().getFullYear() + 1
+    }, `Year must be between 1900 and ${new Date().getFullYear() + 1}`),
+  ]),
+})
+
+type EquipmentSchemaErrors = Partial<Record<keyof z.infer<typeof equipmentSchema>, string>>
 
 const EQUIPMENT_CATEGORIES = [
   'CT', 'MRI', 'Ultrasound', 'Cath/Angio Lab', 'Mammography',
@@ -96,6 +121,7 @@ export default function EquipmentForm() {
   const [form, setForm] = useState<FormData>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<EquipmentSchemaErrors>({})
 
   useEffect(() => {
     if (isEdit && id) {
@@ -158,15 +184,35 @@ export default function EquipmentForm() {
       setForm(prev => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }))
     } else {
       setForm(prev => ({ ...prev, [name]: value }))
+      if (name in fieldErrors) {
+        setFieldErrors(prev => ({ ...prev, [name]: undefined }))
+      }
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.internalCode || !form.make || !form.model || !form.category) {
-      toast.error('SKU, Manufacturer, Model, and Category are required')
+    // Zod validation for required/core fields
+    const parsed = equipmentSchema.safeParse({
+      internalCode: form.internalCode,
+      make: form.make,
+      model: form.model,
+      category: form.category,
+      acquisitionCost: form.acquisitionCost,
+      askingPrice: form.askingPrice,
+      yearOfManufacture: form.yearOfManufacture,
+    })
+    if (!parsed.success) {
+      const errors: EquipmentSchemaErrors = {}
+      parsed.error.errors.forEach(err => {
+        const key = err.path[0] as keyof EquipmentSchemaErrors
+        errors[key] = err.message
+      })
+      setFieldErrors(errors)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
     try {
       setSaving(true)
       const payload = {
@@ -446,13 +492,14 @@ export default function EquipmentForm() {
               value={form.category}
               onChange={handleChange}
               required
-              className="w-full md:w-1/2 border border-indigo-300 rounded-lg px-3 py-2.5 text-base font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              className={`w-full md:w-1/2 border rounded-lg px-3 py-2.5 text-base font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white ${fieldErrors.category ? 'border-red-500' : 'border-indigo-300'}`}
             >
               <option value="">-- Select Category --</option>
               {EQUIPMENT_CATEGORIES.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            {fieldErrors.category && <p className="mt-1 text-xs text-red-600">{fieldErrors.category}</p>}
           </div>
 
           {/* Step 2+: Shown only when category selected */}
@@ -464,21 +511,24 @@ export default function EquipmentForm() {
                   <div>
                     <label className={labelClass}>SKU (Internal Code) *</label>
                     <input type="text" name="internalCode" value={form.internalCode} onChange={handleChange} required
-                      className={inputClass} placeholder="e.g. EX4597" />
+                      className={`${inputClass} ${fieldErrors.internalCode ? 'border-red-500' : ''}`} placeholder="e.g. EX4597" />
+                    {fieldErrors.internalCode && <p className="mt-1 text-xs text-red-600">{fieldErrors.internalCode}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Manufacturer *</label>
-                    <select name="make" value={form.make} onChange={handleChange} required className={inputClass}>
+                    <select name="make" value={form.make} onChange={handleChange} required className={`${inputClass} ${fieldErrors.make ? 'border-red-500' : ''}`}>
                       <option value="">-- Select Manufacturer --</option>
                       {MANUFACTURERS.map(m => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
+                    {fieldErrors.make && <p className="mt-1 text-xs text-red-600">{fieldErrors.make}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Model *</label>
                     <input type="text" name="model" value={form.model} onChange={handleChange} required
-                      className={inputClass} placeholder="e.g. Definition Edge 128 Slice" />
+                      className={`${inputClass} ${fieldErrors.model ? 'border-red-500' : ''}`} placeholder="e.g. Definition Edge 128 Slice" />
+                    {fieldErrors.model && <p className="mt-1 text-xs text-red-600">{fieldErrors.model}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Location</label>
@@ -492,7 +542,8 @@ export default function EquipmentForm() {
                   <div>
                     <label className={labelClass}>Year of Manufacture</label>
                     <input type="number" name="yearOfManufacture" value={form.yearOfManufacture} onChange={handleChange}
-                      className={inputClass} placeholder="e.g. 2015" min="1970" max="2030" />
+                      className={`${inputClass} ${fieldErrors.yearOfManufacture ? 'border-red-500' : ''}`} placeholder="e.g. 2015" min="1970" max="2030" />
+                    {fieldErrors.yearOfManufacture && <p className="mt-1 text-xs text-red-600">{fieldErrors.yearOfManufacture}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Status</label>
@@ -521,7 +572,8 @@ export default function EquipmentForm() {
                   <div>
                     <label className={labelClass}>Acquisition Cost</label>
                     <input type="number" name="acquisitionCost" value={form.acquisitionCost} onChange={handleChange}
-                      className={inputClass} step="0.01" placeholder="0.00" />
+                      className={`${inputClass} ${fieldErrors.acquisitionCost ? 'border-red-500' : ''}`} step="0.01" placeholder="0.00" />
+                    {fieldErrors.acquisitionCost && <p className="mt-1 text-xs text-red-600">{fieldErrors.acquisitionCost}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Acquisition Currency</label>
@@ -545,7 +597,8 @@ export default function EquipmentForm() {
                   <div>
                     <label className={labelClass}>Asking Price</label>
                     <input type="number" name="askingPrice" value={form.askingPrice} onChange={handleChange}
-                      className={inputClass} step="0.01" placeholder="0.00" />
+                      className={`${inputClass} ${fieldErrors.askingPrice ? 'border-red-500' : ''}`} step="0.01" placeholder="0.00" />
+                    {fieldErrors.askingPrice && <p className="mt-1 text-xs text-red-600">{fieldErrors.askingPrice}</p>}
                   </div>
                   <div>
                     <label className={labelClass}>Asking Currency</label>

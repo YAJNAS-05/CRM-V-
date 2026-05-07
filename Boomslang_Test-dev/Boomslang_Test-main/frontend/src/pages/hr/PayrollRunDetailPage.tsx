@@ -200,6 +200,61 @@ const PayrollRunDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Finance Integration Section (X-01: Cross-module linking) */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Finance Integration</h2>
+        <div className="space-y-4">
+          <div className="border-l-4 border-indigo-500 bg-indigo-50 p-4 rounded">
+            <p className="text-sm font-medium text-indigo-900">GL Posting Status</p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                run.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                run.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {run.status === 'PAID' ? '✓ Posted to GL' : 
+                 run.status === 'APPROVED' ? 'Pending GL Posting' :
+                 'Not Ready for GL'}
+              </div>
+            </div>
+            {run.status === 'PAID' && (
+              <p className="text-xs text-indigo-700 mt-2">
+                Payroll entries have been posted to the General Ledger and expense accounts have been updated in Finance.
+              </p>
+            )}
+            {run.status === 'APPROVED' && (
+              <p className="text-xs text-blue-700 mt-2">
+                GL posting will be triggered when this payroll run is marked as PAID. Finance will automatically create expense entries.
+              </p>
+            )}
+            {run.status === 'DRAFT' && (
+              <p className="text-xs text-gray-600 mt-2">
+                Approve this payroll run first, then mark as PAID to post to General Ledger.
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-medium text-gray-600 uppercase mb-1">Total Payroll Amount</p>
+              <p className="text-lg font-semibold text-gray-900">
+                ${items.reduce((sum, item) => sum + (item.netPay || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-600 uppercase mb-1">Total Deductions</p>
+              <p className="text-lg font-semibold text-gray-900">
+                ${items.reduce((sum, item) => sum + (item.deductions || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </p>
+            </div>
+          </div>
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              💡 When this payroll run is marked as PAID, expense entries are automatically created in Finance and posted to the GL under the Payroll Expense account.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

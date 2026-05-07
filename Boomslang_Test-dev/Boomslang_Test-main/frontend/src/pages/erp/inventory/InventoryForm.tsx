@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Save, Package } from 'lucide-react'
+import { z } from 'zod'
 import { inventoryApi, supplierApi } from '../../../api/erpApi'
 import { InventoryItem, CreateInventoryItemRequest, Supplier } from '../../../types/erp'
 import { ApiResponse } from '../../../types'
 import { useAuthStore } from '../../../store/authStore'
 import { toast } from 'react-hot-toast'
 import SearchableLookupSelect from '../../../components/form/SearchableLookupSelect'
+
+const inventorySchema = z.object({
+  itemCode: z.string().min(1, 'Item code is required'),
+  name: z.string().min(1, 'Item name is required'),
+  unitPrice: z.number().min(0, 'Unit price cannot be negative'),
+  quantity: z.number().min(0, 'Quantity cannot be negative'),
+  minStockLevel: z.number().min(0, 'Minimum stock level cannot be negative'),
+  maxStockLevel: z.number().min(0, 'Maximum stock level cannot be negative'),
+}).refine((d) => d.maxStockLevel >= d.minStockLevel, {
+  message: 'Maximum stock level must be greater than minimum stock level',
+  path: ['maxStockLevel'],
+})
 
 const INVENTORY_CATEGORIES = [
   'EQUIPMENT',
@@ -54,6 +67,7 @@ const InventoryForm: React.FC = () => {
   const [lookupLoading, setLookupLoading] = useState(false)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [selectedSupplierId, setSelectedSupplierId] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
 
   useEffect(() => {
     if (isEditing && id) {
@@ -129,30 +143,25 @@ const InventoryForm: React.FC = () => {
     e.preventDefault()
 
     // Validation
-    if (!formData.itemCode.trim()) {
-      toast.error('Item code is required')
+    const result = inventorySchema.safeParse({
+      itemCode: formData.itemCode.trim(),
+      name: formData.name.trim(),
+      unitPrice: formData.unitPrice,
+      quantity: formData.quantity,
+      minStockLevel: formData.minStockLevel,
+      maxStockLevel: formData.maxStockLevel,
+    })
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
-    if (!formData.name.trim()) {
-      toast.error('Item name is required')
-      return
-    }
-    if (formData.unitPrice < 0) {
-      toast.error('Unit price cannot be negative')
-      return
-    }
-    if (formData.quantity < 0) {
-      toast.error('Quantity cannot be negative')
-      return
-    }
-    if (formData.minStockLevel < 0) {
-      toast.error('Minimum stock level cannot be negative')
-      return
-    }
-    if (formData.maxStockLevel < formData.minStockLevel) {
-      toast.error('Maximum stock level must be greater than minimum stock level')
-      return
-    }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -246,10 +255,10 @@ const InventoryForm: React.FC = () => {
                 name="itemCode"
                 value={formData.itemCode}
                 onChange={handleInputChange}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${fieldErrors.itemCode ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="Enter item code"
               />
+              {fieldErrors.itemCode && <p className="mt-1 text-xs text-red-600">{fieldErrors.itemCode}</p>}
             </div>
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
@@ -261,10 +270,10 @@ const InventoryForm: React.FC = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${fieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="Enter item name"
               />
+              {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
             </div>
             <div className="md:col-span-2">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700">

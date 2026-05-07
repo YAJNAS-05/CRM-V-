@@ -11,6 +11,7 @@ const FieldJobListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     loadJobs();
@@ -19,6 +20,7 @@ const FieldJobListPage: React.FC = () => {
   const loadJobs = async () => {
     try {
       setLoading(true);
+      setIsOffline(false);
       const response = await FieldJobApi.getAllFieldJobs();
       let filtered = (response || []) as any[];
       
@@ -37,6 +39,7 @@ const FieldJobListPage: React.FC = () => {
       setJobs(filtered);
     } catch (error) {
       console.error('Failed to load field jobs:', error);
+      setIsOffline(true);
     } finally {
       setLoading(false);
     }
@@ -59,6 +62,12 @@ const FieldJobListPage: React.FC = () => {
 
   return (
     <div className="p-8">
+      {isOffline && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-800 text-sm">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" /></svg>
+          <span>Working offline — data is stored locally and will sync when the server is available.</span>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Field Jobs</h1>
         <a 

@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import useEmployeeWorkspace from '../../hooks/useEmployeeWorkspace'
 import useEmployeeWorkspaceSync from '../../hooks/useEmployeeWorkspaceSync'
-import { useEmployeeWorkspaceStore } from '../../store/employeeWorkspaceStore'
+import { projectApi, taskApi } from '../../api/pmApi'
+import { attendanceApi, timesheetApi } from '../../api/hrApi'
 
 const formatShortDate = (value?: string) => {
   if (!value) return 'TBD'
@@ -21,15 +23,43 @@ const formatRelative = (value: string) => {
 const EmployeeWorkspaceDashboardPage: React.FC = () => {
   const { workspaceUser } = useEmployeeWorkspace()
   const { currentEmployee } = useEmployeeWorkspaceSync()
-  const projects = useEmployeeWorkspaceStore((state) => state.projects)
-  const tasks = useEmployeeWorkspaceStore((state) => state.tasks)
-  const timeEntries = useEmployeeWorkspaceStore((state) => state.timeEntries)
-  const attendanceRecords = useEmployeeWorkspaceStore((state) => state.attendanceRecords)
-  const getCurrentPunch = useEmployeeWorkspaceStore((state) => state.getCurrentPunch)
   const employeeIdentityIds = useMemo(
     () => new Set([workspaceUser?.id, currentEmployee?.id].filter(Boolean)),
     [currentEmployee?.id, workspaceUser?.id],
   )
+
+  const { data: projectsData, isLoading: isProjectsLoading } = useQuery({
+    queryKey: ['pm-projects-all'],
+    queryFn: () => projectApi.getAll(0, 500),
+  })
+
+  const { data: tasksData, isLoading: isTasksLoading } = useQuery({
+    queryKey: ['pm-tasks-all'],
+    queryFn: () => taskApi.getAll(0, 500),
+  })
+
+  const { data: timesheetsData } = useQuery({
+    queryKey: ['hr-timesheets', currentEmployee?.id],
+    queryFn: () => timesheetApi.getByEmployee(currentEmployee!.id),
+    enabled: !!currentEmployee?.id,
+  })
+
+  const { data: attendanceData } = useQuery({
+    queryKey: ['attendance', 'me', 'today-widget'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0]
+      const response = await attendanceApi.getMe({ start: today, end: today })
+      return response.data.data || []
+    },
+    enabled: Boolean(workspaceUser),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+
+  const projects = projectsData?.data?.data?.content || []
+  const tasks = tasksData?.data?.data?.content || []
+  const timesheets = timesheetsData?.data?.data || []
+  const todayPunch = attendanceData?.find((record) => !record.punchOut) || null
 
   const summary = useMemo(() => {
     if (!workspaceUser) {
@@ -41,18 +71,16 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
         openTasks: 0,
         timeThisWeek: 0,
         projectStatusCounts: [] as Array<{ label: string; value: number; tone: string }>,
-        recentActivity: [] as typeof timeEntries,
+        recentActivity: [] as typeof timesheets,
         weekBlocks: [] as Array<{ label: string; hours: number }>,
-        currentPunch: null as ReturnType<typeof getCurrentPunch>,
+        currentPunch: null as any,
       }
     }
 
-    const activeProjects = projects.filter(
-      (project) => project.ownerId === workspaceUser.id || project.team.includes(workspaceUser.fullName),
-    )
+    const activeProjects = projects
     const projectIds = new Set(activeProjects.map((project) => project.id))
     const myTasks = tasks.filter(
-      (task) => task.assigneeId === workspaceUser.id || projectIds.has(task.projectId),
+      (task) => task.assigneeId === workspaceUser.id,
     )
     const today = new Date().toISOString().split('T')[0]
     const dueToday = myTasks.filter((task) => task.dueDate === today && task.status !== 'DONE')
@@ -62,10 +90,10 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
     startOfWeek.setHours(0, 0, 0, 0)
     startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7))
 
-    const myTimeEntries = timeEntries.filter((entry) => employeeIdentityIds.has(entry.employeeId))
+    const myTimeEntries = timesheets
     const timeThisWeek = myTimeEntries
       .filter((entry) => new Date(entry.workDate) >= startOfWeek)
-      .reduce((total, entry) => total + entry.hours, 0)
+      .reduce((total, entry) => total + (entry.hoursWorked || 0), 0)
 
     const statusOrder = [
       { label: 'Planning', key: 'PLANNING', tone: 'bg-slate-400' },
@@ -82,7 +110,7 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
     }))
 
     const recentActivity = myTimeEntries.slice().sort((left, right) =>
-      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      new Date(right.createdAt || '').getTime() - new Date(left.createdAt || '').getTime(),
     ).slice(0, 5)
 
     const weekBlocks = Array.from({ length: 5 }, (_, index) => {
@@ -91,7 +119,7 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
       const key = date.toISOString().split('T')[0]
       const hours = myTimeEntries
         .filter((entry) => entry.workDate === key)
-        .reduce((total, entry) => total + entry.hours, 0)
+        .reduce((total, entry) => total + (entry.hoursWorked || 0), 0)
       return {
         label: date.toLocaleDateString('en-AU', { weekday: 'short' }),
         hours,
@@ -108,16 +136,16 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
       projectStatusCounts,
       recentActivity,
       weekBlocks,
-      currentPunch: getCurrentPunch(workspaceUser.id),
+      currentPunch: todayPunch,
     }
-  }, [attendanceRecords, employeeIdentityIds, getCurrentPunch, projects, tasks, timeEntries, workspaceUser])
+  }, [projects, tasks, timesheets, todayPunch, workspaceUser])
 
   const projectLookup = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
     [projects],
   )
 
-  if (!workspaceUser) {
+  if (!workspaceUser || isProjectsLoading || isTasksLoading) {
     return <div className="shell-card p-8 text-sm text-slate-500">Loading your workspace...</div>
   }
 
@@ -163,7 +191,7 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
                 <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{projectLookup.get(task.projectId)?.name || 'Project'} · Due today</p>
+                    <p className="mt-1 text-xs text-slate-500">{projectLookup.get(task.projectId || '')?.projectName || 'Project'} · Due today</p>
                   </div>
                   <Link to={`/employee/projects/${task.projectId}`} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
                     Open project
@@ -206,15 +234,14 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
           ) : (
             <div className="divide-y divide-slate-100">
               {summary.recentActivity.map((entry) => {
-                const task = summary.myTasks.find((item) => item.id === entry.taskId)
-                const project = projectLookup.get(entry.projectId)
+                const project = Array.from(projectLookup.values()).find(p => p.linkedFieldJobId === entry.fieldJobId)
                 return (
                   <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{task?.title || 'Task time logged'}</p>
-                      <p className="mt-1 text-xs text-slate-500">{project?.code || 'PROJECT'} · {entry.hours}h · {entry.note || 'Time recorded'}</p>
+                      <p className="text-sm font-semibold text-slate-900">Task time logged</p>
+                      <p className="mt-1 text-xs text-slate-500">{project?.projectCode || 'PROJECT'} · {entry.hoursWorked}h · {entry.notes || 'Time recorded'}</p>
                     </div>
-                    <span className="text-xs text-slate-400">{formatRelative(entry.createdAt)}</span>
+                    <span className="text-xs text-slate-400">{formatRelative(entry.createdAt || '')}</span>
                   </div>
                 )
               })}
@@ -259,20 +286,12 @@ const EmployeeWorkspaceDashboardPage: React.FC = () => {
           <Link key={project.id} to={`/employee/projects/${project.id}`} className="shell-card p-5 transition hover:-translate-y-0.5 hover:shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">{project.code}</p>
-                <h2 className="mt-2 text-lg font-semibold text-slate-900">{project.name}</h2>
-                <p className="mt-1 text-sm text-slate-500">{project.client}</p>
+                <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">{project.projectCode}</p>
+                <h2 className="mt-2 text-lg font-semibold text-slate-900">{project.projectName}</h2>
               </div>
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                {project.progress}%
-              </span>
-            </div>
-            <div className="mt-4 h-2 rounded-full bg-slate-100">
-              <div className="h-2 rounded-full bg-blue-600" style={{ width: `${project.progress}%` }} />
             </div>
             <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-              <span>Due {formatShortDate(project.dueDate)}</span>
-              <span>{project.team.length} members</span>
+              <span>Due {formatShortDate(project.endDate)}</span>
             </div>
           </Link>
         ))}

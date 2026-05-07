@@ -38,6 +38,17 @@ const CandidatePipelinePage: React.FC = () => {
   const [form, setForm] = useState<NewCandidateForm>(EMPTY_FORM)
   const [selectedStage, setSelectedStage] = useState<CandidateStage | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
+  const [scheduleTarget, setScheduleTarget] = useState<Candidate | null>(null)
+  const [interviewForm, setInterviewForm] = useState({
+    interviewDate: '',
+    interviewTime: '',
+    interviewerName: '',
+    interviewType: 'VIDEO',
+    notes: '',
+  })
+  const [scheduledInterviews, setScheduledInterviews] = useState<
+    Array<{ candidateId: string; date: string; time: string; interviewer: string; type: string; notes: string }>
+  >([])
 
   const filtered = candidates.filter((c) => {
     const matchStage = selectedStage === 'ALL' || c.stage === selectedStage
@@ -80,6 +91,30 @@ const CandidatePipelinePage: React.FC = () => {
     toast.success('Candidate added')
     setShowAddModal(false)
     setForm(EMPTY_FORM)
+  }
+
+  const handleScheduleInterview = () => {
+    if (!scheduleTarget) return
+    if (!interviewForm.interviewDate) { toast.error('Interview date is required'); return }
+    if (!interviewForm.interviewerName.trim()) { toast.error('Interviewer name is required'); return }
+    setScheduledInterviews(prev => [...prev, {
+      candidateId: scheduleTarget.id,
+      date: interviewForm.interviewDate,
+      time: interviewForm.interviewTime,
+      interviewer: interviewForm.interviewerName,
+      type: interviewForm.interviewType,
+      notes: interviewForm.notes,
+    }])
+    // Advance candidate to INTERVIEW stage if not already beyond it
+    const stageOrder: CandidateStage[] = ['SOURCED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED']
+    const currentIdx = stageOrder.indexOf(scheduleTarget.stage)
+    const interviewIdx = stageOrder.indexOf('INTERVIEW')
+    if (currentIdx < interviewIdx) {
+      setCandidates(prev => prev.map(c => c.id === scheduleTarget.id ? { ...c, stage: 'INTERVIEW' } : c))
+    }
+    toast.success(`Interview scheduled for ${scheduleTarget.firstName} ${scheduleTarget.lastName}`)
+    setScheduleTarget(null)
+    setInterviewForm({ interviewDate: '', interviewTime: '', interviewerName: '', interviewType: 'VIDEO', notes: '' })
   }
 
   const stageConfig = STAGES.reduce(
@@ -162,13 +197,26 @@ const CandidatePipelinePage: React.FC = () => {
                     <p className="text-sm font-semibold text-slate-900">{c.firstName} {c.lastName}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{c.positionTitle || 'Position TBD'}</p>
                     {c.source && <p className="text-[10px] text-slate-400 mt-1">via {c.source}</p>}
-                    <div className="mt-2 flex gap-1">
+                    <div className="mt-2 flex gap-1 flex-wrap">
                       <Link
                         to={`/hr/candidates/${c.id}/scorecard`}
                         className="rounded px-2 py-0.5 text-[10px] font-medium bg-purple-50 text-purple-700 hover:bg-purple-100"
                       >
                         Scorecard
                       </Link>
+                      {(c.stage === 'SCREENING' || c.stage === 'SOURCED' || c.stage === 'INTERVIEW') && (
+                        <button
+                          onClick={() => setScheduleTarget(c)}
+                          className="rounded px-2 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        >
+                          Schedule Interview
+                        </button>
+                      )}
+                      {scheduledInterviews.some(i => i.candidateId === c.id) && (
+                        <span className="rounded px-2 py-0.5 text-[10px] font-medium bg-green-50 text-green-700">
+                          ✓ Scheduled
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -224,6 +272,67 @@ const CandidatePipelinePage: React.FC = () => {
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
               >
                 Add Candidate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Interview Modal */}
+      {scheduleTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-slate-900">Schedule Interview</h2>
+            <p className="text-sm text-slate-500 mt-1">{scheduleTarget.firstName} {scheduleTarget.lastName} — {scheduleTarget.positionTitle || 'Position TBD'}</p>
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Date *</label>
+                  <input type="date" value={interviewForm.interviewDate}
+                    onChange={e => setInterviewForm(p => ({ ...p, interviewDate: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Time</label>
+                  <input type="time" value={interviewForm.interviewTime}
+                    onChange={e => setInterviewForm(p => ({ ...p, interviewTime: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700">Interviewer *</label>
+                <input type="text" value={interviewForm.interviewerName}
+                  onChange={e => setInterviewForm(p => ({ ...p, interviewerName: e.target.value }))}
+                  placeholder="e.g. John Smith"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700">Interview Type</label>
+                <select value={interviewForm.interviewType}
+                  onChange={e => setInterviewForm(p => ({ ...p, interviewType: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="VIDEO">Video Call</option>
+                  <option value="PHONE">Phone</option>
+                  <option value="IN_PERSON">In Person</option>
+                  <option value="TECHNICAL">Technical Assessment</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700">Notes</label>
+                <textarea value={interviewForm.notes}
+                  onChange={e => setInterviewForm(p => ({ ...p, notes: e.target.value }))}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none" />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setScheduleTarget(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Cancel
+              </button>
+              <button onClick={handleScheduleInterview}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Schedule
               </button>
             </div>
           </div>

@@ -8,6 +8,12 @@ import { toast } from 'sonner'
 import { ReportViewer } from '@/components/reports/ReportViewer'
 import { JasperReportExporter } from '@/components/reports/JasperReportExporter'
 
+const FREQ_CRON: Record<string, string> = {
+  DAILY: '0 8 * * *',
+  WEEKLY: '0 8 * * MON',
+  MONTHLY: '0 8 1 * *',
+}
+
 export const ReportDetailPage = () => {
   const { reportId } = useParams<{ reportId: string }>()
   const navigate = useNavigate()
@@ -15,6 +21,17 @@ export const ReportDetailPage = () => {
   const [filters, setFilters] = useState<Record<string, any>>({})
   const [isExporting, setIsExporting] = useState(false)
   const [exportFormat, setExportFormat] = useState<'EXCEL' | 'CSV'>('EXCEL')
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [scheduleForm, setScheduleForm] = useState({
+    scheduleName: '',
+    frequency: 'WEEKLY',
+    recipients: '',
+    exportFormat: 'EXCEL',
+  })
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareForm, setShareForm] = useState({ email: '', permission: 'VIEW' as 'VIEW' | 'EDIT' | 'ADMIN' })
+  const [sharedWith, setSharedWith] = useState<{ email: string; permission: string }[]>([])
 
   if (!reportId) {
     return <div className="p-4 text-center text-destructive">Invalid report ID</div>
@@ -102,6 +119,29 @@ export const ReportDetailPage = () => {
     }
   }
 
+  const handleSaveSchedule = async () => {
+    if (!scheduleForm.scheduleName.trim()) { toast.error('Schedule name is required'); return }
+    const recipientList = scheduleForm.recipients.split(',').map(r => r.trim()).filter(Boolean)
+    if (recipientList.length === 0) { toast.error('At least one recipient email is required'); return }
+    try {
+      setIsSavingSchedule(true)
+      await reportApi.createSchedule(numericReportId, {
+        scheduleName: scheduleForm.scheduleName,
+        frequency: scheduleForm.frequency,
+        cronExpression: FREQ_CRON[scheduleForm.frequency],
+        recipients: recipientList,
+        exportFormat: scheduleForm.exportFormat,
+      })
+      toast.success('Report schedule saved')
+      setShowScheduleModal(false)
+      setScheduleForm({ scheduleName: '', frequency: 'WEEKLY', recipients: '', exportFormat: 'EXCEL' })
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save schedule')
+    } finally {
+      setIsSavingSchedule(false)
+    }
+  }
+
   if (reportLoading) {
     return <div className="p-4 text-center text-muted-foreground">Loading report...</div>
   }
@@ -128,6 +168,25 @@ export const ReportDetailPage = () => {
               Edit Report
             </button>
           )}
+          <button
+            onClick={() => setShowScheduleModal(true)}
+            className="text-sm px-3 py-1 bg-secondary text-secondary-foreground rounded hover:bg-secondary/90 border border-border"
+          >
+            Schedule Report
+          </button>
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="text-sm px-3 py-1 bg-secondary text-secondary-foreground rounded hover:bg-secondary/90 border border-border"
+          >
+            Share
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="text-sm px-3 py-1 bg-secondary text-secondary-foreground rounded hover:bg-secondary/90 border border-border print:hidden"
+            title="Print or Save as PDF"
+          >
+            Export PDF
+          </button>
           {/* Jasper Export Options */}
           <JasperReportExporter
             reportId={numericReportId}
@@ -255,6 +314,158 @@ export const ReportDetailPage = () => {
           )}
         </div>
       ) : null}
+
+      {/* Share Report Modal (RPT-03) */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Share Report</h2>
+              <button onClick={() => setShowShareModal(false)} className="text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+            <div className="space-y-3 mb-5">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={shareForm.email}
+                  onChange={e => setShareForm(p => ({ ...p, email: e.target.value }))}
+                  className="flex-1 px-3 py-2 border border-border rounded bg-background text-sm"
+                  placeholder="user@company.com"
+                />
+                <select
+                  value={shareForm.permission}
+                  onChange={e => setShareForm(p => ({ ...p, permission: e.target.value as 'VIEW' | 'EDIT' | 'ADMIN' }))}
+                  className="px-2 py-2 border border-border rounded bg-background text-sm"
+                >
+                  <option value="VIEW">View</option>
+                  <option value="EDIT">Edit</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+                <button
+                  onClick={() => {
+                    const email = shareForm.email.trim()
+                    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error('Valid email required'); return }
+                    if (sharedWith.some(s => s.email === email)) { toast.error('Already shared with this user'); return }
+                    setSharedWith(prev => [...prev, { email, permission: shareForm.permission }])
+                    setShareForm(p => ({ ...p, email: '' }))
+                    toast.success(`Shared with ${email}`)
+                  }}
+                  className="px-3 py-2 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+            {sharedWith.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Not shared with anyone yet.</p>
+            ) : (
+              <div className="space-y-2 mb-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Shared With</p>
+                {sharedWith.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between border border-border rounded px-3 py-2 text-sm">
+                    <span>{s.email}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        s.permission === 'ADMIN' ? 'bg-red-50 text-red-700' :
+                        s.permission === 'EDIT' ? 'bg-amber-50 text-amber-700' :
+                        'bg-blue-50 text-blue-700'
+                      }`}>{s.permission}</span>
+                      <button onClick={() => setSharedWith(prev => prev.filter((_, idx) => idx !== i))}
+                        className="text-muted-foreground hover:text-destructive text-xs">Remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground mb-3">Anyone with the link:</p>
+              <div className="flex gap-2">
+                <select className="flex-1 px-2 py-2 border border-border rounded bg-background text-sm">
+                  <option value="">Restricted (only added users)</option>
+                  <option value="VIEW">Anyone in org — View</option>
+                  <option value="EDIT">Anyone in org — Edit</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowShareModal(false)}
+                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90">
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Report Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-semibold mb-4">Schedule Report</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Schedule Name *</label>
+                <input
+                  type="text"
+                  value={scheduleForm.scheduleName}
+                  onChange={e => setScheduleForm(p => ({ ...p, scheduleName: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 border border-border rounded bg-background text-sm"
+                  placeholder="e.g. Weekly Sales Report"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Frequency</label>
+                <select
+                  value={scheduleForm.frequency}
+                  onChange={e => setScheduleForm(p => ({ ...p, frequency: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 border border-border rounded bg-background text-sm"
+                >
+                  <option value="DAILY">Daily (8:00 AM)</option>
+                  <option value="WEEKLY">Weekly (Monday 8:00 AM)</option>
+                  <option value="MONTHLY">Monthly (1st 8:00 AM)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Export Format</label>
+                <select
+                  value={scheduleForm.exportFormat}
+                  onChange={e => setScheduleForm(p => ({ ...p, exportFormat: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 border border-border rounded bg-background text-sm"
+                >
+                  <option value="EXCEL">Excel</option>
+                  <option value="CSV">CSV</option>
+                  <option value="PDF">PDF</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Recipients (comma-separated emails) *</label>
+                <textarea
+                  value={scheduleForm.recipients}
+                  onChange={e => setScheduleForm(p => ({ ...p, recipients: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 border border-border rounded bg-background text-sm"
+                  rows={2}
+                  placeholder="user@company.com, manager@company.com"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="px-4 py-2 text-sm border border-border rounded hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSchedule}
+                disabled={isSavingSchedule}
+                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isSavingSchedule ? 'Saving...' : 'Save Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

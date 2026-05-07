@@ -3,6 +3,7 @@ package com.everx.crm.lead;
 import com.everx.crm.lead.dto.CreateLeadRequest;
 import com.everx.crm.lead.dto.LeadDto;
 import com.everx.crm.lead.dto.UpdateLeadRequest;
+import com.everx.crm.webhook.CrmWebhookPublisher;
 import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -13,14 +14,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @Transactional
 @Slf4j
 public class LeadService {
 
+    private static final String ENTITY_LEAD = "LEAD";
+
     @Autowired
     private LeadRepository leadRepository;
+
+    @Autowired
+    private CrmWebhookPublisher crmWebhookPublisher;
 
     public Page<LeadDto> getAllLeads(Pageable pageable) {
         log.info("Fetching leads page {} size {}", pageable.getPageNumber(), pageable.getPageSize());
@@ -72,7 +79,10 @@ public class LeadService {
                 .isConverted(false)
                 .ownerId(ownerId)
                 .build();
-        return LeadDto.fromEntity(leadRepository.save(lead));
+            Lead saved = leadRepository.save(lead);
+            LeadDto dto = LeadDto.fromEntity(saved);
+            crmWebhookPublisher.publish(ENTITY_LEAD, "created", saved.getId(), dto);
+            return dto;
     }
 
     public LeadDto updateLead(UUID leadId, UpdateLeadRequest request) {
@@ -101,8 +111,10 @@ public class LeadService {
         if (request.getEmployees() != null) lead.setEmployees(request.getEmployees());
         if (request.getDescription() != null) lead.setDescription(request.getDescription());
         if (request.getOwnerId() != null) lead.setOwnerId(request.getOwnerId());
-
-        return LeadDto.fromEntity(leadRepository.save(lead));
+        Lead saved = leadRepository.save(lead);
+        LeadDto dto = LeadDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_LEAD, "updated", saved.getId(), dto);
+        return dto;
     }
 
     public void deleteLead(UUID leadId) {
@@ -110,7 +122,9 @@ public class LeadService {
         Lead lead = leadRepository.findByIdActive(leadId)
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found with id: " + leadId));
         lead.softDelete();
-        leadRepository.save(lead);
+        Lead saved = leadRepository.save(lead);
+        LeadDto dto = LeadDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_LEAD, "deleted", saved.getId(), dto, Map.of("deleted", true));
     }
 
     public Page<LeadDto> getLeadsByAccount(UUID accountId, Pageable pageable) {

@@ -3,6 +3,7 @@ package com.everx.crm.contact;
 import com.everx.crm.contact.dto.ContactDto;
 import com.everx.crm.contact.dto.CreateContactRequest;
 import com.everx.crm.contact.dto.UpdateContactRequest;
+import com.everx.crm.webhook.CrmWebhookPublisher;
 import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -13,14 +14,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @Transactional
 @Slf4j
 public class ContactService {
 
+    private static final String ENTITY_CONTACT = "CONTACT";
+
     @Autowired
     private ContactRepository contactRepository;
+
+    @Autowired
+    private CrmWebhookPublisher crmWebhookPublisher;
 
     public Page<ContactDto> getAllContacts(Pageable pageable) {
         log.info("Fetching contacts page {} size {}", pageable.getPageNumber(), pageable.getPageSize());
@@ -68,7 +75,10 @@ public class ContactService {
                 .emailOptOut(request.getEmailOptOut() != null ? request.getEmailOptOut() : false)
                 .ownerId(ownerId)
                 .build();
-        return ContactDto.fromEntity(contactRepository.save(contact));
+            Contact saved = contactRepository.save(contact);
+            ContactDto dto = ContactDto.fromEntity(saved);
+            crmWebhookPublisher.publish(ENTITY_CONTACT, "created", saved.getId(), dto);
+            return dto;
     }
 
     public ContactDto updateContact(UUID contactId, UpdateContactRequest request) {
@@ -99,8 +109,10 @@ public class ContactService {
         if (request.getDoNotCall() != null) contact.setDoNotCall(request.getDoNotCall());
         if (request.getEmailOptOut() != null) contact.setEmailOptOut(request.getEmailOptOut());
         if (request.getOwnerId() != null) contact.setOwnerId(request.getOwnerId());
-
-        return ContactDto.fromEntity(contactRepository.save(contact));
+        Contact saved = contactRepository.save(contact);
+        ContactDto dto = ContactDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_CONTACT, "updated", saved.getId(), dto);
+        return dto;
     }
 
     public void deleteContact(UUID contactId) {
@@ -108,7 +120,9 @@ public class ContactService {
         Contact contact = contactRepository.findByIdActive(contactId)
                 .orElseThrow(() -> new EntityNotFoundException("Contact not found with id: " + contactId));
         contact.softDelete();
-        contactRepository.save(contact);
+        Contact saved = contactRepository.save(contact);
+        ContactDto dto = ContactDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_CONTACT, "deleted", saved.getId(), dto, Map.of("deleted", true));
     }
 
     public Page<ContactDto> getContactsByAccountId(UUID accountId, Pageable pageable) {

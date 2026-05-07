@@ -2,6 +2,19 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supplierApi } from '../../api/erpApi'
 import { toast } from 'react-hot-toast'
+import { getErrorMessage } from '../../utils/errorUtils'
+import { z } from 'zod'
+
+const supplierSchema = z.object({
+  companyName: z.string().min(1, 'Company Name is required'),
+  country: z.string().optional(),
+  contactName: z.string().optional(),
+  email: z.string().email('Invalid email address').or(z.literal('')).optional(),
+  phone: z.string().optional(),
+  supplierType: z.string().optional(),
+  paymentTerms: z.string().optional(),
+  notes: z.string().optional(),
+})
 
 interface FormData {
   companyName: string
@@ -55,7 +68,7 @@ export default function SupplierForm() {
           notes: e.notes || '',
         })
       }
-    } catch { toast.error('Failed to load supplier') }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to load supplier')) }
     finally { setLoading(false) }
   }
 
@@ -65,7 +78,11 @@ export default function SupplierForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.companyName) { toast.error('Company Name is required'); return }
+    const result = supplierSchema.safeParse(form)
+    if (!result.success) {
+      toast.error(result.error.errors[0]?.message || 'Please fix validation errors')
+      return
+    }
     try {
       setSaving(true)
       if (isEdit) {
@@ -75,7 +92,7 @@ export default function SupplierForm() {
         const response = await supplierApi.create(form)
         if (response.data.success) { toast.success('Supplier created'); navigate('/erp/suppliers') }
       }
-    } catch (error: any) { toast.error(error?.response?.data?.message || 'Failed to save supplier') }
+    } catch (error: any) { toast.error(getErrorMessage(error, 'Failed to save supplier')) }
     finally { setSaving(false) }
   }
 

@@ -48,7 +48,7 @@ public class DashboardService {
         BigDecimal totalValue = BigDecimal.ZERO;
 
         for (Deal d : deals) {
-            String stage = d.getStage() != null ? d.getStage().name() : "UNKNOWN";
+            String stage = d.getStage() != null ? d.getStage() : "UNKNOWN";
             dealsByStage.merge(stage, 1L, (oldVal, newVal) -> oldVal + newVal);
             if (d.getAmount() != null) {
                 valueByStage.merge(stage, d.getAmount(), BigDecimal::add);

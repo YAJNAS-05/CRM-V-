@@ -4,6 +4,8 @@ import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import { employeeApi, timesheetApi } from '../../api/hrApi'
 import { Employee, Timesheet, TimesheetStatus } from '../../types/hr'
+import { useOptionSet } from '../../hooks/useOptionSet'
+import { getOptionLabel } from '../../utils/optionSet'
 
 const STATUS_OPTIONS: TimesheetStatus[] = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED']
 const SORT_OPTIONS = [
@@ -26,6 +28,12 @@ const TimesheetListPage: React.FC = () => {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [sort, setSort] = useState('workDate,desc')
+  const { options: statusOptions } = useOptionSet({
+    module: 'HR',
+    entity: 'TIMESHEET',
+    field: 'status',
+    fallbackValues: STATUS_OPTIONS,
+  })
 
   useEffect(() => {
     fetchTimesheets()
@@ -125,9 +133,9 @@ const TimesheetListPage: React.FC = () => {
           className="rounded border border-gray-200 px-3 py-2 text-sm"
         >
           <option value="">All statuses</option>
-          {STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>
-              {status}
+          {statusOptions.map((option) => (
+            <option key={option.id} value={option.value}>
+              {option.label || option.value}
             </option>
           ))}
         </select>
@@ -214,7 +222,7 @@ const TimesheetListPage: React.FC = () => {
                       {new Date(timesheet.workDate).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{timesheet.hoursWorked ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-600">{timesheet.status}</td>
+                    <td className="px-4 py-3 text-gray-600">{getOptionLabel(statusOptions, timesheet.status)}</td>
                   </tr>
                 ))
               )}

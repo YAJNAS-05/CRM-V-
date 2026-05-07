@@ -1,8 +1,10 @@
 package com.everx.shared.util;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,6 +37,19 @@ public final class SecurityUserContext {
 
     public static UUID getCurrentUserIdOrNull() {
         return getCurrentUserId().orElse(null);
+    }
+
+    public static List<String> getCurrentUserRoles() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return List.of();
+        }
+
+        return authentication.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(role -> role != null && !role.isBlank())
+                .toList();
     }
 
     private static UUID tryParseUuid(String value) {

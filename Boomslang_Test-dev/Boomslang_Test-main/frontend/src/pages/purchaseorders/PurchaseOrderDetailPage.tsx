@@ -68,6 +68,34 @@ export default function PurchaseOrderDetailPage() {
     }
   }
 
+  const handleUpdateStatus = async (status: string) => {
+    if (!confirm(`Change status to "${status}"?`)) return
+    try {
+      const response = await purchaseOrderApi.updateStatus(id!, status)
+      if (response.data.success) {
+        setPo(response.data.data)
+        setFormData(response.data.data)
+        alert(`Status updated to ${status}`)
+      }
+    } catch (err) {
+      alert('Error updating status: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    }
+  }
+
+  const handleReceive = async () => {
+    if (!confirm('Mark this PO as received? This will synchronize inventory.')) return
+    try {
+      const response = await purchaseOrderApi.receive(id!)
+      if (response.data.success) {
+        setPo(response.data.data)
+        setFormData(response.data.data)
+        alert('Purchase order received and inventory synchronized')
+      }
+    } catch (err) {
+      alert('Error receiving PO: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    }
+  }
+
   if (loading) return <div className="p-6">Loading...</div>
   if (error) return <div className="p-6 bg-red-50 text-red-700 rounded">{error}</div>
   if (!po && !editMode) return <div className="p-6 bg-yellow-50 text-yellow-700 rounded">Purchase order not found</div>
@@ -88,6 +116,21 @@ export default function PurchaseOrderDetailPage() {
             </>
           ) : (
             <>
+              {po?.status === 'DRAFT' && (
+                <FeatureGate requiredPermission="ERP_EDIT">
+                  <button onClick={() => handleUpdateStatus('SENT')} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Submit</button>
+                </FeatureGate>
+              )}
+              {po?.status === 'SENT' && (
+                <FeatureGate requiredPermission="ERP_APPROVE">
+                  <button onClick={() => handleUpdateStatus('CONFIRMED')} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
+                </FeatureGate>
+              )}
+              {(po?.status === 'CONFIRMED') && (
+                <FeatureGate requiredPermission="ERP_EDIT">
+                  <button onClick={handleReceive} className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700">Receive Goods</button>
+                </FeatureGate>
+              )}
               <FeatureGate requiredPermission="ERP_EDIT">
                 <button onClick={() => setEditMode(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>
               </FeatureGate>
@@ -155,6 +198,68 @@ export default function PurchaseOrderDetailPage() {
       <div className="mt-6 bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Notes</h2>
         <textarea name="notes" value={displayData?.notes || ''} onChange={handleInputChange} disabled={!editMode} className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-100" rows={4} />
+      </div>
+
+      {/* Finance Integration Section (X-05: Cross-module linking) */}
+      <div className="mt-6 bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-semibold mb-4">Finance Integration - GL Posting Status</h2>
+        <div className="space-y-4">
+          <div className="border-l-4 border-indigo-500 bg-indigo-50 p-4 rounded">
+            <p className="text-sm font-medium text-indigo-900">Goods Receipt & GL Posting Status</p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                po?.status === 'RECEIVED' || po?.status === 'CLOSED' ? 'bg-green-100 text-green-800' :
+                po?.status === 'CONFIRMED' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {po?.status === 'RECEIVED' ? '✓ Goods Received - GL Posted' : 
+                 po?.status === 'CLOSED' ? '✓ Closed - GL Posted' :
+                 po?.status === 'CONFIRMED' ? 'Ready to Receive' :
+                 'Not Ready'}
+              </div>
+            </div>
+            {(po?.status === 'RECEIVED' || po?.status === 'CLOSED') && (
+              <p className="text-xs text-indigo-700 mt-2">
+                Goods receipt has been recorded and inventory GL account updated. Three-way match (PO + Receipt + Invoice) is now active for this order.
+              </p>
+            )}
+            {po?.status === 'CONFIRMED' && (
+              <p className="text-xs text-yellow-700 mt-2">
+                Click "Receive Goods" to create a goods receipt. GL posting will be triggered automatically when goods are received, creating inventory and liability entries.
+              </p>
+            )}
+            {['DRAFT', 'SENT'].includes(po?.status || '') && (
+              <p className="text-xs text-gray-600 mt-2">
+                Approve this PO first, then receive goods to trigger GL posting to inventory and accounts payable.
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-medium text-gray-600 uppercase mb-1">PO Amount</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {displayData?.currency || 'USD'} {(displayData?.totalAmount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-600 uppercase mb-1">PO Status</p>
+              <p className="text-lg font-semibold text-gray-900">{po?.status || 'UNKNOWN'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-600 uppercase mb-1">GL Account Impact</p>
+              <p className="text-sm text-gray-700 mt-1">
+                {(po?.status === 'RECEIVED' || po?.status === 'CLOSED') ? 
+                  'Inventory ↑ | AP ↑' : 
+                  'Pending GL entries'}
+              </p>
+            </div>
+          </div>
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              💡 When goods are received, the system automatically posts inventory received (Inventory account) and creates matching accounts payable (AP account) for reconciliation with supplier invoices.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

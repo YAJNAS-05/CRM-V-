@@ -1,0 +1,17 @@
+package com.everx.backend.auth.repository;
+
+import com.everx.backend.auth.entity.AccountLockout;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Repository for AccountLockout entity
+ */
+@Repository
+public interface AccountLockoutRepository extends JpaRepository<AccountLockout, UUID> {
+    
+    Optional<AccountLockout> findByUserIdAndIsDeletedFalse(UUID userId);
+}

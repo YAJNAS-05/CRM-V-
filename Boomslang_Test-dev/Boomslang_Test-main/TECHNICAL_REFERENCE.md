@@ -780,3 +780,538 @@ Persisted to `localStorage` under key `everx_auth_store`. Normalizes roles/permi
 ---
 
 *This document is auto-generated from the live EverX codebase. Last updated: April 2026.*
+
+
+
+Let me analyze your project structure to give detailed enterprise specifications:   
+
+Read [](file:///c%3A/Users/Arun%20A/Saved%20Games/Full/CRM-V-/Boomslang_Test-dev/Boomslang_Test-main/README.md)
+
+Read [](file:///c%3A/Users/Arun%20A/Saved%20Games/Full/CRM-V-/Boomslang_Test-dev/Boomslang_Test-main/PROJECT_CONFIG.md)
+
+Read [](file:///c%3A/Users/Arun%20A/Saved%20Games/Full/CRM-V-/Boomslang_Test-dev/Boomslang_Test-main/backend/pom.xml#1-1), lines 1 to 80
+
+Read [](file:///c%3A/Users/Arun%20A/Saved%20Games/Full/CRM-V-/Boomslang_Test-dev/Boomslang_Test-main/backend/src/main/java/com/everx)
+
+Read [](file:///c%3A/Users/Arun%20A/Saved%20Games/Full/CRM-V-/Boomslang_Test-dev/Boomslang_Test-main/frontend/src)
+
+Searched for regex `@RestController|@Service|@Repository|@Configuration` (`**/backend/src/main/java/com/everx/**/*.java`), 30 results
+
+Read [](file:///c%3A/Users/Arun%20A/Saved%20Games/Full/CRM-V-/Boomslang_Test-dev/Boomslang_Test-main/backend/src/main/java/com/everx/config)
+
+Based on my analysis of your project, here's a **comprehensive enterprise-level specification** for your EverX CRM/ERP platform:
+
+---
+
+## **ENTERPRISE SPECIFICATIONS FOR EVERX PLATFORM**
+
+### **I. ARCHITECTURE LAYERS**
+
+#### **A. Security & Authentication Layer** ✅ Partial
+**Current State:** Basic JWT with refresh tokens
+**What's Missing:**
+- ❌ Multi-factor authentication (MFA/2FA)
+- ❌ OAuth 2.0 / SSO integration (Google, Azure AD, Okta)
+- ❌ Password complexity validation (uppercase, numbers, special chars, min 12 chars)
+- ❌ Account lockout after N failed attempts
+- ❌ Session management & concurrent login limits
+- ❌ API key authentication for third-party integrations
+- ❌ Rate limiting per user/IP
+- ❌ CORS hardening (specific origins, not wildcard)
+- ❌ CSRF token validation
+- ❌ Secure password reset flow (email token, expiration)
+
+**Implementation Details:**
+```
+Auth Flow:
+- Login → 2FA via SMS/Email → Access Token (15 min) + Refresh Token (7 days)
+- Account Lockout: 5 failed attempts → 30 min lockout
+- Token Refresh: Check user status (not deleted, not suspended)
+- API Key: Long-lived tokens for integrations with IP whitelisting
+- Rate Limiting: 10 requests/minute per user, 100/minute per IP
+```
+
+---
+
+#### **B. Data Access Control Layer** ✅ Partial
+**Current State:** Soft deletes, data scope (OWN/TEAM/ORG/AUTO)
+**What's Missing:**
+- ❌ Field-level security (hide salary for non-HR, etc.)
+- ❌ Row-level security (User A can't see User B's data unless permitted)
+- ❌ Time-based access (access only during work hours)
+- ❌ Data masking for PII (SSN, PAN, Aadhaar shown as ****1234)
+- ❌ Encryption for sensitive fields (passwords, tokens, keys)
+- ❌ Data residency compliance (GDPR, data location restrictions)
+- ❌ Access revocation in real-time (on role change, not session-based)
+
+**Implementation Details:**
+```
+Row-Level Security (RLS):
+- Employees see only their own data + team data (if manager)
+- Sales reps see only their accounts/deals
+- Payroll info visible only to HR + Finance roles
+- Audit trails show WHO accessed WHAT and WHEN
+
+Field Masking:
+- PAN: "****1234"
+- SSN: "***-**-1234"  
+- Aadhaar: "****-****-1234"
+- Salary: visible only to HR/Finance/Employee themselves
+```
+
+---
+
+#### **C. Audit & Logging Layer** ✅ Partial
+**Current State:** Basic audit log table
+**What's Missing:**
+- ❌ Immutable audit trails (log entries can't be modified/deleted)
+- ❌ Structured logging (JSON format with context)
+- ❌ Compliance audit logs (GDPR access requests, data exports)
+- ❌ Change tracking (before/after values for all updates)
+- ❌ Centralized logging (ELK, Splunk, CloudWatch integration)
+- ❌ Log retention policies (1 year audit, 7 years compliance)
+- ❌ Real-time alerts (suspicious activity, policy violations)
+
+**Audit Events to Track:**
+```
+- User login/logout (with IP, browser, device)
+- Permission changes (who changed, when, from X to Y)
+- Data creation/update/deletion (with before/after snapshots)
+- Failed access attempts (5+ attempts = alert)
+- Export operations (who exported what when)
+- Admin actions (role changes, deletions, config changes)
+- Compliance events (GDPR requests, data access)
+```
+
+---
+
+#### **D. Error Handling & Resilience** ❌ Missing
+**What's Missing:**
+- ❌ Graceful error responses (not exposing stack traces)
+- ❌ Retry logic with exponential backoff
+- ❌ Circuit breaker for external API calls
+- ❌ Fallback mechanisms (cache, default values)
+- ❌ Dead letter queues for failed async tasks
+- ❌ Health check endpoints (`/health`, `/readiness`, `/liveness`)
+- ❌ Chaos engineering & failure injection tests
+
+**Standard Response Format:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ACCOUNT_NOT_FOUND",
+    "message": "Account with ID xyz not found",
+    "timestamp": "2026-05-05T12:00:00Z",
+    "requestId": "req-12345-xyz"
+  }
+}
+```
+
+---
+
+### **II. MODULE-SPECIFIC ENTERPRISE FEATURES**
+
+#### **CRM Module** ✅ Basic | ❌ Enterprise Gaps
+
+**Current:** Account, Contact, Deal, Activity, Quote, Lead, Activity tracking
+
+**Missing Enterprise Features:**
+```
+1. Lead Scoring
+   - ❌ Automatic scoring based on engagement
+   - ❌ Qualification rules (hot/warm/cold)
+   - ❌ Sales readiness prediction
+
+2. Sales Pipeline Management
+   - ❌ Stage-based workflows (PROSPECT → QUALIFIED → PROPOSAL → NEGOTIATION → CLOSED)
+   - ❌ Automatic stage transitions based on triggers
+   - ❌ Probability-weighted forecasting
+   - ❌ Sales velocity analytics (days in stage)
+   - ❌ Pipeline health score
+
+3. Territory Management
+   - ❌ Geographic territory assignment
+   - ❌ Territory overlap detection
+   - ❌ Capacity planning
+
+4. Account Hierarchy
+   - ❌ Parent-child account relationships
+   - ❌ Rollup reporting (sum metrics across hierarchy)
+
+5. Relationship Management
+   - ❌ Contact relationship mapping (who reports to whom)
+   - ❌ Organizational chart visualization
+   - ❌ Decision-maker identification
+
+6. Activity Tracking
+   - ❌ Email sync (Gmail, Outlook integration)
+   - ❌ Call recording & transcription
+   - ❌ Meeting scheduling integration
+   - ❌ Automated activity creation (from emails, calendar)
+
+7. Forecasting & Analytics
+   - ❌ Revenue forecasting models
+   - ❌ Predictive churn scoring
+   - ❌ Win/loss analysis
+   - ❌ Sales performance benchmarking
+
+8. Integration
+   - ❌ Salesforce migration (data import)
+   - ❌ HubSpot sync
+   - ❌ Slack notifications for important events
+```
+
+---
+
+#### **HR Module** ✅ Basic | ❌ Enterprise Gaps
+
+**Current:** Employee, Payroll, Recruitment, Timesheets, Training, Compliance
+
+**Missing Enterprise Features:**
+```
+1. Performance Management
+   - ❌ Goal setting & OKRs (Objectives & Key Results)
+   - ❌ 360-degree feedback system
+   - ❌ Performance rating scales
+   - ❌ Calibration sessions (manager discussions)
+   - ❌ Performance curve (bell curve vs actual)
+   - ❌ Succession planning
+
+2. Compensation Planning
+   - ❌ Salary benchmarking against market rates
+   - ❌ Bonus calculation models
+   - ❌ Stock option vesting schedules
+   - ❌ Equity management
+   - ❌ Compensation equity audit (gender/race pay gap)
+
+3. Payroll Processing
+   - ❌ Multi-country payroll (tax calculations for each region)
+   - ❌ Statutory compliance (PF, ESI, TDS, LIC, GST)
+   - ❌ Salary advance tracking
+   - ❌ Leave deductions calculation
+   - ❌ Arrear settlement
+   - ❌ Payroll audit trail & sign-off workflow
+
+4. Leave Management
+   - ❌ Multiple leave types (PTO, sick, maternity, unpaid, sabbatical)
+   - ❌ Accrual rules (monthly, yearly)
+   - ❌ Carryover policies
+   - ❌ Encashment calculation
+   - ❌ Department-level balance forecasting
+   - ❌ Integration with attendance
+
+5. Compliance & Safety
+   - ❌ Document management (offer letters, employment contracts)
+   - ❌ Certification tracking (safety training, compliance certs)
+   - ❌ Safety incident reporting & investigation
+   - ❌ Regulatory audit trail
+   - ❌ Background check integration
+   - ❌ GDPR/privacy compliance data subject rights
+
+6. Recruitment
+   - ❌ Multi-channel job posting (LinkedIn, Indeed, Glassdoor)
+   - ❌ Applicant tracking pipeline
+   - ❌ Interview scheduling & feedback forms
+   - ❌ Offer letter generation & e-signing
+   - ❌ Background verification workflow
+   - ❌ Onboarding checklist & automation
+   - ❌ Reference checks
+
+7. Learning & Development
+   - ❌ Course library & catalog
+   - ❌ Skill gap analysis
+   - ❌ Training transcripts
+   - ❌ Certification tracking
+   - ❌ Competency matrix per role
+   - ❌ Microlearning content
+
+8. Employee Self-Service
+   - ❌ Self-service leave requests
+   - ❌ Self-service attendance corrections
+   - ❌ Expense report submission & approval
+   - ❌ Personal data updates
+   - ❌ Document downloads (payslips, certificates)
+```
+
+---
+
+#### **Finance/ERP Module** ✅ Basic | ❌ Enterprise Gaps
+
+**Current:** Invoicing, Purchase Orders, basic accounting
+
+**Missing Enterprise Features:**
+```
+1. Accounts Payable
+   - ❌ Vendor management
+   - ❌ Invoice matching (PO → GR → Invoice 3-way match)
+   - ❌ Payment terms & discount calculation
+   - ❌ Vendor statement reconciliation
+   - ❌ Duplicate invoice detection
+
+2. Accounts Receivable
+   - ❌ Customer aging reports
+   - ❌ Credit limit enforcement
+   - ❌ Dunning management (payment reminders)
+   - ❌ Collections workflow
+   - ❌ Bad debt provisioning
+
+3. Accounting & GL
+   - ❌ Chart of accounts (COA) per entity/cost center
+   - ❌ Automated journal entry posting
+   - ❌ Month-end closing checklist & sign-off
+   - ❌ Intercompany transactions & reconciliation
+   - ❌ Consolidation (multi-entity, multi-currency)
+   - ❌ Accrual accounting support
+
+4. Financial Reporting
+   - ❌ Balance sheet
+   - ❌ Income statement (P&L)
+   - ❌ Cash flow statement
+   - ❌ Tax compliance reports
+   - ❌ Statutory filings (GST, income tax, annual filings)
+   - ❌ Budget vs actual variance analysis
+   - ❌ Ratio analysis & KPIs
+
+5. Multi-Currency & FX
+   - ❌ Exchange rate management
+   - ❌ Unrealized gain/loss tracking
+   - ❌ FX revaluation
+   - ❌ Multi-currency bank reconciliation
+
+6. Tax Management
+   - ❌ Tax calculation engines (TDS, GST, income tax, VAT)
+   - ❌ Tax compliance calendar
+   - ❌ E-filing integration (GST, income tax, customs)
+   - ❌ Withholding tax management
+   - ❌ Tax audit trails
+
+7. Asset Management
+   - ❌ Fixed asset register
+   - ❌ Depreciation calculation
+   - ❌ Asset lifecycle tracking (acquisition → disposal)
+   - ❌ Maintenance scheduling
+```
+
+---
+
+#### **Reporting & Analytics Module** ✅ Basic | ❌ Enterprise Gaps
+
+**Current:** Basic reporting dashboard
+
+**Missing Enterprise Features:**
+```
+1. Self-Service BI
+   - ❌ Drag-and-drop report builder
+   - ❌ Data exploration (drill-down, slice-and-dice)
+   - ❌ Ad-hoc query builder
+   - ❌ Report scheduling (daily, weekly, monthly)
+   - ❌ Report distribution (email, portal, Slack)
+
+2. Real-Time Analytics
+   - ❌ Real-time dashboards (not stale data)
+   - ❌ Streaming data ingestion
+   - ❌ Incremental fact loading
+
+3. Advanced Analytics
+   - ❌ Predictive models (churn, revenue, lead scoring)
+   - ❌ Cohort analysis
+   - ❌ Attribution modeling
+   - ❌ Anomaly detection (unusual activity alerts)
+   - ❌ Time series forecasting
+
+4. Data Warehouse
+   - ❌ Dimension tables (Date, Employee, Product, Customer)
+   - ❌ Fact tables (Sales, Inventory, HR)
+   - ❌ Slowly Changing Dimensions (SCD) handling
+   - ❌ ETL pipelines with quality checks
+
+5. Data Governance
+   - ❌ Data dictionary / metadata management
+   - ❌ Data lineage (where does this metric come from?)
+   - ❌ Data quality monitoring (completeness, accuracy, freshness)
+   - ❌ Master data management (MDM) for key entities
+```
+
+---
+
+### **III. INFRASTRUCTURE & DEVOPS**
+
+#### **A. Deployment** ❌ Missing
+```
+- ❌ Docker containerization (Dockerfile for backend, frontend)
+- ❌ Kubernetes orchestration (Pod, Service, Deployment manifests)
+- ❌ CI/CD pipelines (GitHub Actions, Jenkins, GitLab CI)
+- ❌ Environment parity (dev, staging, prod)
+- ❌ Blue-green deployments (zero downtime)
+- ❌ Database migration strategy (Flyway versioning)
+- ❌ Secrets management (vaults for API keys, DB passwords)
+```
+
+#### **B. Monitoring & Observability** ❌ Missing
+```
+- ❌ Metrics collection (Prometheus, Datadog)
+- ❌ Log aggregation (ELK stack, Splunk)
+- ❌ Distributed tracing (Jaeger, Zipkin)
+- ❌ APM (Application Performance Monitoring)
+- ❌ Alerting rules (threshold breaches, anomalies)
+- ❌ SLA tracking & reporting
+- ❌ Uptime monitoring
+```
+
+#### **C. Backup & Disaster Recovery** ❌ Missing
+```
+- ❌ Automated daily backups (point-in-time recovery)
+- ❌ Backup verification & restore testing
+- ❌ Disaster recovery plan & drills
+- ❌ RPO (Recovery Point Objective): max data loss tolerance
+- ❌ RTO (Recovery Time Objective): max downtime tolerance
+- ❌ Multi-region failover
+```
+
+---
+
+### **IV. FRONTEND ENTERPRISE FEATURES** ❌ Missing
+
+```
+1. Accessibility (WCAG 2.1 AA)
+   - ❌ Screen reader compatibility
+   - ❌ Keyboard navigation
+   - ❌ Color contrast ratios
+   - ❌ Alt text for images
+
+2. Internationalization (i18n)
+   - ❌ Multi-language support (English, Spanish, French, Hindi, etc.)
+   - ❌ Right-to-left (RTL) text support (Arabic, Hebrew)
+   - ❌ Date/time formatting per locale
+   - ❌ Currency formatting per locale
+
+3. Performance
+   - ❌ Code splitting (lazy loading)
+   - ❌ Tree-shaking (unused code removal)
+   - ❌ Image optimization (WebP, responsive images)
+   - ❌ Caching strategy (service workers, HTTP caching)
+   - ❌ Time to Interactive (TTI) < 3 seconds
+
+4. Security
+   - ❌ Content Security Policy (CSP) headers
+   - ❌ XSS (Cross-Site Scripting) prevention
+   - ❌ CSRF token validation
+   - ❌ Input sanitization (HTML encoding, SQL injection prevention)
+   - ❌ Secure storage (no sensitive data in localStorage)
+
+5. UI/UX Enterprise Patterns
+   - ❌ Dark mode support
+   - ❌ Customizable themes/branding
+   - ❌ Keyboard shortcuts (for power users)
+   - ❌ Undo/redo functionality
+   - ❌ Auto-save drafts
+   - ❌ Offline mode with sync
+   - ❌ Conflict resolution (simultaneous edits)
+   - ❌ Collaborative features (real-time collaboration)
+```
+
+---
+
+### **V. DATA QUALITY & INTEGRITY**
+
+```
+❌ Missing:
+- ❌ Data validation rules (field-level, business-level)
+- ❌ Duplicate detection & merging (duplicate accounts/contacts)
+- ❌ Data profiling & quality metrics
+- ❌ Referential integrity enforcement
+- ❌ Idempotency keys (prevent duplicate API calls)
+- ❌ Transaction handling (ACID compliance)
+- ❌ Optimistic concurrency control (version-based updates)
+- ❌ Data reconciliation & variance reports
+```
+
+---
+
+### **VI. INTEGRATION ECOSYSTEM**
+
+```
+❌ Missing:
+- ❌ REST API documentation (OpenAPI/Swagger)
+- ❌ Webhook management (reliable delivery, retry logic)
+- ❌ API rate limiting & throttling
+- ❌ Third-party integrations:
+   - ❌ Salesforce
+   - ❌ HubSpot
+   - ❌ Slack
+   - ❌ Email (Gmail, Outlook)
+   - ❌ Calendar (Google Calendar, Outlook Calendar)
+   - ❌ Payment processors (Stripe, PayPal)
+   - ❌ Accounting software (QuickBooks, Xero)
+   - ❌ HRIS systems (BambooHR, Workday)
+- ❌ Custom webhook builder
+- ❌ iPaaS connectors (Zapier, Make)
+```
+
+---
+
+### **VII. TESTING STRATEGY** ❌ Minimal
+
+```
+Missing:
+- ❌ Unit tests (70%+ code coverage)
+- ❌ Integration tests (API layer)
+- ❌ End-to-end (E2E) tests (user workflows)
+- ❌ Performance tests (load, stress)
+- ❌ Security tests (OWASP, penetration testing)
+- ❌ Contract testing (API versioning)
+- ❌ Chaos engineering tests
+- ❌ Test data management
+- ❌ Automated test reporting
+```
+
+---
+
+### **VIII. COMPLIANCE & REGULATIONS**
+
+```
+❌ Missing:
+- ❌ GDPR compliance (right to be forgotten, data portability)
+- ❌ HIPAA compliance (healthcare data)
+- ❌ SOC 2 compliance (security controls audit)
+- ❌ ISO 27001 (information security)
+- ❌ PCI DSS (payment card data)
+- ❌ Data localization requirements (India: data residency)
+- ❌ Compliance audit logs & proof of compliance
+```
+
+---
+
+## **IMPLEMENTATION PRIORITY**
+
+### **Phase 1 (Critical - MVP):**
+1. ✅ Authentication & Authorization (fix gaps)
+2. ✅ Error handling & graceful degradation
+3. ✅ Audit logging (immutable trails)
+4. ✅ Data validation rules
+5. ✅ API documentation (Swagger)
+
+### **Phase 2 (Important - Business Value):**
+6. ❌ CRM: Lead scoring, pipeline forecasting
+7. ❌ HR: Performance management, leave accrual
+8. ❌ Finance: A/P, A/R, GL integration
+9. ❌ Real-time dashboards
+10. ❌ Unit/integration test coverage (70%+)
+
+### **Phase 3 (Advanced - Market Competitiveness):**
+11. ❌ Multi-language support
+12. ❌ Advanced analytics & predictions
+13. ❌ Third-party integrations (Salesforce, HubSpot, Slack)
+14. ❌ Mobile app (React Native/Flutter)
+15. ❌ Compliance certifications (SOC 2, ISO 27001)
+
+---
+
+**Would you like me to:**
+1. Deep-dive into any specific module?
+2. Create implementation roadmap with timeline?
+3. Set up enterprise testing strategy?
+4. Build specific missing features (e.g., lead scoring, performance management)?
+
+Let me know which area you want to focus on first!

@@ -3,6 +3,7 @@ package com.everx.crm.activity;
 import com.everx.crm.activity.dto.ActivityDto;
 import com.everx.crm.activity.dto.CreateActivityRequest;
 import com.everx.crm.activity.dto.UpdateActivityRequest;
+import com.everx.crm.webhook.CrmWebhookPublisher;
 import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -14,13 +15,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ActivityService {
 
+    private static final String ENTITY_ACTIVITY = "ACTIVITY";
+    private static final String EVENT_CREATED = "created";
+    private static final String EVENT_UPDATED = "updated";
+    private static final String EVENT_DELETED = "deleted";
+    private static final String EVENT_COMPLETED = "completed";
+
     private final ActivityRepository activityRepository;
+    private final CrmWebhookPublisher crmWebhookPublisher;
 
     @Transactional
     public ActivityDto createActivity(CreateActivityRequest request) {
@@ -38,9 +47,10 @@ public class ActivityService {
         activity.setLeadId(request.getLeadId());
         activity.setAccountId(request.getAccountId());
         activity.setAssignedTo(assignedTo);
-
         Activity saved = activityRepository.save(activity);
-        return toDto(saved);
+        ActivityDto dto = toDto(saved);
+        crmWebhookPublisher.publish(ENTITY_ACTIVITY, EVENT_CREATED, saved.getId(), dto);
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -108,9 +118,10 @@ public class ActivityService {
         if (request.getLeadId() != null) activity.setLeadId(request.getLeadId());
         if (request.getAccountId() != null) activity.setAccountId(request.getAccountId());
         if (request.getAssignedTo() != null) activity.setAssignedTo(request.getAssignedTo());
-
         Activity updated = activityRepository.save(activity);
-        return toDto(updated);
+        ActivityDto dto = toDto(updated);
+        crmWebhookPublisher.publish(ENTITY_ACTIVITY, EVENT_UPDATED, updated.getId(), dto);
+        return dto;
     }
 
     @Transactional
@@ -120,7 +131,10 @@ public class ActivityService {
 
         activity.setCompletedAt(Instant.now());
         Activity updated = activityRepository.save(activity);
-        return toDto(updated);
+        ActivityDto dto = toDto(updated);
+        crmWebhookPublisher.publish(ENTITY_ACTIVITY, EVENT_UPDATED, updated.getId(), dto);
+        crmWebhookPublisher.publish(ENTITY_ACTIVITY, EVENT_COMPLETED, updated.getId(), dto);
+        return dto;
     }
 
     @Transactional
@@ -128,7 +142,9 @@ public class ActivityService {
         Activity activity = activityRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Activity not found with id: " + id));
         activity.softDelete();
-        activityRepository.save(activity);
+        Activity saved = activityRepository.save(activity);
+        ActivityDto dto = toDto(saved);
+        crmWebhookPublisher.publish(ENTITY_ACTIVITY, EVENT_DELETED, saved.getId(), dto, Map.of("deleted", true));
     }
 
     private ActivityDto toDto(Activity activity) {

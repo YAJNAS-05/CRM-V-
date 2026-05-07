@@ -1,12 +1,13 @@
 package com.everx.hr.timesheet;
 
-import com.everx.hr.TimesheetStatus;
 import com.everx.hr.employee.EmployeeRepository;
 import com.everx.hr.timeentry.TimeEntry;
 import com.everx.hr.timeentry.TimeEntryRepository;
 import com.everx.hr.timesheet.dto.CreateTimesheetRequest;
 import com.everx.hr.timesheet.dto.TimesheetDto;
 import com.everx.hr.timesheet.dto.UpdateTimesheetRequest;
+import com.everx.platform.config.service.OptionSetService;
+import com.everx.platform.config.service.WorkflowEngineService;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +27,19 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TimesheetService {
 
+    private static final String MODULE_HR = "HR";
+    private static final String ENTITY_TIMESHEET = "TIMESHEET";
+    private static final String FIELD_STATUS = "status";
+    private static final String STATUS_DRAFT = "DRAFT";
+    private static final String STATUS_SUBMITTED = "SUBMITTED";
+    private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_REJECTED = "REJECTED";
+
     private final TimesheetRepository timesheetRepository;
     private final EmployeeRepository employeeRepository;
     private final TimeEntryRepository timeEntryRepository;
+    private final WorkflowEngineService workflowEngineService;
+    private final OptionSetService optionSetService;
 
     @Transactional
     public TimesheetDto createTimesheet(CreateTimesheetRequest request) {
@@ -47,7 +58,7 @@ public class TimesheetService {
             timesheet.setTotalBillableHours(BigDecimal.ZERO);
         }
         timesheet.setNotes(request.getNotes());
-        timesheet.setStatus(TimesheetStatus.DRAFT);
+        timesheet.setStatus(resolveDefaultStatus());
 
         return toDto(timesheetRepository.save(timesheet));
     }
@@ -62,7 +73,7 @@ public class TimesheetService {
     @Transactional(readOnly = true)
     public Page<TimesheetDto> getTimesheets(Pageable pageable,
                                             UUID employeeId,
-                                            TimesheetStatus status,
+                                            String status,
                                             LocalDate startDate,
                                             LocalDate endDate) {
         return timesheetRepository.findAllFiltered(employeeId, status, startDate, endDate, pageable).map(this::toDto);
@@ -90,7 +101,11 @@ public class TimesheetService {
             timesheet.setTotalBillableHours(BigDecimal.ZERO);
         }
         if (request.getNotes() != null) timesheet.setNotes(request.getNotes());
-        if (request.getStatus() != null) timesheet.setStatus(request.getStatus());
+        String requestedStatus = normalizeValue(request.getStatus());
+        if (requestedStatus != null) {
+            validateStatus(requestedStatus);
+            timesheet.setStatus(requestedStatus);
+        }
 
         return toDto(timesheetRepository.save(timesheet));
     }
@@ -99,10 +114,26 @@ public class TimesheetService {
     public TimesheetDto submitTimesheet(UUID id) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
-        if (timesheet.getStatus() != TimesheetStatus.DRAFT) {
+        if (!STATUS_DRAFT.equalsIgnoreCase(timesheet.getStatus())) {
             throw new ValidationException("Only DRAFT timesheets can be submitted");
         }
-        timesheet.setStatus(TimesheetStatus.SUBMITTED);
+
+        if (workflowEngineService.hasWorkflow(MODULE_HR, ENTITY_TIMESHEET)) {
+            boolean transitionDefined = workflowEngineService
+                    .findTransition(MODULE_HR, ENTITY_TIMESHEET, timesheet.getStatus(), STATUS_SUBMITTED)
+                    .isPresent();
+            if (!transitionDefined) {
+                throw new ValidationException("Transition not allowed by workflow");
+            }
+            workflowEngineService.enforceTransition(
+                    MODULE_HR,
+                    ENTITY_TIMESHEET,
+                    id.toString(),
+                    timesheet.getStatus(),
+                    STATUS_SUBMITTED);
+        }
+
+        timesheet.setStatus(STATUS_SUBMITTED);
         return toDto(timesheetRepository.save(timesheet));
     }
 
@@ -110,10 +141,26 @@ public class TimesheetService {
     public TimesheetDto approveTimesheet(UUID id, UUID approvedBy) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
-        if (timesheet.getStatus() != TimesheetStatus.SUBMITTED) {
+        if (!STATUS_SUBMITTED.equalsIgnoreCase(timesheet.getStatus())) {
             throw new ValidationException("Only SUBMITTED timesheets can be approved");
         }
-        timesheet.setStatus(TimesheetStatus.APPROVED);
+
+        if (workflowEngineService.hasWorkflow(MODULE_HR, ENTITY_TIMESHEET)) {
+            boolean transitionDefined = workflowEngineService
+                    .findTransition(MODULE_HR, ENTITY_TIMESHEET, timesheet.getStatus(), STATUS_APPROVED)
+                    .isPresent();
+            if (!transitionDefined) {
+                throw new ValidationException("Transition not allowed by workflow");
+            }
+            workflowEngineService.enforceTransition(
+                    MODULE_HR,
+                    ENTITY_TIMESHEET,
+                    id.toString(),
+                    timesheet.getStatus(),
+                    STATUS_APPROVED);
+        }
+
+        timesheet.setStatus(STATUS_APPROVED);
         timesheet.setApprovedBy(approvedBy);
         timesheet.setApprovedAt(OffsetDateTime.now());
         return toDto(timesheetRepository.save(timesheet));
@@ -123,10 +170,26 @@ public class TimesheetService {
     public TimesheetDto rejectTimesheet(UUID id, String notes) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
-        if (timesheet.getStatus() != TimesheetStatus.SUBMITTED) {
+        if (!STATUS_SUBMITTED.equalsIgnoreCase(timesheet.getStatus())) {
             throw new ValidationException("Only SUBMITTED timesheets can be rejected");
         }
-        timesheet.setStatus(TimesheetStatus.REJECTED);
+
+        if (workflowEngineService.hasWorkflow(MODULE_HR, ENTITY_TIMESHEET)) {
+            boolean transitionDefined = workflowEngineService
+                    .findTransition(MODULE_HR, ENTITY_TIMESHEET, timesheet.getStatus(), STATUS_REJECTED)
+                    .isPresent();
+            if (!transitionDefined) {
+                throw new ValidationException("Transition not allowed by workflow");
+            }
+            workflowEngineService.enforceTransition(
+                    MODULE_HR,
+                    ENTITY_TIMESHEET,
+                    id.toString(),
+                    timesheet.getStatus(),
+                    STATUS_REJECTED);
+        }
+
+        timesheet.setStatus(STATUS_REJECTED);
         if (notes != null) {
             timesheet.setNotes(notes);
         }
@@ -141,7 +204,7 @@ public class TimesheetService {
                     timesheet.setEmployeeId(employeeId);
                     timesheet.setWorkDate(workDate);
                     timesheet.setWeekStartDate(resolveWeekStart(workDate));
-                    timesheet.setStatus(TimesheetStatus.DRAFT);
+                    timesheet.setStatus(resolveDefaultStatus());
                     return timesheetRepository.save(timesheet);
                 });
     }
@@ -206,5 +269,23 @@ public class TimesheetService {
             return null;
         }
         return workDate.with(WeekFields.ISO.dayOfWeek(), 1);
+    }
+
+    private void validateStatus(String status) {
+        if (!optionSetService.isValidOptionValue(MODULE_HR, ENTITY_TIMESHEET, FIELD_STATUS, status)) {
+            throw new ValidationException("Timesheet status is not configured");
+        }
+    }
+
+    private String resolveDefaultStatus() {
+        return optionSetService.resolveDefaultValue(MODULE_HR, ENTITY_TIMESHEET, FIELD_STATUS, STATUS_DRAFT);
+    }
+
+    private String normalizeValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

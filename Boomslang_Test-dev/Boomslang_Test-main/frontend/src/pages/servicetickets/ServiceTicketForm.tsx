@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
 import { serviceTicketApi, equipmentApi, subcontractorApi, sparePartApi, warrantyApi } from '../../api/erpApi'
 import { accountApi } from '../../api/crmApi'
 import { adminApi } from '../../api/adminApi'
@@ -22,6 +23,22 @@ const SERVICE_TYPES = [
 const SERVICE_STATUSES = ['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'PENDING_PARTS', 'RESOLVED', 'CLOSED', 'CANCELLED']
 const SERVICE_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'EMERGENCY']
 const CURRENCIES = ['AUD', 'USD', 'JPY', 'EUR', 'GBP']
+
+const serviceTicketSchema = z.object({
+  accountId: z.string().min(1, 'Account is required'),
+  type: z.string().min(1, 'Type is required'),
+  status: z.string().min(1, 'Status is required'),
+  priority: z.string().min(1, 'Priority is required'),
+  reportedDate: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  resolvedDate: z.string().optional(),
+}).refine((d) => !d.reportedDate || !d.scheduledDate || d.scheduledDate >= d.reportedDate, {
+  message: 'Scheduled date cannot be before reported date',
+  path: ['scheduledDate'],
+}).refine((d) => !d.scheduledDate || !d.resolvedDate || d.resolvedDate >= d.scheduledDate, {
+  message: 'Resolved date cannot be before scheduled date',
+  path: ['resolvedDate'],
+})
 
 interface FormData {
   ticketNumber: string
@@ -106,6 +123,7 @@ export default function ServiceTicketForm() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [lookupLoading, setLookupLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
 
   const [accounts, setAccounts] = useState<Account[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -304,20 +322,27 @@ export default function ServiceTicketForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.accountId || !form.type || !form.status || !form.priority) {
-      toast.error('Account, Type, Status, and Priority are required')
-      return
-    }
 
-    if (form.reportedDate && form.scheduledDate && form.scheduledDate < form.reportedDate) {
-      toast.error('Scheduled date cannot be before reported date')
+    const result = serviceTicketSchema.safeParse({
+      accountId: form.accountId,
+      type: form.type,
+      status: form.status,
+      priority: form.priority,
+      reportedDate: form.reportedDate,
+      scheduledDate: form.scheduledDate,
+      resolvedDate: form.resolvedDate,
+    })
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
-
-    if (form.scheduledDate && form.resolvedDate && form.resolvedDate < form.scheduledDate) {
-      toast.error('Resolved date cannot be before scheduled date')
-      return
-    }
+    setFieldErrors({})
 
     try {
       setSaving(true)

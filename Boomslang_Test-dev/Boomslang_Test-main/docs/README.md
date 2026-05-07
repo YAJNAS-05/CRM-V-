@@ -20,6 +20,7 @@ This repository keeps operational and implementation documents under the docs fo
 - Getting Started: docs/getting-started/GET_STARTED.md
 - Quick Start: docs/getting-started/QUICK_START.md
 - PRD: docs/product/PRD.md
+- Roles and Permissions Spec: docs/product/ROLES_AND_PERMISSIONS.md
 - Custom Reporting Guide: docs/guides/CUSTOM_REPORTING_GUIDE.md
 - Testing & Integration Guide: docs/guides/TESTING_AND_INTEGRATION_GUIDE.md
 - Build Verification Report: docs/reports/BUILD_VERIFICATION_REPORT.md

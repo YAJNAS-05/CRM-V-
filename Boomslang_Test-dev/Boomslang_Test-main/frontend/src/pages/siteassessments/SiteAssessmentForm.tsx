@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
+import { z } from 'zod'
 import { siteAssessmentApi, salesOrderApi } from '../../api/erpApi'
 import { accountApi } from '../../api/crmApi'
 import { Account } from '../../types/crm'
@@ -10,6 +11,19 @@ import SearchableLookupSelect from '../../components/form/SearchableLookupSelect
 const READINESS_VALUES = ['PENDING', 'READY', 'REMEDIATION_REQUIRED', 'FAILED']
 const ASSESSMENT_METHODS = ['ON_SITE_VISIT', 'VIDEO_CALL', 'DOCUMENT_REVIEW']
 const SHIELDING_TYPES = ['LEAD', 'RF_CAGE', 'LEAD_AND_RF', 'NONE', 'PENDING']
+
+const siteAssessmentSchema = z.object({
+  salesOrderId: z.string().optional(),
+  accountId: z.string().optional(),
+  assessmentMethod: z.string().min(1, 'Assessment method is required'),
+  overallReadiness: z.string().min(1, 'Overall readiness is required'),
+  assessedDate: z.string().optional(),
+}).refine(
+  (data) => Boolean(data.salesOrderId) || Boolean(data.accountId),
+  { message: 'Select a Sales Order or Account', path: ['accountId'] }
+)
+
+type SiteAssessmentErrors = Partial<Record<string, string>>
 
 interface FormData {
   assessmentNumber: string
@@ -52,6 +66,7 @@ export default function SiteAssessmentForm() {
   const [form, setForm] = useState<FormData>(defaultForm)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<SiteAssessmentErrors>({})
   const [lookupLoading, setLookupLoading] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([])
@@ -119,6 +134,7 @@ export default function SiteAssessmentForm() {
   }
 
   const handleLookupChange = (name: string, value: string) => {
+    if (fieldErrors[name]) setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
     if (name === 'salesOrderId') {
       const selectedSalesOrder = salesOrders.find((item) => item.id === value)
       setForm((prev) => ({
@@ -155,10 +171,18 @@ export default function SiteAssessmentForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!form.accountId.trim() && !form.salesOrderId.trim()) {
-      toast.error('Select a Sales Order or an Account')
+    const result = siteAssessmentSchema.safeParse(form)
+    if (!result.success) {
+      const errs: SiteAssessmentErrors = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
 
     try {
       setSaving(true)
@@ -238,12 +262,14 @@ export default function SiteAssessmentForm() {
               required={!form.salesOrderId}
               placeholder="Search account"
             />
+            {fieldErrors.accountId && <p className="col-span-full text-xs text-red-600 -mt-2">{fieldErrors.accountId}</p>}
 
             <div>
               <label className="block text-sm font-medium mb-1">Assessment Method</label>
-              <select name="assessmentMethod" value={form.assessmentMethod} onChange={handleChange} className="w-full border rounded px-3 py-2">
+              <select name="assessmentMethod" value={form.assessmentMethod} onChange={handleChange} className={`w-full border rounded px-3 py-2 ${fieldErrors.assessmentMethod ? 'border-red-500' : ''}`}>
                 {ASSESSMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
               </select>
+              {fieldErrors.assessmentMethod && <p className="mt-1 text-xs text-red-600">{fieldErrors.assessmentMethod}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Room Dimensions</label>
@@ -272,9 +298,10 @@ export default function SiteAssessmentForm() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Overall Readiness</label>
-              <select name="overallReadiness" value={form.overallReadiness} onChange={handleChange} className="w-full border rounded px-3 py-2">
+              <select name="overallReadiness" value={form.overallReadiness} onChange={handleChange} className={`w-full border rounded px-3 py-2 ${fieldErrors.overallReadiness ? 'border-red-500' : ''}`}>
                 {READINESS_VALUES.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
+              {fieldErrors.overallReadiness && <p className="mt-1 text-xs text-red-600">{fieldErrors.overallReadiness}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Assessed Date</label>

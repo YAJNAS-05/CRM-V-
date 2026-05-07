@@ -1695,6 +1695,38 @@ export const CustomReportBuilderPage: React.FC = () => {
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                               />
                             </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Color Palette</label>
+                              <div className="flex flex-wrap gap-2">
+                                {[
+                                  { name: 'Default', colors: ['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6'] },
+                                  { name: 'Ocean', colors: ['#0ea5e9','#06b6d4','#0891b2','#0284c7','#0369a1'] },
+                                  { name: 'Sunset', colors: ['#f97316','#ef4444','#ec4899','#a855f7','#f59e0b'] },
+                                  { name: 'Forest', colors: ['#22c55e','#16a34a','#15803d','#84cc16','#a3e635'] },
+                                  { name: 'Mono', colors: ['#111827','#374151','#6b7280','#9ca3af','#d1d5db'] },
+                                ].map(palette => (
+                                  <button
+                                    key={palette.name}
+                                    title={palette.name}
+                                    onClick={() => handleUpdateSelectedWidgetConfig('colorPalette', palette.colors)}
+                                    className={`flex gap-0.5 rounded-lg overflow-hidden border-2 p-0.5 transition ${JSON.stringify(selectedWidget.config?.colorPalette) === JSON.stringify(palette.colors) ? 'border-indigo-500' : 'border-slate-200 hover:border-indigo-300'}`}
+                                  >
+                                    {palette.colors.map(c => <span key={c} className="w-4 h-4 rounded-sm" style={{ background: c }} />)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedWidget.config?.showLegend !== false}
+                                  onChange={e => handleUpdateSelectedWidgetConfig('showLegend', e.target.checked)}
+                                  className="w-4 h-4 rounded"
+                                />
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Show Legend</span>
+                              </label>
+                            </div>
                           </>
                         )}
 

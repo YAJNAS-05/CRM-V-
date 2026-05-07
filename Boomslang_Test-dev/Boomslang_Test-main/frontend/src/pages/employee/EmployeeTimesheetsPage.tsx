@@ -1,18 +1,17 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import useEmployeeTimeLogger from '../../hooks/useEmployeeTimeLogger'
 import useEmployeeWorkspace from '../../hooks/useEmployeeWorkspace'
 import useEmployeeWorkspaceSync from '../../hooks/useEmployeeWorkspaceSync'
-import { useEmployeeWorkspaceStore } from '../../store/employeeWorkspaceStore'
+import { projectApi, taskApi } from '../../api/pmApi'
+import { timesheetApi } from '../../api/hrApi'
 
 const EmployeeTimesheetsPage: React.FC = () => {
   const { workspaceUser } = useEmployeeWorkspace()
   const { currentEmployee, employeesQuery } = useEmployeeWorkspaceSync()
   const { logEmployeeTime } = useEmployeeTimeLogger()
-  const projects = useEmployeeWorkspaceStore((state) => state.projects)
-  const tasks = useEmployeeWorkspaceStore((state) => state.tasks)
-  const timeEntries = useEmployeeWorkspaceStore((state) => state.timeEntries)
 
   const [projectId, setProjectId] = useState('')
   const [taskId, setTaskId] = useState('')
@@ -20,24 +19,37 @@ const EmployeeTimesheetsPage: React.FC = () => {
   const [hours, setHours] = useState('')
   const [note, setNote] = useState('')
 
+  const { data: projectsData } = useQuery({
+    queryKey: ['pm-projects-all'],
+    queryFn: () => projectApi.getAll(0, 500),
+  })
+
+  const { data: tasksData } = useQuery({
+    queryKey: ['pm-tasks-all'],
+    queryFn: () => taskApi.getAll(0, 500),
+  })
+
+  const { data: timesheetsData } = useQuery({
+    queryKey: ['hr-timesheets', currentEmployee?.id],
+    queryFn: () => timesheetApi.getByEmployee(currentEmployee!.id),
+    enabled: !!currentEmployee?.id,
+  })
+
+  const projects = projectsData?.data?.data?.content || []
+  const tasks = tasksData?.data?.data?.content || []
+  const timesheets = timesheetsData?.data?.data || []
+
   const projectLookup = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
   const taskLookup = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
-  const employeeIdentityIds = useMemo(
-    () => new Set([workspaceUser?.id, currentEmployee?.id].filter(Boolean)),
-    [currentEmployee?.id, workspaceUser?.id],
-  )
+
+  const visibleProjects = useMemo(() => {
+    return projects
+  }, [projects])
 
   const myTasks = useMemo(() => {
     if (!workspaceUser) return []
     return tasks.filter((task) => task.assigneeId === workspaceUser.id)
   }, [tasks, workspaceUser])
-
-  const visibleProjects = useMemo(() => {
-    if (!workspaceUser) return []
-    return projects.filter(
-      (project) => project.ownerId === workspaceUser.id || project.team.includes(workspaceUser.fullName),
-    )
-  }, [projects, workspaceUser])
 
   const visibleTasks = useMemo(
     () => myTasks.filter((task) => (projectId ? task.projectId === projectId : true)),
@@ -45,11 +57,8 @@ const EmployeeTimesheetsPage: React.FC = () => {
   )
 
   const myEntries = useMemo(() => {
-    if (employeeIdentityIds.size === 0) return []
-    return timeEntries
-      .filter((entry) => employeeIdentityIds.has(entry.employeeId))
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-  }, [employeeIdentityIds, timeEntries])
+    return timesheets.sort((left, right) => new Date(right.createdAt || '').getTime() - new Date(left.createdAt || '').getTime())
+  }, [timesheets])
 
   const weeklyHours = useMemo(() => {
     const start = new Date()
@@ -57,7 +66,7 @@ const EmployeeTimesheetsPage: React.FC = () => {
     start.setHours(0, 0, 0, 0)
     return myEntries
       .filter((entry) => new Date(entry.workDate) >= start)
-      .reduce((total, entry) => total + entry.hours, 0)
+      .reduce((total, entry) => total + (entry.hoursWorked || 0), 0)
   }, [myEntries])
 
   const handleSubmit = async () => {
@@ -155,7 +164,7 @@ const EmployeeTimesheetsPage: React.FC = () => {
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <select value={projectId} onChange={(event) => { setProjectId(event.target.value); setTaskId('') }} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
             <option value="">Select project</option>
-            {visibleProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+            {visibleProjects.map((project) => <option key={project.id} value={project.id}>{project.projectName}</option>)}
           </select>
           <select value={taskId} onChange={(event) => setTaskId(event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
             <option value="">Select task</option>
@@ -185,11 +194,11 @@ const EmployeeTimesheetsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {myEntries.map((entry) => (
                 <tr key={entry.id}>
-                  <td className="px-4 py-4 text-slate-900">{projectLookup.get(entry.projectId)?.name || 'HR timesheet'}</td>
-                  <td className="px-4 py-4 text-slate-600">{taskLookup.get(entry.taskId)?.title || 'HR timesheet'}</td>
+                  <td className="px-4 py-4 text-slate-900">{projectLookup.get(entry.fieldJobId || '')?.projectName || 'HR timesheet'}</td>
+                  <td className="px-4 py-4 text-slate-600">—</td>
                   <td className="px-4 py-4 text-slate-600">{entry.workDate}</td>
-                  <td className="px-4 py-4 font-semibold text-slate-900">{entry.hours}h</td>
-                  <td className="px-4 py-4 text-slate-600">{entry.note || '—'}</td>
+                  <td className="px-4 py-4 font-semibold text-slate-900">{entry.hoursWorked}h</td>
+                  <td className="px-4 py-4 text-slate-600">{entry.notes || '—'}</td>
                 </tr>
               ))}
               {myEntries.length === 0 && (

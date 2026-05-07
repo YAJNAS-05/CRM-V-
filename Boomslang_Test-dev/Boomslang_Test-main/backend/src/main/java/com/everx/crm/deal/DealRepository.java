@@ -23,7 +23,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID> {
     Page<Deal> findByAccountId(@Param("accountId") UUID accountId, Pageable pageable);
 
     @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.stage = :stage ORDER BY d.createdAt DESC")
-    Page<Deal> findByStage(@Param("stage") DealStage stage, Pageable pageable);
+    Page<Deal> findByStage(@Param("stage") String stage, Pageable pageable);
 
         @Query("""
                         SELECT d FROM Deal d
@@ -36,7 +36,7 @@ public interface DealRepository extends JpaRepository<Deal, UUID> {
                             )
                         ORDER BY d.createdAt DESC
                         """)
-        Page<Deal> search(@Param("query") String query, @Param("stage") DealStage stage, Pageable pageable);
+        Page<Deal> search(@Param("query") String query, @Param("stage") String stage, Pageable pageable);
 
     long countByOwnerIdAndIsDeletedFalse(UUID ownerId);
 }

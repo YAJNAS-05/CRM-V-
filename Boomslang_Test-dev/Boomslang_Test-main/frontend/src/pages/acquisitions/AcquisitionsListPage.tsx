@@ -53,7 +53,7 @@ export default function AcquisitionsListPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {items.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/erp/acquisitions/${item.id}/edit`)}>
+              <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/erp/acquisitions/${item.id}`)}>
                 <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.acquisitionNumber}</td>
                 <td className="px-6 py-4 text-sm text-gray-700">{item.equipmentSource}</td>
                 <td className="px-6 py-4 text-sm text-gray-700">{item.sellerName || '-'}</td>

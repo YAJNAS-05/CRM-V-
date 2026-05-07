@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { departmentApi, employeeApi, positionApi } from '../../api/hrApi'
 import {
   CreateEmployeeRequest,
@@ -12,6 +13,37 @@ import {
   Position,
   WorkLocation,
 } from '../../types/hr'
+
+const employeeSchema = z.object({
+  employeeCode: z.string().min(1, 'Employee code is required').max(20, 'Code must be under 20 characters'),
+  firstName: z.string().min(1, 'First name is required').max(50, 'First name must be under 50 characters'),
+  lastName: z.string().min(1, 'Last name is required').max(50, 'Last name must be under 50 characters'),
+  email: z.string().min(1, 'Email is required').email('Invalid email format'),
+  phone: z.string().max(20, 'Phone must be under 20 characters').optional().nullable(),
+  departmentId: z.string().optional().nullable(),
+  positionId: z.string().optional().nullable(),
+  managerId: z.string().optional().nullable(),
+  employmentType: z.string().min(1, 'Employment type is required'),
+  status: z.string().min(1, 'Status is required'),
+  hireDate: z.string().optional().nullable(),
+  terminationDate: z.string().optional().nullable(),
+  workLocation: z.string().min(1, 'Work location is required'),
+  lifecycleStage: z.string().min(1, 'Lifecycle stage is required'),
+  gender: z.string().optional().nullable(),
+  nationality: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
+  probationEndDate: z.string().optional().nullable(),
+  confirmationDate: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
+  emergencyContactName: z.string().optional().nullable(),
+  emergencyContactPhone: z.string().optional().nullable(),
+  emergencyContactRelation: z.string().optional().nullable(),
+  addressLine1: z.string().optional().nullable(),
+  addressCity: z.string().optional().nullable(),
+  addressState: z.string().optional().nullable(),
+  addressCountry: z.string().optional().nullable(),
+  addressPincode: z.string().optional().nullable(),
+})
 
 const EMPLOYMENT_TYPES: EmploymentType[] = ['FULL_TIME', 'PART_TIME', 'CONTRACTOR', 'TEMPORARY']
 const EMPLOYEE_STATUSES: EmployeeStatus[] = ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'TERMINATED']
@@ -64,6 +96,7 @@ const EmployeeFormPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(isEditing)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
 
   useEffect(() => {
     loadLookups()
@@ -143,6 +176,9 @@ const EmployeeFormPage: React.FC = () => {
       ...prev,
       [name]: value,
     }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
   }
 
   const normalizeOptionalId = (value?: string | null) => (value ? value : null)
@@ -151,10 +187,18 @@ const EmployeeFormPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.employeeCode.trim() || !formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
-      toast.error('Please fill all required fields')
+    const result = employeeSchema.safeParse(formData)
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -255,7 +299,8 @@ const EmployeeFormPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Employee Code *</label>
                 <input type="text" name="employeeCode" value={formData.employeeCode} onChange={handleChange}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
+                  className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${fieldErrors.employeeCode ? 'border-red-500' : 'border-gray-300'}`} required />
+                {fieldErrors.employeeCode && <p className="mt-1 text-xs text-red-600">{fieldErrors.employeeCode}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Employment Type *</label>
@@ -269,17 +314,20 @@ const EmployeeFormPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">First Name *</label>
                 <input type="text" name="firstName" value={formData.firstName} onChange={handleChange}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
+                  className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${fieldErrors.firstName ? 'border-red-500' : 'border-gray-300'}`} required />
+                {fieldErrors.firstName && <p className="mt-1 text-xs text-red-600">{fieldErrors.firstName}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Last Name *</label>
                 <input type="text" name="lastName" value={formData.lastName} onChange={handleChange}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
+                  className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${fieldErrors.lastName ? 'border-red-500' : 'border-gray-300'}`} required />
+                {fieldErrors.lastName && <p className="mt-1 text-xs text-red-600">{fieldErrors.lastName}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Email *</label>
                 <input type="email" name="email" value={formData.email} onChange={handleChange}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
+                  className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${fieldErrors.email ? 'border-red-500' : 'border-gray-300'}`} required />
+                {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Phone</label>

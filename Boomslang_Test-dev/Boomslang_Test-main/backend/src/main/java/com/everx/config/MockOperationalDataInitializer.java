@@ -128,8 +128,9 @@ public class MockOperationalDataInitializer implements ApplicationRunner {
         // 4. Seed Deals
         Deal d1 = new Deal();
         d1.setName("ACME Server Upgrade");
+        d1.setAccountId(acme.getId());
         d1.setAmount(new BigDecimal("150000.00"));
-        d1.setStage(com.everx.crm.deal.DealStage.NEGOTIATION);
+        d1.setStage("NEGOTIATION");
         d1.setProbability(60);
         d1.setIsDeleted(false);
         dealRepository.save(d1);

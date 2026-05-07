@@ -3,6 +3,7 @@ package com.everx.crm.account;
 import com.everx.crm.account.dto.AccountDto;
 import com.everx.crm.account.dto.CreateAccountRequest;
 import com.everx.crm.account.dto.UpdateAccountRequest;
+import com.everx.crm.webhook.CrmWebhookPublisher;
 import com.everx.shared.util.SecurityUserContext;
 import com.everx.shared.exception.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -13,14 +14,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @Transactional
 @Slf4j
 public class AccountService {
 
+    private static final String ENTITY_ACCOUNT = "ACCOUNT";
+
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private CrmWebhookPublisher crmWebhookPublisher;
 
     public Page<AccountDto> getAllAccounts(Pageable pageable) {
         log.info("Fetching accounts page {} size {}", pageable.getPageNumber(), pageable.getPageSize());
@@ -55,7 +62,10 @@ public class AccountService {
                 .description(request.getDescription())
                 .ownerId(ownerId)
                 .build();
-        return AccountDto.fromEntity(accountRepository.save(account));
+            Account saved = accountRepository.save(account);
+            AccountDto dto = AccountDto.fromEntity(saved);
+            crmWebhookPublisher.publish(ENTITY_ACCOUNT, "created", saved.getId(), dto);
+            return dto;
     }
 
     public AccountDto updateAccount(UUID accountId, UpdateAccountRequest request) {
@@ -78,8 +88,10 @@ public class AccountService {
         if (request.getEmployees() != null) account.setEmployees(request.getEmployees());
         if (request.getDescription() != null) account.setDescription(request.getDescription());
         if (request.getOwnerId() != null) account.setOwnerId(request.getOwnerId());
-
-        return AccountDto.fromEntity(accountRepository.save(account));
+        Account saved = accountRepository.save(account);
+        AccountDto dto = AccountDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_ACCOUNT, "updated", saved.getId(), dto);
+        return dto;
     }
 
     public void deleteAccount(UUID accountId) {
@@ -87,7 +99,9 @@ public class AccountService {
         Account account = accountRepository.findByIdActive(accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found with id: " + accountId));
         account.softDelete();
-        accountRepository.save(account);
+        Account saved = accountRepository.save(account);
+        AccountDto dto = AccountDto.fromEntity(saved);
+        crmWebhookPublisher.publish(ENTITY_ACCOUNT, "deleted", saved.getId(), dto, Map.of("deleted", true));
     }
 
     public Page<AccountDto> searchAccounts(String query, Pageable pageable) {

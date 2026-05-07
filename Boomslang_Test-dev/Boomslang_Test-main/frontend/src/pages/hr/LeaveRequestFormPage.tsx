@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { employeeApi, leaveRequestApi } from '../../api/hrApi'
 import {
   CreateLeaveRequest,
@@ -9,6 +10,17 @@ import {
   LeaveStatus,
   LeaveType,
 } from '../../types/hr'
+
+const leaveRequestSchema = z.object({
+  employeeId: z.string().min(1, 'Employee is required'),
+  leaveType: z.string().min(1, 'Leave type is required'),
+  startDate: z.string().min(1, 'Start date is required'),
+  endDate: z.string().min(1, 'End date is required'),
+  notes: z.string().optional(),
+}).refine((data) => data.endDate >= data.startDate, {
+  message: 'End date must be on or after start date',
+  path: ['endDate'],
+})
 
 const LEAVE_TYPES: LeaveType[] = ['ANNUAL', 'SICK', 'UNPAID', 'MATERNITY', 'PATERNITY', 'BEREAVEMENT']
 const LEAVE_STATUSES: LeaveStatus[] = ['REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED']
@@ -29,6 +41,7 @@ const LeaveRequestFormPage: React.FC = () => {
   const [status, setStatus] = useState<LeaveStatus>('REQUESTED')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(isEditing)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
 
   useEffect(() => {
     loadEmployees()
@@ -79,15 +92,26 @@ const LeaveRequestFormPage: React.FC = () => {
       ...prev,
       [name]: value,
     }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.employeeId || !formData.startDate || !formData.endDate) {
-      toast.error('Please complete all required fields')
+    const result = leaveRequestSchema.safeParse(formData)
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -141,7 +165,7 @@ const LeaveRequestFormPage: React.FC = () => {
               name="employeeId"
               value={formData.employeeId}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.employeeId ? 'border-red-500' : 'border-gray-300'}`}
               required
             >
               <option value="">Select employee</option>
@@ -151,6 +175,7 @@ const LeaveRequestFormPage: React.FC = () => {
                 </option>
               ))}
             </select>
+            {fieldErrors.employeeId && <p className="mt-1 text-xs text-red-600">{fieldErrors.employeeId}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Leave Type *</label>
@@ -174,9 +199,10 @@ const LeaveRequestFormPage: React.FC = () => {
               name="startDate"
               value={formData.startDate}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.startDate ? 'border-red-500' : 'border-gray-300'}`}
               required
             />
+            {fieldErrors.startDate && <p className="mt-1 text-xs text-red-600">{fieldErrors.startDate}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">End Date *</label>
@@ -185,9 +211,10 @@ const LeaveRequestFormPage: React.FC = () => {
               name="endDate"
               value={formData.endDate}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.endDate ? 'border-red-500' : 'border-gray-300'}`}
               required
             />
+            {fieldErrors.endDate && <p className="mt-1 text-xs text-red-600">{fieldErrors.endDate}</p>}
           </div>
           {isEditing && (
             <div>

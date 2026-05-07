@@ -1,6 +1,5 @@
 package com.everx.hr.timesheet;
 
-import com.everx.hr.TimesheetStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -34,24 +33,24 @@ public interface TimesheetRepository extends JpaRepository<Timesheet, UUID> {
                             AND (:endDate IS NULL OR t.workDate <= :endDate)
                         """)
         Page<Timesheet> findAllFiltered(@Param("employeeId") UUID employeeId,
-                                                                        @Param("status") TimesheetStatus status,
-                                                                        @Param("startDate") LocalDate startDate,
-                                                                        @Param("endDate") LocalDate endDate,
-                                                                        Pageable pageable);
+                                        @Param("status") String status,
+                                        @Param("startDate") LocalDate startDate,
+                                        @Param("endDate") LocalDate endDate,
+                                        Pageable pageable);
 
     long countByEmployeeIdAndIsDeletedFalse(UUID employeeId);
 
-    long countByEmployeeIdAndStatusAndIsDeletedFalse(UUID employeeId, TimesheetStatus status);
+    long countByEmployeeIdAndStatusAndIsDeletedFalse(UUID employeeId, String status);
 
-    long countByEmployeeIdInAndStatusAndIsDeletedFalse(List<UUID> employeeIds, TimesheetStatus status);
+    long countByEmployeeIdInAndStatusAndIsDeletedFalse(List<UUID> employeeIds, String status);
 
-    long countByStatusAndIsDeletedFalse(TimesheetStatus status);
+    long countByStatusAndIsDeletedFalse(String status);
 
     @Query("SELECT COALESCE(SUM(t.hoursWorked), 0) FROM Timesheet t " +
             "WHERE t.employeeId = :employeeId AND t.status = :status " +
             "AND t.workDate >= :startDate AND t.workDate <= :endDate")
     BigDecimal sumHoursForEmployee(@Param("employeeId") UUID employeeId,
-                                   @Param("status") TimesheetStatus status,
+                       @Param("status") String status,
                                    @Param("startDate") LocalDate startDate,
                                    @Param("endDate") LocalDate endDate);
 }

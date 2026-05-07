@@ -118,6 +118,30 @@ public class RbacDataInitializer implements ApplicationRunner {
                 new PermissionSeed("REPORT_VIEW", "REPORT", "VIEW", "View reports"),
                 new PermissionSeed("REPORT_EXPORT", "REPORT", "EXPORT", "Export reports"),
 
+                new PermissionSeed("PM_VIEW", "PM", "VIEW", "View project management"),
+                new PermissionSeed("PM_CREATE", "PM", "CREATE", "Create projects and tasks"),
+                new PermissionSeed("PM_EDIT", "PM", "EDIT", "Edit projects and tasks"),
+                new PermissionSeed("PM_DELETE", "PM", "DELETE", "Delete projects and tasks"),
+
+                new PermissionSeed("PM_PROJECT_VIEW", "PM", "PROJECT_VIEW", "View projects"),
+                new PermissionSeed("PM_PROJECT_CREATE", "PM", "PROJECT_CREATE", "Create projects"),
+                new PermissionSeed("PM_PROJECT_EDIT", "PM", "PROJECT_EDIT", "Edit projects"),
+                new PermissionSeed("PM_PROJECT_DELETE", "PM", "PROJECT_DELETE", "Delete projects"),
+                new PermissionSeed("PM_PROJECT_MEMBER_ADD", "PM", "PROJECT_MEMBER_ADD", "Add project members"),
+                new PermissionSeed("PM_PROJECT_MEMBER_REMOVE", "PM", "PROJECT_MEMBER_REMOVE", "Remove project members"),
+                new PermissionSeed("PM_PROJECT_COST_VIEW", "PM", "PROJECT_COST_VIEW", "View project costs"),
+                new PermissionSeed("PM_PROJECT_COST_ADD", "PM", "PROJECT_COST_ADD", "Add project costs"),
+                new PermissionSeed("PM_TASK_VIEW", "PM", "TASK_VIEW", "View tasks"),
+                new PermissionSeed("PM_TASK_CREATE", "PM", "TASK_CREATE", "Create tasks"),
+                new PermissionSeed("PM_TASK_EDIT", "PM", "TASK_EDIT", "Edit tasks"),
+                new PermissionSeed("PM_TASK_DELETE", "PM", "TASK_DELETE", "Delete tasks"),
+                new PermissionSeed("PM_TASK_ASSIGN", "PM", "TASK_ASSIGN", "Assign tasks"),
+
+                new PermissionSeed("ATTENDANCE_SELF_VIEW", "ATTENDANCE", "SELF_VIEW", "View own attendance"),
+                new PermissionSeed("ATTENDANCE_SELF_PUNCH", "ATTENDANCE", "SELF_PUNCH", "Check-in/out for own attendance"),
+                new PermissionSeed("ATTENDANCE_MANAGE_VIEW", "ATTENDANCE", "MANAGE_VIEW", "View attendance for employees"),
+                new PermissionSeed("ATTENDANCE_MANAGE_CORRECT", "ATTENDANCE", "MANAGE_CORRECT", "Correct employee attendance"),
+
                 new PermissionSeed("INSIGHTS_VIEW", "INSIGHTS", "VIEW", "View personal insights"),
 
                 new PermissionSeed("DASHBOARD_VIEW", "CRM", "VIEW", "View CRM dashboard"),
@@ -125,6 +149,7 @@ public class RbacDataInitializer implements ApplicationRunner {
                 new PermissionSeed("DASHBOARD_TEAM_VIEW", "CRM", "TEAM_VIEW", "View CRM team dashboard"),
                 new PermissionSeed("DASHBOARD_FINANCE_VIEW", "DASHBOARD", "FINANCE_VIEW", "View finance dashboard"),
                 new PermissionSeed("DASHBOARD_HR_VIEW", "DASHBOARD", "HR_VIEW", "View HR dashboard"),
+                new PermissionSeed("DASHBOARD_PM_VIEW", "DASHBOARD", "PM_VIEW", "View PM dashboard"),
                 new PermissionSeed("DASHBOARD_TECH_VIEW", "DASHBOARD", "TECH_VIEW", "View technician dashboard"),
                 new PermissionSeed("DASHBOARD_OPERATIONS_VIEW", "DASHBOARD", "OPS_VIEW", "View operations dashboard"),
 
@@ -325,9 +350,29 @@ public class RbacDataInitializer implements ApplicationRunner {
             "DASHBOARD_SELF_VIEW",
             "DASHBOARD_TEAM_VIEW",
             "DASHBOARD_HR_VIEW",
+            "DASHBOARD_PM_VIEW",
             "DASHBOARD_OPERATIONS_VIEW",
             "INSIGHTS_VIEW",
-            "DATA_SCOPE_TEAM"
+            "DATA_SCOPE_TEAM",
+            "PM_VIEW",
+            "PM_CREATE",
+            "PM_EDIT",
+            "PM_DELETE",
+            "PM_PROJECT_VIEW",
+            "PM_PROJECT_CREATE",
+            "PM_PROJECT_EDIT",
+            "PM_PROJECT_DELETE",
+            "PM_PROJECT_MEMBER_ADD",
+            "PM_PROJECT_MEMBER_REMOVE",
+            "PM_PROJECT_COST_VIEW",
+            "PM_PROJECT_COST_ADD",
+            "PM_TASK_VIEW",
+            "PM_TASK_CREATE",
+            "PM_TASK_EDIT",
+            "PM_TASK_DELETE",
+            "PM_TASK_ASSIGN",
+            "ATTENDANCE_MANAGE_VIEW",
+            "ATTENDANCE_MANAGE_CORRECT"
         ));
         matrix.put(User.UserRole.SALES_MANAGER.name(), Set.of(
             "CRM_VIEW",
@@ -428,7 +473,9 @@ public class RbacDataInitializer implements ApplicationRunner {
             "REPORT_TEAM_VIEW",
             "DASHBOARD_HR_VIEW",
             "INSIGHTS_VIEW",
-            "DATA_SCOPE_ORG"
+            "DATA_SCOPE_ORG",
+            "ATTENDANCE_MANAGE_VIEW",
+            "ATTENDANCE_MANAGE_CORRECT"
         ));
         matrix.put(User.UserRole.RECRUITER.name(), Set.of(
             "HR_VIEW",
@@ -476,6 +523,7 @@ public class RbacDataInitializer implements ApplicationRunner {
             "DASHBOARD_HR_VIEW",
             "DASHBOARD_FINANCE_VIEW",
             "DASHBOARD_OPERATIONS_VIEW",
+            "DASHBOARD_PM_VIEW",
             "INSIGHTS_VIEW",
             "DATA_SCOPE_ORG"
         ));
@@ -496,7 +544,10 @@ public class RbacDataInitializer implements ApplicationRunner {
             "HR_APPRAISAL_VIEW",
             "INSIGHTS_VIEW",
             "REPORT_PERSONAL_VIEW",
-            "DATA_SCOPE_OWN"
+            "DATA_SCOPE_OWN",
+            "PM_VIEW",
+            "ATTENDANCE_SELF_VIEW",
+            "ATTENDANCE_SELF_PUNCH"
         ));
         matrix.put(User.UserRole.VIEWER.name(), viewerSet);
         matrix.put(User.UserRole.READ_ONLY.name(), viewerSet);

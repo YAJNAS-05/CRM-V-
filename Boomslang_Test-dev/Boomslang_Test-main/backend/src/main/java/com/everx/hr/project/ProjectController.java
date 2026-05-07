@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/hr/projects")
+@RequestMapping("/api/v1/pm/projects")
 @RequiredArgsConstructor
 public class ProjectController {
 

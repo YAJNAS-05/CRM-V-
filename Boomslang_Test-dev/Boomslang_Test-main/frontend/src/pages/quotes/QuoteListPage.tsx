@@ -5,6 +5,8 @@ import { Quote } from '../../types/crm'
 import { useAuthStore } from '../../store/authStore'
 import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
+import { useOptionSet } from '../../hooks/useOptionSet'
+import { getOptionLabel } from '../../utils/optionSet'
 
 const QuoteListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -17,6 +19,12 @@ const QuoteListPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0)
   const [totalItems, setTotalItems] = useState(0)
   const pageSize = 20
+  const { options: statusOptions } = useOptionSet({
+    module: 'CRM',
+    entity: 'QUOTE',
+    field: 'status',
+    fallbackValues: ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED'],
+  })
 
   useEffect(() => {
     fetchQuotes()
@@ -114,7 +122,7 @@ const QuoteListPage: React.FC = () => {
                       quote.status === 'SENT' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {quote.status}
+                      {getOptionLabel(statusOptions, quote.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm">

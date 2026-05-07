@@ -12,7 +12,6 @@ import com.everx.hr.payroll.dto.PayrollProfileDto;
 import com.everx.hr.payroll.dto.PayrollRunDto;
 import com.everx.hr.payroll.dto.UpdatePayrollProfileRequest;
 import com.everx.hr.timesheet.TimesheetRepository;
-import com.everx.hr.TimesheetStatus;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -147,7 +146,7 @@ public class PayrollService {
 
     private BigDecimal calculateGrossPay(PayrollProfile profile, Employee employee, LocalDate start, LocalDate end) {
         if (profile.getPayType() == PayType.HOURLY) {
-            BigDecimal hours = timesheetRepository.sumHoursForEmployee(employee.getId(), TimesheetStatus.APPROVED, start, end);
+            BigDecimal hours = timesheetRepository.sumHoursForEmployee(employee.getId(), "APPROVED", start, end);
             BigDecimal rate = profile.getHourlyRate() != null ? profile.getHourlyRate() : BigDecimal.ZERO;
             return rate.multiply(hours);
         }

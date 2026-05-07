@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
+import { z } from 'zod'
 import { acquisitionApi, equipmentApi, purchaseOrderApi, supplierApi } from '../../api/erpApi'
 import { Equipment, PurchaseOrder, Supplier } from '../../types/erp'
 import SearchableLookupSelect from '../../components/form/SearchableLookupSelect'
@@ -18,6 +19,23 @@ const STAGES = [
 ]
 
 const SOURCES = ['HOSPITAL', 'DEALER', 'BROKER', 'AUCTION', 'DIRECT_SELLER']
+
+const acquisitionSchema = z.object({
+  acquisitionNumber: z.string().optional(),
+  equipmentId: z.string().optional(),
+  supplierId: z.string().optional(),
+  purchaseOrderId: z.string().optional(),
+  equipmentSource: z.string().min(1, 'Equipment source is required'),
+  sellerName: z.string().optional(),
+  stage: z.string().min(1, 'Stage is required'),
+  warehouseLocation: z.string().optional(),
+  refurbCost: z
+    .string()
+    .optional()
+    .refine((v) => !v || (!isNaN(Number(v)) && Number(v) >= 0), { message: 'Refurb cost must be a positive number' }),
+  shipmentTracking: z.string().optional(),
+  notes: z.string().optional(),
+})
 
 interface FormData {
   acquisitionNumber: string
@@ -157,6 +175,13 @@ export default function AcquisitionForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const result = acquisitionSchema.safeParse(form)
+    if (!result.success) {
+      const firstError = result.error.errors[0]
+      toast.error(firstError?.message || 'Please fix validation errors')
+      return
+    }
 
     try {
       setSaving(true)

@@ -1,6 +1,5 @@
 package com.everx.hr.timesheet.dto;
 
-import com.everx.hr.TimesheetStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -24,7 +23,7 @@ public class TimesheetDto {
     private BigDecimal totalBillableHours;
     private BigDecimal totalNonBillableHours;
     private BigDecimal totalHours;
-    private TimesheetStatus status;
+    private String status;
     private UUID approvedBy;
     private OffsetDateTime approvedAt;
     private String notes;

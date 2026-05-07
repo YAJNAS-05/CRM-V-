@@ -1,29 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { timeEntryApi } from '../../api/hrApi'
-import useEmployeeTimeLogger from '../../hooks/useEmployeeTimeLogger'
-import useEmployeeWorkspace from '../../hooks/useEmployeeWorkspace'
-import {
-  useEmployeeWorkspaceStore,
-  type WorkspacePriority,
-  type WorkspaceProjectStatus,
-  type WorkspaceTask,
-  type WorkspaceTaskDraft,
-  type WorkspaceTaskStatus,
-} from '../../store/employeeWorkspaceStore'
+import { projectApi, taskApi } from '../../api/pmApi'
+import { employeeApi } from '../../api/hrApi'
+import { useAuthStore } from '../../store/authStore'
+import { useOptionSet } from '../../hooks/useOptionSet'
+import { getOptionLabel } from '../../utils/optionSet'
+import { ProjectStatus } from '../../types/pm'
+import { Task, TaskStatus, TaskPriority } from '../../types/hr'
 
-const COLUMNS: { key: WorkspaceTaskStatus; label: string; tone: string }[] = [
-  { key: 'TODO', label: 'To Do', tone: 'bg-slate-100 text-slate-700' },
-  { key: 'IN_PROGRESS', label: 'In Progress', tone: 'bg-blue-50 text-blue-700' },
-  { key: 'ON_HOLD', label: 'On Hold', tone: 'bg-amber-50 text-amber-700' },
-  { key: 'IN_REVIEW', label: 'In Review', tone: 'bg-purple-50 text-purple-700' },
-  { key: 'DONE', label: 'Done', tone: 'bg-emerald-50 text-emerald-700' },
-]
+const FALLBACK_TASK_STATUS_OPTIONS: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'BACKLOG', 'REVIEW', 'DONE']
+const FALLBACK_PROJECT_STATUS_OPTIONS: ProjectStatus[] = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'IN_REVIEW', 'DONE']
+const FALLBACK_PRIORITY_OPTIONS: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
-const PROJECT_STATUS_OPTIONS: WorkspaceProjectStatus[] = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'IN_REVIEW', 'DONE']
+const TASK_STATUS_TONES: Record<string, string> = {
+  TODO: 'bg-slate-100 text-slate-700',
+  IN_PROGRESS: 'bg-blue-50 text-blue-700',
+  BACKLOG: 'bg-amber-50 text-amber-700',
+  REVIEW: 'bg-purple-50 text-purple-700',
+  DONE: 'bg-emerald-50 text-emerald-700',
+}
 
-const PRIORITY_COLORS: Record<WorkspacePriority, string> = {
+const PRIORITY_COLORS: Record<TaskPriority, string> = {
   LOW: 'bg-slate-100 text-slate-600',
   MEDIUM: 'bg-blue-50 text-blue-700',
   HIGH: 'bg-amber-50 text-amber-700',
@@ -33,28 +32,11 @@ const PRIORITY_COLORS: Record<WorkspacePriority, string> = {
 type TaskFormState = {
   title: string
   description: string
-  status: WorkspaceTaskStatus
-  priority: WorkspacePriority
-  assigneeName: string
+  status: TaskStatus
+  priority: TaskPriority
+  assigneeId: string
   dueDate: string
-  estimateHours: string
-}
-
-type ProjectFormState = {
-  name: string
-  client: string
-  product: string
-  description: string
-  status: WorkspaceProjectStatus
-  priority: WorkspacePriority
-  dueDate: string
-}
-
-type TimeLogState = {
-  taskId: string
-  workDate: string
-  hours: string
-  note: string
+  storyPoints: string
 }
 
 const EMPTY_TASK_FORM: TaskFormState = {
@@ -62,415 +44,239 @@ const EMPTY_TASK_FORM: TaskFormState = {
   description: '',
   status: 'TODO',
   priority: 'MEDIUM',
-  assigneeName: '',
+  assigneeId: '',
   dueDate: '',
-  estimateHours: '',
+  storyPoints: '',
 }
 
-const EMPTY_TIME_LOG: TimeLogState = {
-  taskId: '',
-  workDate: new Date().toISOString().split('T')[0],
-  hours: '',
-  note: '',
+type MemberFormState = {
+  employeeId: string
+  role: string
 }
 
-const EMPTY_PROJECT_FORM: ProjectFormState = {
-  name: '',
-  client: '',
-  product: '',
-  description: '',
-  status: 'PLANNING',
-  priority: 'MEDIUM',
-  dueDate: '',
+const EMPTY_MEMBER_FORM: MemberFormState = {
+  employeeId: '',
+  role: 'MEMBER',
 }
-
-const slugName = (value: string) => `member-${value.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 
 const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
-  const { workspaceUser, isEmployee } = useEmployeeWorkspace()
-  const projects = useEmployeeWorkspaceStore((state) => state.projects)
-  const tasks = useEmployeeWorkspaceStore((state) => state.tasks)
-  const timeEntries = useEmployeeWorkspaceStore((state) => state.timeEntries)
-  const taskTimer = useEmployeeWorkspaceStore((state) => state.taskTimer)
-  const startTaskTimer = useEmployeeWorkspaceStore((state) => state.startTaskTimer)
-  const stopTaskTimer = useEmployeeWorkspaceStore((state) => state.stopTaskTimer)
-  const setTaskTimerNote = useEmployeeWorkspaceStore((state) => state.setTaskTimerNote)
-  const logTime = useEmployeeWorkspaceStore((state) => state.logTime)
-  const saveProject = useEmployeeWorkspaceStore((state) => state.saveProject)
-  const saveTask = useEmployeeWorkspaceStore((state) => state.saveTask)
-  const deleteTask = useEmployeeWorkspaceStore((state) => state.deleteTask)
-  const moveTask = useEmployeeWorkspaceStore((state) => state.moveTask)
-  const { logEmployeeTime } = useEmployeeTimeLogger()
+  const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.user)
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'board' | 'timesheets' | 'members'>('board')
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'overview' | 'board' | 'members'>('board')
   const [showTaskModal, setShowTaskModal] = useState(false)
-  const [showTimeModal, setShowTimeModal] = useState(false)
-  const [showProjectModal, setShowProjectModal] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [taskForm, setTaskForm] = useState<TaskFormState>(EMPTY_TASK_FORM)
-  const [timeForm, setTimeForm] = useState<TimeLogState>(EMPTY_TIME_LOG)
-  const [projectForm, setProjectForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM)
-  const [timerNow, setTimerNow] = useState(Date.now())
-  const [memberName, setMemberName] = useState('')
+  const [showMemberModal, setShowMemberModal] = useState(false)
+  const [memberForm, setMemberForm] = useState<MemberFormState>(EMPTY_MEMBER_FORM)
+  const [employeeSearch, setEmployeeSearch] = useState('')
 
-  const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
-  const projectTasks = useMemo(() => tasks.filter((task) => task.projectId === id), [id, tasks])
-  const projectEntries = useMemo(
-    () => timeEntries.filter((entry) => entry.projectId === id).sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
-    [id, timeEntries],
+  const { options: taskStatusOptions } = useOptionSet({
+    module: 'PM',
+    entity: 'TASK',
+    field: 'status',
+    fallbackValues: FALLBACK_TASK_STATUS_OPTIONS,
+  })
+
+  const { options: taskPriorityOptions } = useOptionSet({
+    module: 'PM',
+    entity: 'TASK',
+    field: 'priority',
+    fallbackValues: FALLBACK_PRIORITY_OPTIONS,
+  })
+
+  const { options: projectStatusOptions } = useOptionSet({
+    module: 'PM',
+    entity: 'PROJECT',
+    field: 'status',
+    fallbackValues: FALLBACK_PROJECT_STATUS_OPTIONS,
+  })
+
+  const { data: projectData, isLoading: isLoadingProject } = useQuery({
+    queryKey: ['pm-project', id],
+    queryFn: () => projectApi.getById(id!),
+    enabled: !!id,
+  })
+
+  const { data: tasksData } = useQuery({
+    queryKey: ['pm-tasks', id],
+    queryFn: () => taskApi.getAll(0, 500, { projectId: id }),
+    enabled: !!id,
+  })
+
+  const { data: employeesData, isLoading: isLoadingEmployees } = useQuery({
+    queryKey: ['hr-employees', 'pm-member-search', employeeSearch],
+    queryFn: () => employeeApi.getAll(0, 20, { search: employeeSearch }),
+    enabled: showMemberModal,
+    retry: false,
+  })
+
+  const createTaskMutation = useMutation({
+    mutationFn: (data: Partial<Task>) => taskApi.create({ ...data, projectId: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pm-tasks', id] })
+      toast.success('Task created successfully')
+      setShowTaskModal(false)
+      setTaskForm(EMPTY_TASK_FORM)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create task')
+    },
+  })
+
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, data }: { taskId: string; data: Partial<Task> }) => taskApi.update(taskId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pm-tasks', id] })
+      toast.success('Task updated successfully')
+      setShowTaskModal(false)
+      setEditingTaskId(null)
+      setTaskForm(EMPTY_TASK_FORM)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update task')
+    },
+  })
+
+  const updateTaskStatusMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: TaskStatus }) => taskApi.updateStatus(taskId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pm-tasks', id] })
+    },
+  })
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: string) => taskApi.delete(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pm-tasks', id] })
+      toast.success('Task deleted')
+    },
+  })
+
+  const addMemberMutation = useMutation({
+    mutationFn: (payload: MemberFormState) => projectApi.addMember(id!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pm-project', id] })
+      toast.success('Member added')
+      setShowMemberModal(false)
+      setEmployeeSearch('')
+      setMemberForm(EMPTY_MEMBER_FORM)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to add member')
+    },
+  })
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (employeeId: string) => projectApi.removeMember(id!, employeeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pm-project', id] })
+      toast.success('Member removed')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to remove member')
+    },
+  })
+
+  const projectDetail = projectData?.data?.data
+  const project = projectDetail?.project
+  const projectTasks = tasksData?.data?.data?.content || []
+  const teamMembers = projectDetail?.members || []
+
+  const { data: memberEmployeesData } = useQuery({
+    queryKey: ['pm-project', id, 'member-employees', teamMembers.map((m) => m.employeeId).join(',')],
+    queryFn: async () => {
+      const memberEmployeeIds = teamMembers.map((m) => m.employeeId).filter(Boolean)
+      const results = await Promise.allSettled(memberEmployeeIds.map((employeeId) => employeeApi.getById(employeeId)))
+      return results
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+        .map((r) => r.value.data.data)
+        .filter(Boolean)
+    },
+    enabled: teamMembers.length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+
+  const memberUserOptions = useMemo(() => {
+    const employees = memberEmployeesData || []
+    return employees
+      .filter((emp: any) => Boolean(emp?.userId))
+      .map((emp: any) => ({
+        userId: emp.userId as string,
+        label: `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || emp.email || emp.id,
+      }))
+  }, [memberEmployeesData])
+
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const opt of memberUserOptions) {
+      map.set(opt.userId, opt.label)
+    }
+    return map
+  }, [memberUserOptions])
+
+  const taskColumns = useMemo(
+    () => taskStatusOptions.map((option) => ({
+      key: option.value as TaskStatus,
+      label: option.label || option.value,
+      tone: TASK_STATUS_TONES[option.value] || 'bg-slate-100 text-slate-700',
+    })),
+    [taskStatusOptions],
   )
 
-  const teamMembers = useMemo(() => {
-    if (!project) return []
-    return Array.from(new Set([...(project.team || []), project.ownerName]))
-  }, [project])
+  if (isLoadingProject) {
+    return <div className="p-8 text-center text-sm text-slate-500">Loading project details...</div>
+  }
 
-  const taskLookup = useMemo(() => new Map(projectTasks.map((task) => [task.id, task])), [projectTasks])
-
-  if (!project || !workspaceUser) {
+  if (!project) {
     return <div className="shell-card p-8 text-sm text-slate-500">Project not found.</div>
   }
 
-  const canEditProject = workspaceUser.id === project.ownerId
-  const canEditTask = (task: WorkspaceTask) => workspaceUser.id === (task.creatorId || task.assigneeId)
-  const isProjectMember = project.ownerId === workspaceUser.id || project.team.includes(workspaceUser.fullName)
-  useEffect(() => {
-    if (!taskTimer) {
-      return
-    }
+  const projectStatusLabel = getOptionLabel(projectStatusOptions, project.status)
 
-    setTimerNow(Date.now())
-    const interval = window.setInterval(() => setTimerNow(Date.now()), 1000)
-    return () => window.clearInterval(interval)
-  }, [taskTimer])
-
-  const timerSeconds = taskTimer ? Math.max(0, Math.floor((timerNow - taskTimer.startedAt) / 1000)) : 0
-
-
-  if (!isProjectMember) {
-    return (
-      <div className="shell-card p-8 text-sm text-slate-500">
-        You are not a member of this project.
-        <div className="mt-3">
-          <Link to="/employee/projects" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Return to projects</Link>
-        </div>
-      </div>
-    )
-  }
-
-  const openEditProject = () => {
-    if (!canEditProject) {
-      toast.error('Only the project manager can edit this project')
-      return
-    }
-    setProjectForm({
-      name: project.name,
-      client: project.client,
-      product: project.product || '',
-      description: project.description || '',
-      status: project.status,
-      priority: project.priority,
-      dueDate: project.dueDate || '',
-    })
-    setShowProjectModal(true)
-  }
-
-  const openNewTask = (status: WorkspaceTaskStatus = 'TODO') => {
+  const openNewTask = (status: TaskStatus = 'TODO') => {
     setEditingTaskId(null)
-    setTaskForm({ ...EMPTY_TASK_FORM, status, assigneeName: workspaceUser.fullName })
+    setTaskForm({ ...EMPTY_TASK_FORM, status, assigneeId: user?.id || '' })
     setShowTaskModal(true)
   }
 
-  const openEditTask = (task: WorkspaceTask) => {
-    if (!canEditTask(task)) {
-      toast.error('Only the task creator can edit this task')
-      return
-    }
+  const openEditTask = (task: Task) => {
     setEditingTaskId(task.id)
     setTaskForm({
       title: task.title,
       description: task.description || '',
       status: task.status,
-      priority: task.priority,
-      assigneeName: task.assigneeName,
+      priority: task.priority || 'MEDIUM',
+      assigneeId: task.assigneeId || '',
       dueDate: task.dueDate || '',
-      estimateHours: task.estimateHours ? String(task.estimateHours) : '',
+      storyPoints: task.storyPoints ? String(task.storyPoints) : '',
     })
     setShowTaskModal(true)
   }
 
-  const openTimeLog = (taskId: string) => {
-    setTimeForm({ ...EMPTY_TIME_LOG, taskId })
-    setShowTimeModal(true)
-  }
-
   const handleSaveTask = () => {
-    if (!taskForm.title.trim() || !taskForm.assigneeName.trim()) {
-      toast.error('Task title and assignee are required')
+    if (!taskForm.title.trim()) {
+      toast.error('Task title is required')
       return
     }
 
-    const assigneeId = taskForm.assigneeName === workspaceUser.fullName ? workspaceUser.id : slugName(taskForm.assigneeName)
-    const currentTask = editingTaskId ? taskLookup.get(editingTaskId) : null
-    const draft: WorkspaceTaskDraft = {
-      id: editingTaskId || undefined,
-      projectId: project.id,
+    const taskPayload: Partial<Task> = {
       title: taskForm.title,
       description: taskForm.description,
       status: taskForm.status,
       priority: taskForm.priority,
-      assigneeId,
-      assigneeName: taskForm.assigneeName,
-      creatorId: currentTask?.creatorId || workspaceUser.id,
-      creatorName: currentTask?.creatorName || workspaceUser.fullName,
+      assigneeId: taskForm.assigneeId || undefined,
       dueDate: taskForm.dueDate || undefined,
-      estimateHours: taskForm.estimateHours ? Number(taskForm.estimateHours) : undefined,
+      storyPoints: taskForm.storyPoints ? Number(taskForm.storyPoints) : undefined,
     }
 
-    saveTask(draft)
-    toast.success(editingTaskId ? 'Task updated' : 'Task created')
-    setShowTaskModal(false)
-    setEditingTaskId(null)
-    setTaskForm(EMPTY_TASK_FORM)
-  }
-
-  const handleSaveProject = () => {
-    if (!canEditProject) {
-      toast.error('Only the project manager can edit this project')
-      return
-    }
-    if (!projectForm.name.trim() || !projectForm.client.trim()) {
-      toast.error('Project name and client are required')
-      return
-    }
-
-    saveProject({
-      id: project.id,
-      code: project.code,
-      name: projectForm.name,
-      client: projectForm.client,
-      product: projectForm.product,
-      description: projectForm.description,
-      status: projectForm.status,
-      priority: projectForm.priority,
-      dueDate: projectForm.dueDate || undefined,
-      startDate: project.startDate,
-      ownerId: project.ownerId,
-      ownerName: project.ownerName,
-      team: project.team,
-      source: project.source,
-      linkedFieldJobId: project.linkedFieldJobId,
-    })
-
-    toast.success('Project updated')
-    setShowProjectModal(false)
-  }
-
-  const handleAddMember = () => {
-    if (!canEditProject) {
-      toast.error('Only the project manager can manage members')
-      return
-    }
-    const nextName = memberName.trim()
-    if (!nextName) {
-      toast.error('Enter a member name to add')
-      return
-    }
-    if (project.team.includes(nextName) || project.ownerName === nextName) {
-      toast.error('Member already added')
-      return
-    }
-
-    saveProject({
-      id: project.id,
-      code: project.code,
-      name: project.name,
-      client: project.client,
-      product: project.product,
-      description: project.description,
-      status: project.status,
-      priority: project.priority,
-      dueDate: project.dueDate,
-      startDate: project.startDate,
-      ownerId: project.ownerId,
-      ownerName: project.ownerName,
-      team: [...project.team, nextName],
-      source: project.source,
-      linkedFieldJobId: project.linkedFieldJobId,
-    })
-
-    toast.success('Member added')
-    setMemberName('')
-  }
-
-  const handleRemoveMember = (member: string) => {
-    if (!canEditProject) {
-      toast.error('Only the project manager can manage members')
-      return
-    }
-    if (member === project.ownerName) {
-      toast.error('Project manager cannot be removed')
-      return
-    }
-
-    saveProject({
-      id: project.id,
-      code: project.code,
-      name: project.name,
-      client: project.client,
-      product: project.product,
-      description: project.description,
-      status: project.status,
-      priority: project.priority,
-      dueDate: project.dueDate,
-      startDate: project.startDate,
-      ownerId: project.ownerId,
-      ownerName: project.ownerName,
-      team: project.team.filter((item) => item !== member),
-      source: project.source,
-      linkedFieldJobId: project.linkedFieldJobId,
-    })
-
-    toast.success('Member removed')
-  }
-
-  const handleLogTime = async () => {
-    const hours = Number(timeForm.hours)
-    if (!timeForm.taskId || !timeForm.workDate || !Number.isFinite(hours) || hours <= 0) {
-      toast.error('Task, work date, and hours are required')
-      return
-    }
-
-    const task = taskLookup.get(timeForm.taskId)
-    if (!task) {
-      toast.error('Selected task no longer exists')
-      return
-    }
-
-    const result = await logEmployeeTime({
-      project,
-      taskId: timeForm.taskId,
-      workDate: timeForm.workDate,
-      hours,
-      note: timeForm.note,
-    })
-
-    if (result.error) {
-      if (result.localLogged) {
-        toast.error('Time logged locally, but HR timesheet sync failed')
-      } else {
-        toast.error('Failed to log time')
-      }
-      return
-    }
-
-    if (result.apiSynced) {
-      toast.success(`Logged ${hours}h to ${task.title} and synced to HR timesheets`)
+    if (editingTaskId) {
+      updateTaskMutation.mutate({ taskId: editingTaskId, data: taskPayload })
     } else {
-      toast.success(`Logged ${hours}h to ${task.title}`)
+      createTaskMutation.mutate(taskPayload)
     }
-
-    setShowTimeModal(false)
-    setTimeForm(EMPTY_TIME_LOG)
-  }
-
-  const stopTimerAndLog = async (task: WorkspaceTask, timerProjectId: string) => {
-    if (!taskTimer || taskTimer.taskId !== task.id) return false
-
-    const note = taskTimer.note?.trim() || 'Timer session'
-    const seconds = Math.max(0, Math.floor((Date.now() - taskTimer.startedAt) / 1000))
-    const fallbackHours = Math.max(0.01, Math.round((seconds / 3600) * 100) / 100)
-    const fallbackWorkDate = new Date().toISOString().split('T')[0]
-
-    if (!taskTimer.timeEntryId) {
-      logTime({
-        projectId: timerProjectId,
-        taskId: task.id,
-        employeeId: workspaceUser.id,
-        employeeName: workspaceUser.fullName,
-        workDate: fallbackWorkDate,
-        hours: fallbackHours,
-        note,
-      })
-      toast.success(`Logged ${fallbackHours}h from timer`)
-      stopTaskTimer()
-      return true
-    }
-
-    try {
-      const response = await timeEntryApi.stop(taskTimer.timeEntryId)
-      const entry = response.data.data
-      const durationMinutes = entry?.durationMinutes
-      const durationHours = durationMinutes !== null && durationMinutes !== undefined
-        ? Math.max(0.01, Math.round((durationMinutes / 60) * 100) / 100)
-        : fallbackHours
-
-      logTime({
-        projectId: timerProjectId,
-        taskId: task.id,
-        employeeId: workspaceUser.id,
-        employeeName: workspaceUser.fullName,
-        workDate: entry?.workDate || fallbackWorkDate,
-        hours: durationHours,
-        note,
-      })
-
-      toast.success(`Logged ${durationHours}h from timer`)
-      stopTaskTimer()
-      return true
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to stop timer')
-      return false
-    }
-  }
-
-  const handleStartTimer = async (task: WorkspaceTask) => {
-    if (taskTimer && taskTimer.taskId !== task.id) {
-      const confirmStop = window.confirm('A timer is already running on another task. Stop it first?')
-      if (!confirmStop) return
-
-      const activeTask = tasks.find((item) => item.id === taskTimer.taskId)
-      const activeProject = projects.find((item) => item.id === taskTimer.projectId)
-      if (!activeTask || !activeProject) {
-        toast.error('Active timer task no longer exists')
-        return
-      }
-
-      const stopped = await stopTimerAndLog(activeTask, activeProject.id)
-      if (!stopped) {
-        return
-      }
-    }
-
-    if (!isUuid(project.id)) {
-      startTaskTimer(task.id, project.id)
-      setTaskTimerNote('')
-      toast.success('Timer started locally (project not synced yet)')
-      return
-    }
-
-    try {
-      const apiTaskId = isUuid(task.id) ? task.id : undefined
-      const response = await timeEntryApi.start({
-        projectId: project.id,
-        taskId: apiTaskId,
-        description: task.title,
-      })
-
-      startTaskTimer(task.id, project.id, response.data.data?.id)
-      setTaskTimerNote('')
-      toast.success('Timer started')
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to start timer')
-    }
-  }
-
-  const handleStopTimer = async (task: WorkspaceTask) => {
-    if (!taskTimer || taskTimer.taskId !== task.id) return
-    await stopTimerAndLog(task, project.id)
   }
 
   return (
@@ -478,37 +284,24 @@ const ProjectDetailPage: React.FC = () => {
       <div className="shell-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <Link to="/employee/projects" className="text-sm font-semibold text-blue-600 hover:text-blue-700">← Back to projects</Link>
+            <Link to="/pm/projects" className="text-sm font-semibold text-blue-600 hover:text-blue-700">← Back to Projects</Link>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{project.code}</span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{project.status.replace(/_/g, ' ')}</span>
-              {canEditProject && (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Project Manager</span>
-              )}
+              <h1 className="text-2xl font-bold text-slate-900">{project.projectName}</h1>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{project.projectCode}</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{projectStatusLabel}</span>
             </div>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">{project.description}</p>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">{project.description || 'No description provided.'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {canEditProject ? (
-              <button type="button" onClick={openEditProject} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit Project</button>
-            ) : (
-              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Only the project manager can edit</span>
-            )}
             <button type="button" onClick={() => openNewTask()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">+ Add Task</button>
           </div>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <Stat label="Progress" value={`${project.progress}%`} />
-          <Stat label="Tasks" value={projectTasks.length} />
-          <Stat label="Team" value={teamMembers.length} />
-          <Stat label="Hours Logged" value={`${projectEntries.reduce((total, entry) => total + entry.hours, 0).toFixed(1)}h`} />
+          <Stat label="Total Tasks" value={projectTasks.length} />
+          <Stat label="Team Members" value={teamMembers.length} />
+          <Stat label="Budget" value={project.budget ? `${project.currency} ${project.budget.toLocaleString()}` : 'N/A'} />
+          <Stat label="Costs" value={projectDetail?.actualCost ? `${project.currency} ${projectDetail.actualCost.toLocaleString()}` : '0'} />
         </div>
-        {project.linkedFieldJobId && (
-          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            Linked field job: {project.linkedFieldJobId}. Time logged on this project also syncs to HR timesheets.
-          </div>
-        )}
       </div>
 
       <div className="shell-card p-3">
@@ -516,13 +309,12 @@ const ProjectDetailPage: React.FC = () => {
           {[
             { key: 'overview', label: 'Overview' },
             { key: 'board', label: 'Board' },
-            { key: 'timesheets', label: 'Timesheets' },
             { key: 'members', label: 'Members' },
           ].map((tab) => (
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key as 'overview' | 'board' | 'timesheets' | 'members')}
+              onClick={() => setActiveTab(tab.key as 'overview' | 'board' | 'members')}
               className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeTab === tab.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               {tab.label}
@@ -534,19 +326,21 @@ const ProjectDetailPage: React.FC = () => {
       {activeTab === 'overview' && (
         <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
           <div className="shell-card p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Upcoming tasks</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Upcoming Tasks</h2>
             <div className="mt-4 space-y-3">
               {projectTasks.length === 0 ? (
                 <p className="text-sm text-slate-500">No tasks yet. Start by adding your first task.</p>
               ) : (
-                projectTasks.slice().sort((left, right) => (left.dueDate || '').localeCompare(right.dueDate || '')).slice(0, 5).map((task) => (
+                projectTasks.slice().sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')).slice(0, 5).map((task) => (
                   <div key={task.id} className="rounded-xl border border-slate-200 bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                        <p className="mt-1 text-xs text-slate-500">{task.assigneeName} · Due {task.dueDate || 'TBD'}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {task.assigneeId ? (userNameById.get(task.assigneeId) || task.assigneeId) : 'Unassigned'} · Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'TBD'}
+                        </p>
                       </div>
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
+                      {task.priority && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIORITY_COLORS[task.priority]}`}>{getOptionLabel(taskPriorityOptions, task.priority)}</span>}
                     </div>
                   </div>
                 ))
@@ -554,24 +348,73 @@ const ProjectDetailPage: React.FC = () => {
             </div>
           </div>
           <div className="shell-card p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Team members</h2>
-            <div className="mt-4 space-y-3">
-              {isEmployee ? (
-                teamMembers.map((member) => (
-                  <div key={member} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                      {member.split(' ').map((part) => part[0]).slice(0, 2).join('')}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{member}</p>
-                      <p className="text-xs text-slate-500">Project contributor</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">Members are visible only to employees.</p>
-              )}
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Project Details</h2>
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-slate-500">DATES</p>
+                <p className="mt-1 text-sm text-slate-900">{project.startDate ? new Date(project.startDate).toLocaleDateString() : 'TBD'} - {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'TBD'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500">PROFITABILITY</p>
+                <p className="mt-1 text-sm text-slate-900">{projectDetail?.profitMargin ? `${projectDetail.profitMargin.toFixed(1)}%` : 'N/A'}</p>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'members' && (
+        <div className="shell-card p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Team Members</h2>
+            <button
+              type="button"
+              onClick={() => setShowMemberModal(true)}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              + Add member
+            </button>
+          </div>
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Employee ID</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Joined Date</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {teamMembers.length > 0 ? (
+                  teamMembers.map((member) => (
+                    <tr key={member.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-4 text-slate-900 font-semibold">{member.employeeId}</td>
+                      <td className="px-4 py-4 text-slate-600">{member.role}</td>
+                      <td className="px-4 py-4 text-slate-600">{new Date(member.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm('Remove this member from the project?')) {
+                              removeMemberMutation.mutate(member.employeeId)
+                            }
+                          }}
+                          disabled={removeMemberMutation.isPending}
+                          className="text-sm font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-500">No members assigned to this project yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -579,21 +422,19 @@ const ProjectDetailPage: React.FC = () => {
       {activeTab === 'board' && (
         <div className="overflow-x-auto pb-2">
           <div className="flex min-w-max gap-4">
-            {COLUMNS.map((column) => (
+            {taskColumns.map((column) => (
               <div
                 key={column.key}
                 onDragOver={(event) => event.preventDefault()}
-                onDrop={() => {
-                  if (draggedTaskId) {
-                    const draggedTask = taskLookup.get(draggedTaskId)
-                    if (!draggedTask || !canEditTask(draggedTask)) {
-                      toast.error('Only the task creator can update this task')
-                      setDraggedTaskId(null)
-                      return
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const taskId = e.dataTransfer.getData('taskId')
+                  if (taskId) {
+                    const task = projectTasks.find(t => t.id === taskId)
+                    if (task && task.status !== column.key) {
+                      updateTaskStatusMutation.mutate({ taskId, status: column.key })
+                      toast.success(`Task moved to ${column.label}`)
                     }
-                    moveTask(draggedTaskId, column.key)
-                    setDraggedTaskId(null)
-                    toast.success(`Task moved to ${column.label}`)
                   }
                 }}
                 className="w-80 rounded-2xl border border-slate-200 bg-slate-50"
@@ -606,105 +447,41 @@ const ProjectDetailPage: React.FC = () => {
                   {projectTasks.filter((task) => task.status === column.key).map((task) => (
                     <div
                       key={task.id}
-                      draggable={canEditTask(task)}
-                      onClick={() => {
-                        if (canEditTask(task)) {
-                          openEditTask(task)
-                        }
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('taskId', task.id)
                       }}
-                      onDragStart={() => {
-                        if (canEditTask(task)) {
-                          setDraggedTaskId(task.id)
-                        }
-                      }}
-                      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${canEditTask(task) ? 'cursor-pointer' : 'cursor-default opacity-80'}`}
+                      onClick={() => openEditTask(task)}
+                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm cursor-pointer hover:border-blue-300 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{task.assigneeName}</p>
-                          <p className="mt-1 text-[11px] text-slate-400">Task Creator: {task.creatorName || task.assigneeName}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {task.assigneeId ? (userNameById.get(task.assigneeId) || task.assigneeId) : 'Unassigned'}
+                          </p>
                         </div>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
+                        {task.priority && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIORITY_COLORS[task.priority]}`}>{getOptionLabel(taskPriorityOptions, task.priority)}</span>}
                       </div>
-                      {task.description && <p className="mt-3 text-sm text-slate-600">{task.description}</p>}
-                      {taskTimer?.taskId === task.id && (
-                        <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                          Timer running: {Math.floor(timerSeconds / 60).toString().padStart(2, '0')}:{(timerSeconds % 60).toString().padStart(2, '0')}
-                        </div>
-                      )}
+                      {task.description && <p className="mt-3 text-sm text-slate-600 line-clamp-2">{task.description}</p>}
                       <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                        <span>Due {task.dueDate || 'TBD'}</span>
-                        <span>{task.loggedHours.toFixed(1)}h / {task.estimateHours || 0}h</span>
+                        <span>Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'TBD'}</span>
+                        {task.storyPoints ? <span>{task.storyPoints} pts</span> : null}
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 text-xs font-semibold">
-                        {canEditTask(task) && (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openEditTask(task)
-                            }}
-                            className="text-slate-500 hover:text-slate-900"
-                          >
-                            Edit
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
-                            openTimeLog(task.id)
+                            if (confirm('Are you sure you want to delete this task?')) {
+                              deleteTaskMutation.mutate(task.id)
+                            }
                           }}
-                          className="text-blue-600 hover:text-blue-700"
+                          className="text-rose-600 hover:text-rose-700"
                         >
-                          Log time
+                          Delete
                         </button>
-                        {taskTimer?.taskId === task.id ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleStopTimer(task)
-                            }}
-                            className="text-emerald-600 hover:text-emerald-700"
-                          >
-                            Stop Timer
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleStartTimer(task)
-                            }}
-                            className="text-emerald-600 hover:text-emerald-700"
-                          >
-                            Start Timer
-                          </button>
-                        )}
-                        {canEditTask(task) && (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              deleteTask(task.id)
-                              toast.success('Task deleted')
-                            }}
-                            className="text-rose-600 hover:text-rose-700"
-                          >
-                            Delete
-                          </button>
-                        )}
                       </div>
-                      {taskTimer?.taskId === task.id && (
-                        <input
-                          value={taskTimer.note || ''}
-                          onChange={(event) => setTaskTimerNote(event.target.value)}
-                          placeholder="Timer note (optional)"
-                          className="mt-3 w-full rounded-lg border border-slate-200 px-2 py-1 text-xs"
-                        />
-                      )}
                     </div>
                   ))}
                   {projectTasks.filter((task) => task.status === column.key).length === 0 && (
@@ -717,231 +494,182 @@ const ProjectDetailPage: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'timesheets' && (
-        <div className="shell-card overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Project timesheets</h2>
-          </div>
-          {projectEntries.length === 0 ? (
-            <div className="px-5 py-12 text-center text-sm text-slate-500">No time entries yet. Log time from the board to build a project history.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">Task</th>
-                    <th className="px-4 py-3">Employee</th>
-                    <th className="px-4 py-3">Work Date</th>
-                    <th className="px-4 py-3">Hours</th>
-                    <th className="px-4 py-3">Note</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {projectEntries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="px-4 py-4 text-slate-900">{taskLookup.get(entry.taskId)?.title || 'Task'}</td>
-                      <td className="px-4 py-4 text-slate-600">{entry.employeeName}</td>
-                      <td className="px-4 py-4 text-slate-600">{entry.workDate}</td>
-                      <td className="px-4 py-4 font-semibold text-slate-900">{entry.hours}h</td>
-                      <td className="px-4 py-4 text-slate-600">{entry.note || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'members' && (
-        <div className="shell-card p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Members</h2>
-            <span className="text-xs font-semibold text-slate-400">{teamMembers.length} members</span>
-          </div>
-          {canEditProject ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <input
-                value={memberName}
-                onChange={(event) => setMemberName(event.target.value)}
-                placeholder="Add member name"
-                className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                onClick={handleAddMember}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                Add Member
-              </button>
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-slate-500">Only the project manager can add or remove members.</p>
-          )}
-          <div className="mt-4 space-y-3">
-            {teamMembers.map((member) => (
-              <div key={member} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                    {member.split(' ').map((part) => part[0]).slice(0, 2).join('')}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{member}</p>
-                    <p className="text-xs text-slate-500">{member === project.ownerName ? 'Project Manager' : 'Project Member'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {member === project.ownerName && (
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Manager</span>
-                  )}
-                  {canEditProject && member !== project.ownerName && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(member)}
-                      className="text-xs font-semibold text-rose-600 hover:text-rose-700"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-900">{editingTaskId ? 'Edit task' : 'Add task'}</h2>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">{editingTaskId ? 'Edit Task' : 'Create Task'}</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Title</label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Task Title</label>
                 <input value={taskForm.title} onChange={(event) => setTaskForm((state) => ({ ...state, title: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
               </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Description</label>
-                <textarea value={taskForm.description} onChange={(event) => setTaskForm((state) => ({ ...state, description: event.target.value }))} rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</label>
-                <select value={taskForm.status} onChange={(event) => setTaskForm((state) => ({ ...state, status: event.target.value as WorkspaceTaskStatus }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  {COLUMNS.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Priority</label>
-                <select value={taskForm.priority} onChange={(event) => setTaskForm((state) => ({ ...state, priority: event.target.value as WorkspacePriority }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as WorkspacePriority[]).map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Assignee</label>
-                {isEmployee ? (
-                  <select value={taskForm.assigneeName} onChange={(event) => setTaskForm((state) => ({ ...state, assigneeName: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                    {teamMembers.map((member) => <option key={member} value={member}>{member}</option>)}
-                  </select>
-                ) : (
-                  <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    {taskForm.assigneeName || project.ownerName}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Due date</label>
-                <input type="date" value={taskForm.dueDate} onChange={(event) => setTaskForm((state) => ({ ...state, dueDate: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estimated hours</label>
-                <input type="number" min="0" step="0.5" value={taskForm.estimateHours} onChange={(event) => setTaskForm((state) => ({ ...state, estimateHours: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => { setShowTaskModal(false); setEditingTaskId(null); setTaskForm(EMPTY_TASK_FORM) }} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleSaveTask} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save task</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showTimeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-900">Log time</h2>
-            <div className="mt-4 grid gap-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Task</label>
-                <select value={timeForm.taskId} onChange={(event) => setTimeForm((state) => ({ ...state, taskId: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  <option value="">Select a task</option>
-                  {projectTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
-                </select>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Work date</label>
-                  <input type="date" value={timeForm.workDate} onChange={(event) => setTimeForm((state) => ({ ...state, workDate: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Hours</label>
-                  <input type="number" min="0" step="0.25" value={timeForm.hours} onChange={(event) => setTimeForm((state) => ({ ...state, hours: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Note</label>
-                <textarea value={timeForm.note} onChange={(event) => setTimeForm((state) => ({ ...state, note: event.target.value }))} rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => { setShowTimeModal(false); setTimeForm(EMPTY_TIME_LOG) }} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleLogTime} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save time</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showProjectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-900">Edit project</h2>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Project name</label>
-                <input value={projectForm.name} onChange={(event) => setProjectForm((state) => ({ ...state, name: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Client</label>
-                <input value={projectForm.client} onChange={(event) => setProjectForm((state) => ({ ...state, client: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Product</label>
-                <input value={projectForm.product} onChange={(event) => setProjectForm((state) => ({ ...state, product: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</label>
-                <select value={projectForm.status} onChange={(event) => setProjectForm((state) => ({ ...state, status: event.target.value as WorkspaceProjectStatus }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  {PROJECT_STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
+                <select value={taskForm.status} onChange={(event) => setTaskForm((state) => ({ ...state, status: event.target.value as TaskStatus }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  {taskStatusOptions.map((option) => (
+                    <option key={option.id} value={option.value}>{option.label || option.value}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Priority</label>
-                <select value={projectForm.priority} onChange={(event) => setProjectForm((state) => ({ ...state, priority: event.target.value as WorkspacePriority }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as WorkspacePriority[]).map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                <select value={taskForm.priority} onChange={(event) => setTaskForm((state) => ({ ...state, priority: event.target.value as TaskPriority }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  {taskPriorityOptions.map((option) => (
+                    <option key={option.id} value={option.value}>{option.label || option.value}</option>
+                  ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Due Date</label>
+                <input type="date" value={taskForm.dueDate} onChange={(event) => setTaskForm((state) => ({ ...state, dueDate: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Story Points</label>
+                <input type="number" value={taskForm.storyPoints} onChange={(event) => setTaskForm((state) => ({ ...state, storyPoints: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Target date</label>
-                <input type="date" value={projectForm.dueDate} onChange={(event) => setProjectForm((state) => ({ ...state, dueDate: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Assignee</label>
+                <select
+                  value={taskForm.assigneeId}
+                  onChange={(event) => setTaskForm((state) => ({ ...state, assigneeId: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  <option value={user?.id || ''}>Me</option>
+                  {memberUserOptions.map((opt) => (
+                    <option key={opt.userId} value={opt.userId}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  Assignment is limited to project members with linked user accounts.
+                </p>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Description</label>
-                <textarea value={projectForm.description} onChange={(event) => setProjectForm((state) => ({ ...state, description: event.target.value }))} rows={4} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                <textarea value={taskForm.description} onChange={(event) => setTaskForm((state) => ({ ...state, description: event.target.value }))} rows={4} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => setShowProjectModal(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={handleSaveProject} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Update</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTaskModal(false)
+                  setEditingTaskId(null)
+                  setTaskForm(EMPTY_TASK_FORM)
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTask}
+                disabled={createTaskMutation.isPending || updateTaskMutation.isPending}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {createTaskMutation.isPending || updateTaskMutation.isPending ? 'Saving...' : editingTaskId ? 'Update Task' : 'Create Task'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMemberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Add project member</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Add an employee to this project using their employee id.
+            </p>
+
+            <div className="mt-4 grid gap-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Search employees (optional)</label>
+                <input
+                  value={employeeSearch}
+                  onChange={(event) => setEmployeeSearch(event.target.value)}
+                  placeholder="Type name, email, or employee id"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+                <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600">
+                  {isLoadingEmployees ? (
+                    <div>Searching...</div>
+                  ) : employeesData?.data?.data?.content?.length ? (
+                    <div className="max-h-40 overflow-y-auto">
+                      {employeesData.data.data.content.map((emp) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => setMemberForm((state) => ({ ...state, employeeId: emp.id }))}
+                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-white"
+                        >
+                          <span className="font-semibold text-slate-800">{`${emp.firstName} ${emp.lastName}`.trim() || emp.id}</span>
+                          <span className="text-slate-500">{emp.id}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div>Type to search employees.</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Employee ID</label>
+                  <input
+                    value={memberForm.employeeId}
+                    onChange={(event) => setMemberForm((state) => ({ ...state, employeeId: event.target.value }))}
+                    placeholder="e.g. EMP-0001"
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Project role</label>
+                  <select
+                    value={memberForm.role}
+                    onChange={(event) => setMemberForm((state) => ({ ...state, role: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <option value="MEMBER">Member</option>
+                    <option value="LEAD">Lead</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="OBSERVER">Observer</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMemberModal(false)
+                  setEmployeeSearch('')
+                  setMemberForm(EMPTY_MEMBER_FORM)
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!memberForm.employeeId.trim()) {
+                    toast.error('Employee ID is required')
+                    return
+                  }
+                  if (teamMembers.some((m) => m.employeeId === memberForm.employeeId.trim())) {
+                    toast.error('This employee is already a member of the project')
+                    return
+                  }
+                  addMemberMutation.mutate({ employeeId: memberForm.employeeId.trim(), role: memberForm.role })
+                }}
+                disabled={addMemberMutation.isPending}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {addMemberMutation.isPending ? 'Adding...' : 'Add member'}
+              </button>
             </div>
           </div>
         </div>
@@ -952,7 +680,7 @@ const ProjectDetailPage: React.FC = () => {
 
 const Stat = ({ label, value }: { label: string; value: string | number }) => (
   <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
+    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
     <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
   </div>
 )

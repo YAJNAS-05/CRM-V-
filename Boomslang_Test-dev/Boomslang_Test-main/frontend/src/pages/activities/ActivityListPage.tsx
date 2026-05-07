@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore'
 import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
+import { getErrorMessage } from '../../utils/errorUtils'
 
 const TYPE_COLORS: Record<string, string> = {
   CALL: 'bg-blue-100 text-blue-700',
@@ -55,7 +56,7 @@ export default function ActivityListPage() {
       setShowCreateModal(false)
       resetCreateForm()
       fetchActivities()
-    } catch { toast.error('Failed to create activity') } finally { setCreateSaving(false) }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to create activity')) } finally { setCreateSaving(false) }
   }
 
   useEffect(() => { fetchActivities() }, [filter, page, pageSize])
@@ -70,17 +71,17 @@ export default function ActivityListPage() {
         const r = await activityApi.getAll(page, pageSize)
         if (r.data.success) { const d = r.data.data; setActivities(d.content || []); setTotalPages(d.totalPages || 1); setTotalElements(d.totalElements || 0) }
       }
-    } catch { toast.error('Failed to load activities') } finally { setLoading(false) }
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to load activities')) } finally { setLoading(false) }
   }
 
   const handleComplete = async (id: string) => {
     if (!canEdit) { toast.error('You do not have permission to update activities'); return }
-    try { await activityApi.complete(id); toast.success('Marked complete'); fetchActivities() } catch { toast.error('Failed') }
+    try { await activityApi.complete(id); toast.success('Marked complete'); fetchActivities() } catch (err) { toast.error(getErrorMessage(err, 'Failed to mark activity complete')) }
   }
   const handleDelete = async (id: string) => {
     if (!canDelete) { toast.error('You do not have permission to delete activities'); return }
     if (!confirm('Delete this activity?')) return
-    try { await activityApi.delete(id); toast.success('Deleted'); fetchActivities() } catch { toast.error('Failed') }
+    try { await activityApi.delete(id); toast.success('Deleted'); fetchActivities() } catch (err) { toast.error(getErrorMessage(err, 'Failed to delete activity')) }
   }
 
   const filtered = activities.filter(a => {

@@ -37,6 +37,7 @@ public class ReportBuilderController {
     private final ExportService exportService;
     private final ReportMetadataService metadataService;
     private final JasperExecutionService jasperExecutionService;
+    private final com.everx.reporting.repository.ScheduledReportRepository scheduledReportRepository;
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<?>>> listReports(
@@ -166,5 +167,40 @@ public class ReportBuilderController {
     public ResponseEntity<ApiResponse<List<?>>> getModules() {
         return ResponseEntity.ok(ApiResponse.success(
             (List<?>) (List<?>) metadataService.getAllModules()));
+    }
+
+    // ==================== Schedule Endpoints ====================
+
+    @GetMapping("/{reportId}/schedules")
+    public ResponseEntity<ApiResponse<List<com.everx.reporting.entity.ScheduledReportEntity>>> getSchedules(
+            @PathVariable Long reportId) {
+        return ResponseEntity.ok(ApiResponse.success(
+            scheduledReportRepository.findByReportId(reportId)));
+    }
+
+    @PostMapping("/{reportId}/schedules")
+    public ResponseEntity<ApiResponse<com.everx.reporting.entity.ScheduledReportEntity>> createSchedule(
+            @PathVariable Long reportId,
+            @RequestBody ScheduleReportRequest request) {
+        com.everx.reporting.entity.ScheduledReportEntity entity =
+            com.everx.reporting.entity.ScheduledReportEntity.builder()
+                .reportId(reportId)
+                .scheduleName(request.getScheduleName())
+                .frequency(request.getFrequency())
+                .cronExpression(request.getCronExpression() != null ? request.getCronExpression() : "0 8 * * MON")
+                .recipients(request.getRecipients())
+                .exportFormat(request.getExportFormat() != null ? request.getExportFormat() : "EXCEL")
+                .isActive(true)
+                .build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+            scheduledReportRepository.save(entity)));
+    }
+
+    @DeleteMapping("/{reportId}/schedules/{scheduleId}")
+    public ResponseEntity<?> deleteSchedule(
+            @PathVariable Long reportId,
+            @PathVariable Long scheduleId) {
+        scheduledReportRepository.deleteById(scheduleId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Schedule deleted"));
     }
 }

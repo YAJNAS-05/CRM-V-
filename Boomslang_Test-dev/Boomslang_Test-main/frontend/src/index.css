@@ -120,6 +120,15 @@ textarea {
     display: none !important;
   }
 
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Report print styles */
+  nav, aside, header, footer, .sidebar {
+    display: none !important;
+  }
+
   .payslip-print {
     border: 0 !important;
     box-shadow: none !important;

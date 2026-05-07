@@ -2,8 +2,25 @@ import { FormEvent, useState } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { fieldworkApi } from '../../api/fieldworkApi'
 import { FieldJobDto, FieldJobStatus, FieldJobType, JobPriority } from '../../types/fieldwork'
+import { FieldworkPendingIndicator } from '../../components/fieldwork/FieldworkPendingIndicator'
+
+const fieldWorkSchema = z.object({
+  clientOrSellerName: z.string().min(1, 'Client name is required'),
+  siteContactName: z.string().min(1, 'Site contact name is required'),
+  siteContactEmail: z.string().email('Valid email required'),
+  siteAddressLine1: z.string().min(1, 'Address is required'),
+  siteCity: z.string().min(1, 'City is required'),
+  siteCountry: z.string().optional(),
+  startDate: z.string().min(1, 'Start date is required'),
+  endDate: z.string().optional(),
+  jobType: z.string().min(1, 'Job type is required'),
+  priority: z.string().min(1, 'Priority is required'),
+  linkedEntity: z.string().optional(),
+  internalNotes: z.string().optional(),
+})
 
 interface FieldWorkOrder {
   id: number | string
@@ -85,6 +102,7 @@ export const FieldWorkDetailPage = () => {
   const today = new Date().toISOString().slice(0, 10)
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const [isCreating, setIsCreating] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
   const [createForm, setCreateForm] = useState<NewFieldWorkForm>({
     jobType: FieldJobType.INSTALLATION,
     priority: JobPriority.ROUTINE,
@@ -133,24 +151,27 @@ export const FieldWorkDetailPage = () => {
     field: keyof NewFieldWorkForm,
     value: string
   ) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+    setCreateForm((prev) => ({ ...prev, [field]: value }))
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
+    }
   }
 
   const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!createForm.clientOrSellerName || !createForm.siteContactName || !createForm.siteContactEmail) {
-      toast.error('Client and contact details are required')
+    const result = fieldWorkSchema.safeParse(createForm)
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
-
-    if (!createForm.siteAddressLine1 || !createForm.siteCity) {
-      toast.error('Site address and city are required')
-      return
-    }
+    setFieldErrors({})
 
     const scheduledStartDate = new Date(`${createForm.startDate}T09:00:00`).toISOString()
     const scheduledEndDate = new Date(`${createForm.endDate}T17:00:00`).toISOString()
@@ -198,6 +219,7 @@ export const FieldWorkDetailPage = () => {
   if (isCreateMode) {
     return (
       <div className="space-y-4">
+        <FieldworkPendingIndicator />
         <button
           onClick={() => navigate(basePath)}
           className="text-sm text-muted-foreground hover:text-foreground"
@@ -243,9 +265,10 @@ export const FieldWorkDetailPage = () => {
                   type="text"
                   value={createForm.clientOrSellerName}
                   onChange={(e) => handleCreateFieldChange('clientOrSellerName', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background"
+                  className={`mt-1 w-full px-3 py-2 border rounded-lg bg-background ${fieldErrors.clientOrSellerName ? 'border-red-500' : ''}`}
                   required
                 />
+                {fieldErrors.clientOrSellerName && <p className="mt-1 text-xs text-red-600">{fieldErrors.clientOrSellerName}</p>}
               </div>
 
               <div>
@@ -265,9 +288,10 @@ export const FieldWorkDetailPage = () => {
                   type="text"
                   value={createForm.siteContactName}
                   onChange={(e) => handleCreateFieldChange('siteContactName', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background"
+                  className={`mt-1 w-full px-3 py-2 border rounded-lg bg-background ${fieldErrors.siteContactName ? 'border-red-500' : ''}`}
                   required
                 />
+                {fieldErrors.siteContactName && <p className="mt-1 text-xs text-red-600">{fieldErrors.siteContactName}</p>}
               </div>
 
               <div>
@@ -276,9 +300,10 @@ export const FieldWorkDetailPage = () => {
                   type="email"
                   value={createForm.siteContactEmail}
                   onChange={(e) => handleCreateFieldChange('siteContactEmail', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background"
+                  className={`mt-1 w-full px-3 py-2 border rounded-lg bg-background ${fieldErrors.siteContactEmail ? 'border-red-500' : ''}`}
                   required
                 />
+                {fieldErrors.siteContactEmail && <p className="mt-1 text-xs text-red-600">{fieldErrors.siteContactEmail}</p>}
               </div>
 
               <div>
@@ -287,9 +312,10 @@ export const FieldWorkDetailPage = () => {
                   type="text"
                   value={createForm.siteAddressLine1}
                   onChange={(e) => handleCreateFieldChange('siteAddressLine1', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background"
+                  className={`mt-1 w-full px-3 py-2 border rounded-lg bg-background ${fieldErrors.siteAddressLine1 ? 'border-red-500' : ''}`}
                   required
                 />
+                {fieldErrors.siteAddressLine1 && <p className="mt-1 text-xs text-red-600">{fieldErrors.siteAddressLine1}</p>}
               </div>
 
               <div>
@@ -298,9 +324,10 @@ export const FieldWorkDetailPage = () => {
                   type="text"
                   value={createForm.siteCity}
                   onChange={(e) => handleCreateFieldChange('siteCity', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background"
+                  className={`mt-1 w-full px-3 py-2 border rounded-lg bg-background ${fieldErrors.siteCity ? 'border-red-500' : ''}`}
                   required
                 />
+                {fieldErrors.siteCity && <p className="mt-1 text-xs text-red-600">{fieldErrors.siteCity}</p>}
               </div>
 
               <div>
@@ -319,9 +346,10 @@ export const FieldWorkDetailPage = () => {
                   type="date"
                   value={createForm.startDate}
                   onChange={(e) => handleCreateFieldChange('startDate', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background"
+                  className={`mt-1 w-full px-3 py-2 border rounded-lg bg-background ${fieldErrors.startDate ? 'border-red-500' : ''}`}
                   required
                 />
+                {fieldErrors.startDate && <p className="mt-1 text-xs text-red-600">{fieldErrors.startDate}</p>}
               </div>
 
               <div>

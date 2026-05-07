@@ -203,18 +203,24 @@ public class UserService implements UserDetailsService {
      * Change user password
      */
     public void changePassword(@NonNull UUID userId, @NonNull String currentPassword, @NonNull String newPassword) {
-        log.info("Changing password for user: {}", userId);
+        log.info("Password change requested for user: {}", userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
 
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            log.warn("Password change failed for user {}: incorrect current password", userId);
             throw new ValidationException("currentPassword", "Current password is incorrect");
+        }
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            log.warn("Password change rejected for user {}: new password is same as current", userId);
+            throw new ValidationException("newPassword", "New password must differ from the current password");
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        log.info("Password changed successfully for user: {}", userId);
+        log.info("Password changed successfully for user: {} (email: {})", userId, user.getEmail());
     }
 
     /**

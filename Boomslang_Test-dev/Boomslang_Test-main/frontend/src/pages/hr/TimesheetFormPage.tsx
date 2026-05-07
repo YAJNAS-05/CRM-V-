@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { employeeApi, timesheetApi } from '../../api/hrApi'
 import {
   CreateTimesheetRequest,
@@ -8,6 +9,18 @@ import {
   Timesheet,
   TimesheetStatus,
 } from '../../types/hr'
+import CustomFieldsPanel from '../../components/config/CustomFieldsPanel'
+import { useCustomFields } from '../../hooks/useCustomFields'
+import { useLayoutConfig } from '../../hooks/useLayoutConfig'
+import { useOptionSet } from '../../hooks/useOptionSet'
+
+const timesheetSchema = z.object({
+  employeeId: z.string().min(1, 'Employee is required'),
+  fieldJobId: z.string().optional().nullable(),
+  workDate: z.string().min(1, 'Work date is required'),
+  hoursWorked: z.number().positive('Hours must be greater than 0').max(24, 'Hours cannot exceed 24').optional(),
+  notes: z.string().optional(),
+})
 
 const TIMESHEET_STATUSES: TimesheetStatus[] = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED']
 
@@ -27,6 +40,22 @@ const TimesheetFormPage: React.FC = () => {
   const [status, setStatus] = useState<TimesheetStatus>('DRAFT')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(isEditing)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
+  const { options: statusOptions } = useOptionSet({
+    module: 'HR',
+    entity: 'TIMESHEET',
+    field: 'status',
+    fallbackValues: TIMESHEET_STATUSES,
+  })
+  const { definitions: customFieldDefinitions, values: customFieldValues, setValue: setCustomFieldValue, save: saveCustomFields, isLoading: customFieldsLoading } = useCustomFields({
+    module: 'HR',
+    entity: 'TIMESHEET',
+    entityId: id,
+  })
+  const { layout: timesheetLayout } = useLayoutConfig({
+    module: 'HR',
+    entity: 'TIMESHEET',
+  })
 
   useEffect(() => {
     loadEmployees()
@@ -77,6 +106,9 @@ const TimesheetFormPage: React.FC = () => {
       ...prev,
       [name]: value,
     }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
   }
 
   const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,15 +117,26 @@ const TimesheetFormPage: React.FC = () => {
       ...prev,
       hoursWorked: value === '' ? undefined : Number(value),
     }))
+    if (fieldErrors.hoursWorked) {
+      setFieldErrors((prev) => ({ ...prev, hoursWorked: undefined }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.employeeId || !formData.workDate) {
-      toast.error('Please complete required fields')
+    const result = timesheetSchema.safeParse(formData)
+    if (!result.success) {
+      const errs: Partial<Record<string, string>> = {}
+      for (const issue of result.error.errors) {
+        const key = issue.path[0] as string
+        if (key && !errs[key]) errs[key] = issue.message
+      }
+      setFieldErrors(errs)
+      toast.error('Please fix the highlighted fields')
       return
     }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -105,12 +148,25 @@ const TimesheetFormPage: React.FC = () => {
           notes: formData.notes,
           status,
         })
+        try {
+          await saveCustomFields(id)
+        } catch {
+          toast.error('Timesheet updated, but custom fields failed to save')
+        }
         toast.success('Timesheet updated')
       } else {
-        await timesheetApi.create({
+        const response = await timesheetApi.create({
           ...formData,
           fieldJobId: formData.fieldJobId || null,
         })
+        const savedTimesheet = response.data.data
+        if (savedTimesheet?.id) {
+          try {
+            await saveCustomFields(savedTimesheet.id)
+          } catch {
+            toast.error('Timesheet created, but custom fields failed to save')
+          }
+        }
         toast.success('Timesheet created')
       }
       navigate('/hr/timesheets')
@@ -150,7 +206,7 @@ const TimesheetFormPage: React.FC = () => {
               name="employeeId"
               value={formData.employeeId}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.employeeId ? 'border-red-500' : 'border-gray-300'}`}
               required
             >
               <option value="">Select employee</option>
@@ -160,6 +216,7 @@ const TimesheetFormPage: React.FC = () => {
                 </option>
               ))}
             </select>
+            {fieldErrors.employeeId && <p className="mt-1 text-xs text-red-600">{fieldErrors.employeeId}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Work Date *</label>
@@ -168,9 +225,10 @@ const TimesheetFormPage: React.FC = () => {
               name="workDate"
               value={formData.workDate}
               onChange={handleChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.workDate ? 'border-red-500' : 'border-gray-300'}`}
               required
             />
+            {fieldErrors.workDate && <p className="mt-1 text-xs text-red-600">{fieldErrors.workDate}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Hours Worked</label>
@@ -179,8 +237,9 @@ const TimesheetFormPage: React.FC = () => {
               name="hoursWorked"
               value={formData.hoursWorked ?? ''}
               onChange={handleHoursChange}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+              className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.hoursWorked ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {fieldErrors.hoursWorked && <p className="mt-1 text-xs text-red-600">{fieldErrors.hoursWorked}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Field Job ID</label>
@@ -200,9 +259,9 @@ const TimesheetFormPage: React.FC = () => {
                 onChange={(e) => setStatus(e.target.value as TimesheetStatus)}
                 className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
               >
-                {TIMESHEET_STATUSES.map((statusOption) => (
-                  <option key={statusOption} value={statusOption}>
-                    {statusOption}
+                {statusOptions.map((option) => (
+                  <option key={option.id} value={option.value}>
+                    {option.label || option.value}
                   </option>
                 ))}
               </select>
@@ -219,6 +278,15 @@ const TimesheetFormPage: React.FC = () => {
             />
           </div>
         </div>
+
+        <CustomFieldsPanel
+          title="Custom Timesheet Fields"
+          definitions={customFieldDefinitions}
+          values={customFieldValues}
+          onChange={setCustomFieldValue}
+          isLoading={customFieldsLoading}
+          layout={timesheetLayout}
+        />
 
         <div className="flex justify-end">
           <button
