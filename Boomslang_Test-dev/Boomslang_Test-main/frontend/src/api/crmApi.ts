@@ -17,11 +17,14 @@ import {
   UpdateDealStageRequest,
   RecordLeadScoreRequest,
   LeadScore,
+  LeadScoreCalculation,
   ConvertQuoteRequest,
   ReportDashboardKPIs,
   ReportPipeline,
   ReportConversion,
   ReportActivity,
+  PipelineForecastDto,
+  SalesVelocityDto,
 } from '../types/crm'
 import { SalesOrder } from '../types/erp'
 
@@ -125,6 +128,8 @@ export const leadApi = {
     axiosInstance.post<ApiResponse<Contact>>(`/v1/crm/leads/${id}/convert`, data),
   recordScore: (leadId: string, data: RecordLeadScoreRequest) =>
     axiosInstance.post<ApiResponse<LeadScore>>(`/v1/crm/leads/${leadId}/scores`, data),
+  getScoreCalculation: (leadId: string) =>
+    axiosInstance.get<ApiResponse<LeadScoreCalculation>>(`/v1/crm/leads/${leadId}/score-calculation`),
 }
 
 // Deal APIs
@@ -268,4 +273,32 @@ export const reportApi = {
 
   getFull: () =>
     axiosInstance.get<ApiResponse<any>>('/v1/crm/reports'),
+}
+
+// Forecasting APIs
+export const forecastApi = {
+  getPipelineForecast: (ownerId?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams()
+    if (ownerId) params.set('ownerId', ownerId)
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
+    return axiosInstance.get<ApiResponse<PipelineForecastDto>>(`/v1/crm/forecast/pipeline?${params.toString()}`)
+  },
+
+  getSalesVelocity: (ownerId?: string, monthsBack = 6) => {
+    const params = new URLSearchParams()
+    if (ownerId) params.set('ownerId', ownerId)
+    params.set('monthsBack', monthsBack.toString())
+    return axiosInstance.get<ApiResponse<SalesVelocityDto>>(`/v1/crm/forecast/velocity?${params.toString()}`)
+  },
+
+  getMyPipelineForecast: (startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams()
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
+    return axiosInstance.get<ApiResponse<PipelineForecastDto>>(`/v1/crm/forecast/my-pipeline?${params.toString()}`)
+  },
+
+  getMySalesVelocity: (monthsBack = 6) =>
+    axiosInstance.get<ApiResponse<SalesVelocityDto>>(`/v1/crm/forecast/my-velocity?monthsBack=${monthsBack}`),
 }

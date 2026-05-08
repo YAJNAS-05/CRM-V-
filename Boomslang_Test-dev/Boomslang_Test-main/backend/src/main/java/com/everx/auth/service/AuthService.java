@@ -7,6 +7,8 @@ import com.everx.auth.entity.RefreshToken;
 import com.everx.auth.entity.User;
 import com.everx.auth.repository.RefreshTokenRepository;
 import com.everx.auth.repository.UserRepository;
+import com.everx.backend.auth.service.AccountLockoutService;
+import com.everx.shared.exception.AuthenticationException;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import com.everx.shared.util.JwtTokenProvider;
@@ -38,6 +40,9 @@ public class AuthService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AccountLockoutService accountLockoutService;
+
     public LoginResponse login(LoginRequest request) {
         log.info("Login attempt for email: {}", request.getEmail());
 
@@ -48,9 +53,14 @@ public class AuthService {
             throw new ValidationException("User account is not active");
         }
 
+        accountLockoutService.checkAndThrowIfLocked(user.getId());
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new ValidationException("Invalid email or password");
+            accountLockoutService.recordFailedAttempt(user.getId());
+            throw AuthenticationException.invalidCredentials();
         }
+
+        accountLockoutService.recordSuccessfulLogin(user.getId());
 
         // Generate tokens
         List<String> tokenRoles = extractRoles(user);

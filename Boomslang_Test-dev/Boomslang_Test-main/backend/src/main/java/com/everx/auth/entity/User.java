@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users", schema = "everx_auth")
@@ -70,6 +71,9 @@ public class User extends BaseEntity implements UserDetails {
 
     @Column(name = "avatar_url")
     private String avatarUrl;
+
+    @Column(name = "tenant_id")
+    private UUID tenantId;
 
     public enum UserRole {
         SUPER_ADMIN,

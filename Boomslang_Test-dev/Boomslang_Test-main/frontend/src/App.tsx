@@ -9,59 +9,63 @@ import { useFieldworkPendingSync } from './hooks/useFieldworkPendingSync'
 import useNotificationPolling from './hooks/useNotificationPolling'
 import LoginPage from './pages/auth/LoginPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
+import UnauthorizedPage from './pages/auth/UnauthorizedPage'
 import NotificationPanel from './components/NotificationPanel'
 
 // CRM Pages
-import AccountListPage from './pages/accounts/AccountListPage'
-import AccountDetailPage from './pages/accounts/AccountDetailPage'
-import ContactListPage from './pages/contacts/ContactListPage'
-import ContactDetailPage from './pages/contacts/ContactDetailPage'
-import LeadListPage from './pages/leads/LeadListPage'
-import LeadDetailPage from './pages/leads/LeadDetailPage'
-import DealListPage from './pages/deals/DealListPage'
-import DealDetailPage from './pages/deals/DealDetailPage'
-import DealKanbanPage from './pages/deals/DealKanbanPage'
-import QuoteListPage from './pages/quotes/QuoteListPage'
-import QuoteDetailPage from './pages/quotes/QuoteDetailPage'
-import ActivityListPage from './pages/activities/ActivityListPage'
+import AccountListPage from './pages/crm/AccountListPage'
+import AccountDetailPage from './pages/crm/AccountDetailPage'
+import ContactListPage from './pages/crm/ContactListPage'
+import ContactDetailPage from './pages/crm/ContactDetailPage'
+import ProjectsPage from './pages/pm/ProjectsPage'
+import ProjectDetailPage from './pages/pm/ProjectDetailPage'
+import MyTasksPage from './pages/pm/TasksPage'
+import LeadListPage from './pages/crm/LeadListPage'
+import LeadDetailPage from './pages/crm/LeadDetailPage'
+import DealListPage from './pages/crm/DealListPage'
+import DealDetailPage from './pages/crm/DealDetailPage'
+import DealKanbanPage from './pages/crm/DealKanbanPage'
+import QuoteListPage from './pages/crm/QuoteListPage'
+import QuoteDetailPage from './pages/crm/QuoteDetailPage'
+import ActivityListPage from './pages/crm/ActivityListPage'
 
 // ERP Pages
-import EquipmentListPage from './pages/equipment/EquipmentListPage'
-import EquipmentDetailPage from './pages/equipment/EquipmentDetailPage'
-import EquipmentForm from './pages/equipment/EquipmentForm'
-import SparePartsListPage from './pages/spareparts/SparePartsListPage'
-import SparePartDetailPage from './pages/spareparts/SparePartDetailPage'
-import SuppliersListPage from './pages/suppliers/SuppliersListPage'
-import SupplierDetailPage from './pages/suppliers/SupplierDetailPage'
-import PurchaseOrdersListPage from './pages/purchaseorders/PurchaseOrdersListPage'
-import PurchaseOrderDetailPage from './pages/purchaseorders/PurchaseOrderDetailPage'
-import SalesOrdersListPage from './pages/salesorders/SalesOrdersListPage'
-import SalesOrderDetailPage from './pages/salesorders/SalesOrderDetailPage'
-import WarrantiesListPage from './pages/warranties/WarrantiesListPage'
-import WarrantyDetailPage from './pages/warranties/WarrantyDetailPage'
-import ShipmentsListPage from './pages/shipments/ShipmentsListPage'
-import ShipmentDetailPage from './pages/shipments/ShipmentDetailPage'
-import SubcontractorsListPage from './pages/subcontractors/SubcontractorsListPage'
-import SubcontractorDetailPage from './pages/subcontractors/SubcontractorDetailPage'
-import SparePartForm from './pages/spareparts/SparePartForm'
-import SupplierForm from './pages/suppliers/SupplierForm'
-import PurchaseOrderForm from './pages/purchaseorders/PurchaseOrderForm'
-import SalesOrderForm from './pages/salesorders/SalesOrderForm'
-import ShipmentForm from './pages/shipments/ShipmentForm'
-import WarrantyForm from './pages/warranties/WarrantyForm'
-import SubcontractorForm from './pages/subcontractors/SubcontractorForm'
-import AcquisitionsListPage from './pages/acquisitions/AcquisitionsListPage'
-import AcquisitionForm from './pages/acquisitions/AcquisitionForm'
-import AcquisitionDetailPage from './pages/acquisitions/AcquisitionDetailPage'
-import EquipmentAssessmentsListPage from './pages/equipmentassessments/EquipmentAssessmentsListPage'
-import EquipmentAssessmentForm from './pages/equipmentassessments/EquipmentAssessmentForm'
-import SiteAssessmentsListPage from './pages/siteassessments/SiteAssessmentsListPage'
-import SiteAssessmentForm from './pages/siteassessments/SiteAssessmentForm'
-import EquipmentQCListPage from './pages/equipmentqc/EquipmentQCListPage'
-import EquipmentQCForm from './pages/equipmentqc/EquipmentQCForm'
-import ServiceTicketsListPage from './pages/servicetickets/ServiceTicketsListPage'
-import ServiceTicketForm from './pages/servicetickets/ServiceTicketForm'
-import ServiceTicketDetailPage from './pages/servicetickets/ServiceTicketDetailPage'
+import EquipmentListPage from './pages/erp/equipment/EquipmentListPage'
+import EquipmentDetailPage from './pages/erp/equipment/EquipmentDetailPage'
+import EquipmentForm from './pages/erp/equipment/EquipmentForm'
+import SparePartsListPage from './pages/erp/spareparts/SparePartsListPage'
+import SparePartDetailPage from './pages/erp/spareparts/SparePartDetailPage'
+import SuppliersListPage from './pages/erp/suppliers/SuppliersListPage'
+import SupplierDetailPage from './pages/erp/suppliers/SupplierDetailPage'
+import PurchaseOrdersListPage from './pages/erp/purchaseorders/PurchaseOrdersListPage'
+import PurchaseOrderDetailPage from './pages/erp/purchaseorders/PurchaseOrderDetailPage'
+import SalesOrdersListPage from './pages/erp/salesorders/SalesOrdersListPage'
+import SalesOrderDetailPage from './pages/erp/salesorders/SalesOrderDetailPage'
+import WarrantiesListPage from './pages/erp/warranties/WarrantiesListPage'
+import WarrantyDetailPage from './pages/erp/warranties/WarrantyDetailPage'
+import ShipmentsListPage from './pages/erp/shipments/ShipmentsListPage'
+import ShipmentDetailPage from './pages/erp/shipments/ShipmentDetailPage'
+import SubcontractorsListPage from './pages/erp/subcontractors/SubcontractorsListPage'
+import SubcontractorDetailPage from './pages/erp/subcontractors/SubcontractorDetailPage'
+import SparePartForm from './pages/erp/spareparts/SparePartForm'
+import SupplierForm from './pages/erp/suppliers/SupplierForm'
+import PurchaseOrderForm from './pages/erp/purchaseorders/PurchaseOrderForm'
+import SalesOrderForm from './pages/erp/salesorders/SalesOrderForm'
+import ShipmentForm from './pages/erp/shipments/ShipmentForm'
+import WarrantyForm from './pages/erp/warranties/WarrantyForm'
+import SubcontractorForm from './pages/erp/subcontractors/SubcontractorForm'
+import AcquisitionsListPage from './pages/erp/acquisitions/AcquisitionsListPage'
+import AcquisitionForm from './pages/erp/acquisitions/AcquisitionForm'
+import AcquisitionDetailPage from './pages/erp/acquisitions/AcquisitionDetailPage'
+import EquipmentAssessmentsListPage from './pages/erp/equipmentassessments/EquipmentAssessmentsListPage'
+import EquipmentAssessmentForm from './pages/erp/equipmentassessments/EquipmentAssessmentForm'
+import SiteAssessmentsListPage from './pages/erp/siteassessments/SiteAssessmentsListPage'
+import SiteAssessmentForm from './pages/erp/siteassessments/SiteAssessmentForm'
+import EquipmentQCListPage from './pages/erp/equipmentqc/EquipmentQCListPage'
+import EquipmentQCForm from './pages/erp/equipmentqc/EquipmentQCForm'
+import ServiceTicketsListPage from './pages/erp/servicetickets/ServiceTicketsListPage'
+import ServiceTicketForm from './pages/erp/servicetickets/ServiceTicketForm'
+import ServiceTicketDetailPage from './pages/erp/servicetickets/ServiceTicketDetailPage'
 
 // Finance Pages
 import InvoiceListPage from './pages/finance/InvoiceListPage'
@@ -161,17 +165,131 @@ import OnboardingTasksPage from './pages/hr/OnboardingTasksPage'
 import ExitFnFPage from './pages/hr/ExitFnFPage'
 import TaskKanbanPage from './pages/hr/TaskKanbanPage'
 import MyAssetsPage from './pages/hr/MyAssetsPage'
-import AuditLogPage from './pages/admin/AuditLogPage'
+import AuditLogPage from './pages/settings/AuditLogPage'
+
+// Enterprise Pages (Recently Implemented)
+import PipelineForecastPage from './pages/crm/PipelineForecastPage'
+import OkrsPage from './pages/hr/OkrsPage'
+import GpsTrackingPage from './pages/fieldwork/GpsTrackingPage'
+import ArAgingReportPage from './pages/finance/ArAgingReportPage'
+import WarrantyManagementPage from './pages/erp/WarrantyManagementPage'
+import MfaSetupPage from './pages/settings/MfaSetupPage'
+import QueryBuilderPage from './pages/admin/QueryBuilderPage'
+import DashboardWidgetsPage from './pages/admin/DashboardWidgetsPage'
+
+// Role Management Pages
+import EnhancedUserManagementPage from './pages/admin/EnhancedUserManagementPage'
+import RoleManagementDemoPage from './pages/admin/RoleManagementDemoPage'
+
+// Security Pages
+import TwoFactorAuthPage from './pages/security/TwoFactorAuthPage'
+import SSOConfigPage from './pages/security/SSOConfigPage'
+import SecuritySessionsPage from './pages/security/SecuritySessionsPage'
+import SecurityEventsPage from './pages/security/SecurityEventsPage'
+import SecurityPoliciesPage from './pages/security/SecurityPoliciesPage'
+import SecurityAnalyticsPage from './pages/security/SecurityAnalyticsPage'
+import SecuritySettingsPage from './pages/security/SecuritySettingsPage'
+import SecurityAuditPage from './pages/security/SecurityAuditPage'
+import SecurityAlertsPage from './pages/security/SecurityAlertsPage'
+import SecurityReportsPage from './pages/security/SecurityReportsPage'
+import SecurityCompliancePage from './pages/security/SecurityCompliancePage'
+import SecurityIncidentsPage from './pages/security/SecurityIncidentsPage'
+import SecurityRolesPage from './pages/security/SecurityRolesPage'
+import ThreatDetectionPage from './pages/security/ThreatDetectionPage'
+
+// Predictive Analytics Pages
+import ModelManagementPage from './pages/analytics/ModelManagementPage'
+import ForecastingPage from './pages/analytics/ForecastingPage'
+import AnomalyDetectionPage from './pages/analytics/AnomalyDetectionPage'
+import ModelExperimentsPage from './pages/analytics/ModelExperimentsPage'
+import ModelMonitoringPage from './pages/analytics/ModelMonitoringPage'
+import PredictiveModelsPage from './pages/analytics/PredictiveModelsPage'
+import ModelTrainingPage from './pages/analytics/ModelTrainingPage'
+import ForecastGenerationPage from './pages/analytics/ForecastGenerationPage'
+import PredictionsPage from './pages/analytics/PredictionsPage'
+import PredictiveAnalyticsPage from './pages/analytics/PredictiveAnalyticsPage'
+import TrendAnalysisPage from './pages/analytics/TrendAnalysisPage'
+import MLInsightsPage from './pages/analytics/MLInsightsPage'
+
+// AI Pages
+import AIDashboardPage from './pages/ai/AIDashboardPage'
+import AIInsightsPage from './pages/ai/AIInsightsPage'
+import AIModelsPage from './pages/ai/AIModelsPage'
+import AIPredictionsPage from './pages/ai/AIPredictionsPage'
+import AIDataProcessingPage from './pages/ai/AIDataProcessingPage'
+
+// SaaS/Subscription Pages
+import SubscriptionPlansPage from './pages/saas/SubscriptionPlansPage'
+import SubscriptionManagementPage from './pages/saas/SubscriptionManagementPage'
+import BillingManagementPage from './pages/saas/BillingManagementPage'
+import UsageAnalyticsPage from './pages/saas/UsageAnalyticsPage'
+
+// Integration Pages
+import IntegrationDashboardPage from './pages/integrations/IntegrationDashboardPage'
+import IntegrationManagementPage from './pages/integrations/IntegrationManagementPage'
+import WebhookManagementPage from './pages/integrations/WebhookManagementPage'
+import APIIntegrationPage from './pages/integrations/APIIntegrationPage'
+import DataMappingPage from './pages/integrations/DataMappingPage'
+import IntegrationAnalyticsPage from './pages/integrations/IntegrationAnalyticsPage'
+import IntegrationAuditPage from './pages/integrations/IntegrationAuditPage'
+import IntegrationBackupPage from './pages/integrations/IntegrationBackupPage'
+import IntegrationConfigurationPage from './pages/integrations/IntegrationConfigurationPage'
+import IntegrationDocumentationPage from './pages/integrations/IntegrationDocumentationPage'
+import IntegrationLogsPage from './pages/integrations/IntegrationLogsPage'
+import IntegrationMonitoringPage from './pages/integrations/IntegrationMonitoringPage'
+import IntegrationSecurityPage from './pages/integrations/IntegrationSecurityPage'
+import IntegrationTestingPage from './pages/integrations/IntegrationTestingPage'
+import IntegrationTroubleshootingPage from './pages/integrations/IntegrationTroubleshootingPage'
+
+// Performance Pages
+import PerformanceDashboardPage from './pages/performance/PerformanceDashboardPage'
+import PerformanceAlertsPage from './pages/performance/PerformanceAlertsPage'
+import PerformanceAnalyticsPage from './pages/performance/PerformanceAnalyticsPage'
+import PerformanceBenchmarkingPage from './pages/performance/PerformanceBenchmarkingPage'
+import PerformanceComparisonPage from './pages/performance/PerformanceComparisonPage'
+import PerformanceMonitoringPage from './pages/performance/PerformanceMonitoringPage'
+import PerformanceOptimizationPage from './pages/performance/PerformanceOptimizationPage'
+import PerformanceProfilingPage from './pages/performance/PerformanceProfilingPage'
+import PerformanceReportingPage from './pages/performance/PerformanceReportingPage'
+import PerformanceSLAPage from './pages/performance/PerformanceSLAPage'
+import PerformanceThresholdsPage from './pages/performance/PerformanceThresholdsPage'
+import PerformanceTrendsPage from './pages/performance/PerformanceTrendsPage'
+
+// Customer Success Pages
+import CustomerDashboardPage from './pages/customer-success/CustomerDashboardPage'
+import CustomerHealthScorePage from './pages/customer-success/CustomerHealthScorePage'
+
+// Workflow & Automation Pages
+import WorkflowDashboardPage from './pages/workflow/WorkflowDashboardPage'
+import WorkflowDesignerPage from './pages/workflow/WorkflowDesignerPage'
+
+// Advanced Features Pages
+import AdvancedFeaturesDashboardPage from './pages/advanced-features/AdvancedFeaturesDashboardPage'
+
+// UX Enhancement Pages
+import UXEnhancementSettingsPage from './pages/ux-enhancement/UXEnhancementSettingsPage'
+import UXEnhancementAnalyticsPage from './pages/ux-enhancement/UXEnhancementAnalyticsPage'
+import UXEnhancementFeedbackPage from './pages/ux-enhancement/UXEnhancementFeedbackPage'
+import UXEnhancementHelpPage from './pages/ux-enhancement/UXEnhancementHelpPage'
+import UXEnhancementInternationalizationPage from './pages/ux-enhancement/UXEnhancementInternationalizationPage'
+import UXEnhancementMobilePage from './pages/ux-enhancement/UXEnhancementMobilePage'
+import UXEnhancementNotificationsPage from './pages/ux-enhancement/UXEnhancementNotificationsPage'
+import UXEnhancementOnboardingPage from './pages/ux-enhancement/UXEnhancementOnboardingPage'
+import UXEnhancementPerformancePage from './pages/ux-enhancement/UXEnhancementPerformancePage'
+import UXEnhancementPersonalizationPage from './pages/ux-enhancement/UXEnhancementPersonalizationPage'
+import UXEnhancementReportsPage from './pages/ux-enhancement/UXEnhancementReportsPage'
+import UXEnhancementShortcutsPage from './pages/ux-enhancement/UXEnhancementShortcutsPage'
+import UXEnhancementTestingPage from './pages/ux-enhancement/UXEnhancementTestingPage'
+import UXEnhancementThemesPage from './pages/ux-enhancement/UXEnhancementThemesPage'
+import UXEnhancementWidgetsPage from './pages/ux-enhancement/UXEnhancementWidgetsPage'
+import UXEnhancementA11yPage from './pages/ux-enhancement/UXEnhancementA11yPage'
 
 // Components
 import Layout from './components/layout/Layout'
 
-const EmployeeWorkspaceDashboardPage = lazy(() => import('./pages/employee/EmployeeWorkspaceDashboardPage'))
-const ProjectsPage = lazy(() => import('./pages/employee/ProjectsPage'))
-const ProjectDetailPage = lazy(() => import('./pages/employee/ProjectDetailPage'))
-const MyTasksPage = lazy(() => import('./pages/employee/MyTasksPage'))
-const EmployeeTimesheetsPage = lazy(() => import('./pages/employee/EmployeeTimesheetsPage'))
-const EmployeeAttendancePage = lazy(() => import('./pages/employee/EmployeeAttendancePage'))
+const EmployeeWorkspaceDashboardPage = lazy(() => import('./pages/dashboard/EmployeeWorkspaceDashboardPage'))
+const EmployeeTimesheetsPage = lazy(() => import('./pages/hr/EmployeeTimesheetsPage'))
+const EmployeeAttendancePage = lazy(() => import('./pages/hr/EmployeeAttendancePage'))
 
 const queryClient = new QueryClient()
 
@@ -179,20 +297,8 @@ interface ProtectedRouteProps {
   children: React.ReactNode
   requiredPermissions?: string[]
   requiredRoles?: string[]
-}
-
-const HR_ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'HR']
-const HR_MANAGER_ROLES = ['MANAGER', ...HR_ADMIN_ROLES]
-const HR_RECRUITER_ROLES = ['RECRUITER', ...HR_ADMIN_ROLES]
-const HR_PAYROLL_ROLES = ['PAYROLL', ...HR_ADMIN_ROLES]
-const HR_EXECUTIVE_ROLES = ['EXECUTIVE', ...HR_ADMIN_ROLES]
-const HR_SELF_SERVICE_ROLES = ['EMPLOYEE', ...HR_MANAGER_ROLES]
-
-const resolveUserRoles = (user?: { roles?: string[]; role?: string } | null) => {
-  if (!user) return []
-  if (user.roles && user.roles.length > 0) return user.roles
-  if (user.role) return [user.role]
-  return []
+  requireAll?: boolean
+  fallbackPath?: string
 }
 
 const inferRoutePermissions = (pathname: string): string[] => {
@@ -231,6 +337,20 @@ const inferRoutePermissions = (pathname: string): string[] => {
   if (pathname.startsWith('/finance/')) return ['FINANCE_VIEW']
   if (pathname.startsWith('/fieldwork')) return ['FIELDWORK_VIEW']
   if (pathname.startsWith('/reports')) return ['REPORT_VIEW']
+  if (pathname.startsWith('/analytics')) return ['ANALYTICS_VIEW']
+  if (pathname.startsWith('/ai')) {
+    if (pathname.includes('/models') || pathname.includes('/data-processing')) return ['AI_ADMIN']
+    return ['AI_VIEW']
+  }
+  if (pathname.startsWith('/saas')) {
+    if (pathname.includes('/billing')) return ['SAAS_ADMIN']
+    return ['SAAS_VIEW']
+  }
+  if (pathname.startsWith('/ux-enhancement')) {
+    if (pathname.includes('/analytics')) return ['UX_ANALYTICS_VIEW']
+    if (pathname.includes('/feedback')) return ['UX_FEEDBACK_VIEW']
+    return ['UX_SETTINGS_VIEW']
+  }
   return []
 }
 
@@ -273,6 +393,12 @@ const getFirstAuthorizedPath = (permissions: string[], roles: string[] = []): st
   if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
   if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
   if (permissions.includes('REPORT_VIEW')) return '/reports'
+  if (permissions.includes('ANALYTICS_VIEW')) return '/analytics'
+  if (permissions.includes('AI_VIEW')) return '/ai'
+  if (permissions.includes('SAAS_VIEW')) return '/saas'
+  if (permissions.includes('UX_SETTINGS_VIEW')) return '/ux-enhancement'
+  if (permissions.includes('UX_ANALYTICS_VIEW')) return '/ux-enhancement/analytics'
+  if (permissions.includes('UX_FEEDBACK_VIEW')) return '/ux-enhancement/feedback'
   return '/profile'
 }
 
@@ -416,47 +542,56 @@ const AuthSessionSync: React.FC = () => {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
-  requiredPermissions,
-  requiredRoles,
+  requiredPermissions = [],
+  requiredRoles = [],
+  requireAll = false,
+  fallbackPath = '/unauthorized'
 }) => {
+  const { isAuthenticated, isLoading } = useAuthStore()
   const location = useLocation()
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  const user = useAuthStore((state) => state.user)
-  
+
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  const userPermissions = user?.permissions || []
-  const userRoles = resolveUserRoles(user)
+  // Get user permissions and roles from auth store
+  const user = useAuthStore(state => state.user)
+  const userPermissions = new Set(user?.permissions || [])
+  const userRoles = new Set(user?.roles || [])
 
-  const inferredPermissions = inferRoutePermissions(location.pathname)
-  const effectiveRequiredPermissions =
-    requiredPermissions && requiredPermissions.length > 0 ? requiredPermissions : inferredPermissions
-
-  if (effectiveRequiredPermissions.length > 0) {
-    const hasPermissionAccess =
-      effectiveRequiredPermissions.length > 0
-        ? userPermissions.some((permission) => effectiveRequiredPermissions.includes(permission))
-        : false
-
-    if (!hasPermissionAccess) {
-      return <Navigate to={getFirstAuthorizedPath(userPermissions, userRoles)} replace />
+  // Check role-based permissions
+  if (requiredRoles.length > 0) {
+    const hasRequiredRoles = requireAll 
+      ? requiredRoles.every(role => userRoles.has(role))
+      : requiredRoles.some(role => userRoles.has(role))
+    
+    if (!hasRequiredRoles) {
+      return <Navigate to={fallbackPath} replace />
     }
   }
 
-  if (requiredRoles && requiredRoles.length > 0) {
-    const hasRoleAccess = requiredRoles.some((role) => userRoles.includes(role))
-    if (!hasRoleAccess) {
-      return <Navigate to={getFirstAuthorizedPath(userPermissions, userRoles)} replace />
+  // Check permission-based access
+  if (requiredPermissions.length > 0) {
+    const hasRequiredPermissions = requireAll 
+      ? requiredPermissions.every(permission => userPermissions.has(permission))
+      : requiredPermissions.some(permission => userPermissions.has(permission))
+    
+    if (!hasRequiredPermissions) {
+      return <Navigate to={fallbackPath} replace />
     }
   }
 
-  return (
-    <Layout>
-      {children}
-    </Layout>
-  )
+  return <>{children}</>
 }
 
 const NotFoundPage: React.FC = () => {
@@ -498,6 +633,7 @@ function App() {
         <Toaster richColors position="top-right" />
         <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         <Route
           path="/profile"
@@ -639,13 +775,7 @@ function App() {
         />
         <Route
           path="/employee"
-          element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
-              <EmployeeModuleBoundary>
-                <EmployeeWorkspaceDashboardPage />
-              </EmployeeModuleBoundary>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/dashboard/employee" replace />}
         />
         <Route
           path="/employee/projects"
@@ -685,23 +815,11 @@ function App() {
         />
         <Route
           path="/employee/timesheets"
-          element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
-              <EmployeeModuleBoundary>
-                <EmployeeTimesheetsPage />
-              </EmployeeModuleBoundary>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/hr/timesheets" replace />}
         />
         <Route
           path="/employee/attendance"
-          element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
-              <EmployeeModuleBoundary>
-                <EmployeeAttendancePage />
-              </EmployeeModuleBoundary>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/hr/attendance" replace />}
         />
         <Route
           path="/crm/dashboard"
@@ -2051,10 +2169,26 @@ function App() {
           }
         />
         <Route
+          path="/admin/users/enhanced"
+          element={
+            <ProtectedRoute requiredPermissions={['USER_VIEW']}>
+              <EnhancedUserManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/roles"
           element={
             <ProtectedRoute requiredPermissions={['ROLE_VIEW']}>
               <RoleManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles/demo"
+          element={
+            <ProtectedRoute requiredPermissions={['ROLE_VIEW']}>
+              <RoleManagementDemoPage />
             </ProtectedRoute>
           }
         />
@@ -2095,6 +2229,626 @@ function App() {
           element={
             <ProtectedRoute>
               <ModuleLicensingPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Security Routes */}
+        <Route
+          path="/security/2fa"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <TwoFactorAuthPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/sso"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_ADMIN']}>
+              <SSOConfigPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/sessions"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <SecuritySessionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/events"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <SecurityEventsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/policies"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_ADMIN']}>
+              <SecurityPoliciesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/analytics"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <SecurityAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/settings"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_ADMIN']}>
+              <SecuritySettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/audit"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_AUDIT']}>
+              <SecurityAuditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/alerts"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <SecurityAlertsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/reports"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <SecurityReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/compliance"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <SecurityCompliancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/incidents"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_ADMIN']}>
+              <SecurityIncidentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/roles"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_ADMIN']}>
+              <SecurityRolesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security/threat-detection"
+          element={
+            <ProtectedRoute requiredPermissions={['SECURITY_VIEW']}>
+              <ThreatDetectionPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Predictive Analytics Routes */}
+        <Route
+          path="/analytics/models"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <ModelManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/forecasting"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <ForecastingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/anomaly-detection"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <AnomalyDetectionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/experiments"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_ADMIN']}>
+              <ModelExperimentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/monitoring"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <ModelMonitoringPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/predictive-models"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <PredictiveModelsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/model-training"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_ADMIN']}>
+              <ModelTrainingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/forecast-generation"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <ForecastGenerationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/predictions"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <PredictionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/predictive-analytics"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <PredictiveAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/trend-analysis"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <TrendAnalysisPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics/ml-insights"
+          element={
+            <ProtectedRoute requiredPermissions={['ANALYTICS_VIEW']}>
+              <MLInsightsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* AI Routes */}
+        <Route
+          path="/ai"
+          element={
+            <ProtectedRoute requiredPermissions={['AI_VIEW']}>
+              <AIDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai/insights"
+          element={
+            <ProtectedRoute requiredPermissions={['AI_VIEW']}>
+              <AIInsightsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai/models"
+          element={
+            <ProtectedRoute requiredPermissions={['AI_ADMIN']}>
+              <AIModelsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai/predictions"
+          element={
+            <ProtectedRoute requiredPermissions={['AI_VIEW']}>
+              <AIPredictionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai/data-processing"
+          element={
+            <ProtectedRoute requiredPermissions={['AI_ADMIN']}>
+              <AIDataProcessingPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* SaaS/Subscription Routes */}
+        <Route
+          path="/saas/plans"
+          element={
+            <ProtectedRoute requiredPermissions={['SAAS_VIEW']}>
+              <SubscriptionPlansPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/saas/subscription"
+          element={
+            <ProtectedRoute requiredPermissions={['SAAS_VIEW']}>
+              <SubscriptionManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/saas/billing"
+          element={
+            <ProtectedRoute requiredPermissions={['SAAS_ADMIN']}>
+              <BillingManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/saas/usage"
+          element={
+            <ProtectedRoute requiredPermissions={['SAAS_VIEW']}>
+              <UsageAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Integration Routes */}
+        <Route
+          path="/integrations/dashboard"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/management"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <IntegrationManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/webhooks"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <WebhookManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/api-integration"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <APIIntegrationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/data-mapping"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <DataMappingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/analytics"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/audit"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationAuditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/backup"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <IntegrationBackupPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/configuration"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <IntegrationConfigurationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/documentation"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationDocumentationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/logs"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationLogsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/monitoring"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationMonitoringPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/security"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <IntegrationSecurityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/testing"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_ADMIN']}>
+              <IntegrationTestingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/troubleshooting"
+          element={
+            <ProtectedRoute requiredPermissions={['INTEGRATION_VIEW']}>
+              <IntegrationTroubleshootingPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Performance Routes */}
+        <Route
+          path="/performance/dashboard"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/alerts"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_ADMIN']}>
+              <PerformanceAlertsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/analytics"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/benchmarking"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceBenchmarkingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/comparison"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceComparisonPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/monitoring"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceMonitoringPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/optimization"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_ADMIN']}>
+              <PerformanceOptimizationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/profiling"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_ADMIN']}>
+              <PerformanceProfilingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/reporting"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceReportingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/sla"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceSLAPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/thresholds"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_ADMIN']}>
+              <PerformanceThresholdsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/trends"
+          element={
+            <ProtectedRoute requiredPermissions={['PERFORMANCE_VIEW']}>
+              <PerformanceTrendsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Customer Success Routes */}
+        <Route
+          path="/customer-success/dashboard"
+          element={
+            <ProtectedRoute requiredPermissions={['CUSTOMER_SUCCESS_VIEW']}>
+              <CustomerDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customer-success/health-scores"
+          element={
+            <ProtectedRoute requiredPermissions={['CUSTOMER_SUCCESS_ADMIN']}>
+              <CustomerHealthScorePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Workflow & Automation Routes */}
+        <Route
+          path="/workflow/dashboard"
+          element={
+            <ProtectedRoute requiredPermissions={['WORKFLOW_VIEW']}>
+              <WorkflowDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workflow/designer"
+          element={
+            <ProtectedRoute requiredPermissions={['WORKFLOW_ADMIN']}>
+              <WorkflowDesignerPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Advanced Features Routes */}
+        <Route
+          path="/advanced-features/dashboard"
+          element={
+            <ProtectedRoute requiredPermissions={['ADVANCED_FEATURES_VIEW']}>
+              <AdvancedFeaturesDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Enterprise Feature Routes */}
+        <Route
+          path="/crm/forecast"
+          element={
+            <ProtectedRoute requiredPermissions={['CRM_VIEW']}>
+              <PipelineForecastPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/okrs"
+          element={
+            <ProtectedRoute requiredPermissions={['HR_VIEW']}>
+              <OkrsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fieldwork/gps"
+          element={
+            <ProtectedRoute requiredPermissions={['FIELDWORK_VIEW']}>
+              <GpsTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/finance/ar-aging"
+          element={
+            <ProtectedRoute requiredPermissions={['FINANCE_VIEW']}>
+              <ArAgingReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/warranty"
+          element={
+            <ProtectedRoute requiredPermissions={['ERP_VIEW']}>
+              <WarrantyManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/security"
+          element={
+            <ProtectedRoute>
+              <MfaSetupPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/query"
+          element={
+            <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+              <QueryBuilderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard-widgets"
+          element={
+            <ProtectedRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+              <DashboardWidgetsPage />
             </ProtectedRoute>
           }
         />
@@ -2153,6 +2907,144 @@ function App() {
           element={
             <ProtectedRoute>
               <Navigate to="/reports" replace />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* UX Enhancement Routes */}
+        <Route
+          path="/ux-enhancement"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/settings"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/analytics"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_ANALYTICS_VIEW']}>
+              <UXEnhancementAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/feedback"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_FEEDBACK_VIEW']}>
+              <UXEnhancementFeedbackPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/help"
+          element={
+            <ProtectedRoute>
+              <UXEnhancementHelpPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/internationalization"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementInternationalizationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/mobile"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementMobilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/notifications"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementNotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/onboarding"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementOnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/performance"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_ANALYTICS_VIEW']}>
+              <UXEnhancementPerformancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/personalization"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementPersonalizationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/reports"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_ANALYTICS_VIEW']}>
+              <UXEnhancementReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/shortcuts"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementShortcutsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/testing"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_ANALYTICS_VIEW']}>
+              <UXEnhancementTestingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/themes"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementThemesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/widgets"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementWidgetsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ux-enhancement/accessibility"
+          element={
+            <ProtectedRoute requiredPermissions={['UX_SETTINGS_VIEW']}>
+              <UXEnhancementA11yPage />
             </ProtectedRoute>
           }
         />

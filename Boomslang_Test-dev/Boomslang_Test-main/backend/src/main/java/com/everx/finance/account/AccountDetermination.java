@@ -6,10 +6,6 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import java.time.LocalDate;
 
-/**
- * Maps transaction types to GL accounts based on company, transaction key, and valuation class.
- * Enables config-driven GL account determination without hardcoding.
- */
 @Entity
 @Table(name = "account_determination", schema = "everx_erp", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"company_code", "transaction_key", "valuation_class"})

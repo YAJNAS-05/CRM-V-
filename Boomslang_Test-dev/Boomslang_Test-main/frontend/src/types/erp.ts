@@ -104,6 +104,10 @@ export interface PurchaseOrder {
   paymentTerms?: string
   shippingDocs?: string[]
   notes?: string
+  receiptId?: string | null
+  receiptDate?: string | null
+  glPosted?: boolean | null
+  glJournalId?: string | null
   items?: PurchaseOrderItem[]
   createdAt: string
   updatedAt: string

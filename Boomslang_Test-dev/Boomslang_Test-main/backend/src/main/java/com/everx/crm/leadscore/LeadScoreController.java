@@ -1,5 +1,6 @@
 package com.everx.crm.leadscore;
 
+import com.everx.crm.leadscore.dto.LeadScoreCalculationDto;
 import com.everx.crm.leadscore.dto.LeadScoreDto;
 import com.everx.crm.leadscore.dto.RecordLeadScoreRequest;
 import com.everx.shared.dto.ApiResponse;
@@ -25,5 +26,12 @@ public class LeadScoreController {
         LeadScoreDto score = leadScoringService.recordActivity(leadId, request.getActivityType());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(score, "Lead score recorded"));
+    }
+
+    @GetMapping("/{leadId}/score-calculation")
+    public ResponseEntity<ApiResponse<LeadScoreCalculationDto>> getScoreCalculation(
+            @PathVariable UUID leadId) {
+        LeadScoreCalculationDto calculation = leadScoringService.getLeadScoreCalculation(leadId);
+        return ResponseEntity.ok(ApiResponse.ok(calculation));
     }
 }

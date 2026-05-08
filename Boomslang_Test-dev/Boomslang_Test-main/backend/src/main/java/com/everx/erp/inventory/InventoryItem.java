@@ -2,71 +2,31 @@ package com.everx.erp.inventory;
 
 import com.everx.shared.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Entity
-@Table(name = "inventory_items", schema = "everx_erp")
-@Data
-@EqualsAndHashCode(callSuper = false)
+@Table(name = "inventory_item", schema = "everx_erp")
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@SuperBuilder
 public class InventoryItem extends BaseEntity {
-
-    @Column(name = "item_code", nullable = false, unique = true)
-    private String itemCode;
-
-    @Column(name = "name", nullable = false)
-    private String name;
-
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "item_number", nullable = false, unique = true)
+    private String itemNumber;
+    @Column(name = "description", length = 200)
     private String description;
-
-    @Column(name = "category")
-    private String category;
-
-    @Column(name = "unit_of_measure")
+    @Column(name = "item_group", length = 50)
+    private String itemGroup;
+    @Column(name = "unit_of_measure", length = 10)
     private String unitOfMeasure;
-
-    @Column(name = "current_stock", nullable = false)
-    private Integer currentStock;
-
-    @Column(name = "minimum_stock")
-    private Integer minimumStock;
-
-    @Column(name = "maximum_stock")
-    private Integer maximumStock;
-
-    @Column(name = "reorder_point")
-    private Integer reorderPoint;
-
-    @Column(name = "unit_cost")
-    private BigDecimal unitCost;
-
-    @Column(name = "selling_price")
-    private BigDecimal sellingPrice;
-
-    @Column(name = "supplier_id")
-    private java.util.UUID supplierId;
-
-    @Column(name = "supplier_name")
-    private String supplierName;
-
-    @Column(name = "location")
-    private String location;
-
-    @Column(name = "barcode")
-    private String barcode;
-
-    @Column(name = "sku")
-    private String sku;
-
-    @Column(name = "status", nullable = false)
+    @Column(name = "quantity_on_hand")
+    private BigDecimal quantityOnHand;
+    @Column(name = "standard_cost")
+    private BigDecimal standardCost;
+    @Column(name = "status", length = 20)
     private String status;
 }

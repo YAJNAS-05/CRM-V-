@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -57,10 +58,21 @@ public class ReimbursementController {
     }
 
     @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_APPROVE')")
     public ResponseEntity<ApiResponse<ReimbursementRequestDto>> approveReimbursement(
             @PathVariable UUID id,
             @RequestParam UUID approvedBy) {
         return ResponseEntity.ok(ApiResponse.ok(
                 reimbursementService.approveReimbursement(id, approvedBy), "Reimbursement approved"));
+    }
+
+    @PatchMapping("/{id}/pay")
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_APPROVE')")
+    public ResponseEntity<ApiResponse<ReimbursementRequestDto>> payReimbursement(
+            @PathVariable UUID id,
+            @RequestParam UUID paidBy,
+            @RequestParam(required = false) String reference) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                reimbursementService.payReimbursement(id, paidBy, reference), "Reimbursement paid"));
     }
 }

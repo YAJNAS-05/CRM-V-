@@ -1,12 +1,11 @@
 package com.everx.finance.payment.dto;
 
-import com.everx.finance.payment.Payment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -14,13 +13,11 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreatePaymentRequest {
-    private UUID invoiceId;
+    private UUID customerId;
+    private String companyCode;
+    private LocalDateTime paymentDate;
     private BigDecimal amount;
     private String currency;
-    private LocalDate paymentDate;
-    private Payment.PaymentMethod method;
-    private String reference;
-    private BigDecimal exchangeRate;
-    private BigDecimal audEquivalent;
-    private String notes;
+    private String paymentMethod;
+    private UUID invoiceId;
 }

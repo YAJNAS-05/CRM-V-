@@ -1,183 +1,72 @@
 package com.everx.finance.payment;
 
-import com.everx.finance.fx.FxRateLock;
-import com.everx.finance.fx.FxRateLockingService;
-import com.everx.finance.invoice.Invoice;
-import com.everx.finance.invoice.InvoiceRepository;
-import com.everx.finance.journal.GlPostingService;
-import com.everx.finance.period.PostingPeriodEnforcer;
 import com.everx.finance.payment.dto.CreatePaymentRequest;
 import com.everx.finance.payment.dto.PaymentResponse;
-import com.everx.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
-    private final InvoiceRepository invoiceRepository;
-    private final PostingPeriodEnforcer postingPeriodEnforcer;
-    private final FxRateLockingService fxRateLockingService;
-    private final GlPostingService glPostingService;
 
-    @Transactional(readOnly = true)
-    public Page<PaymentResponse> getAllPayments(Pageable pageable) {
-        return paymentRepository.findByIsDeletedFalse(pageable)
-                .map(this::toResponse);
+    public Page<PaymentResponse> findAll(Pageable pageable) {
+        return paymentRepository.findAll(pageable).map(this::toResponse);
     }
 
-    @Transactional(readOnly = true)
-    public PaymentResponse getPaymentById(UUID id) {
-        Payment payment = paymentRepository.findByIdAndIsDeletedFalse(id)
-                .orElseThrow(() -> new EntityNotFoundException("Payment not found with id: " + id));
+    public PaymentResponse findById(UUID id) {
+        Payment payment = paymentRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Payment not found"));
         return toResponse(payment);
     }
 
-    @Transactional(readOnly = true)
-    public List<PaymentResponse> getPaymentsByInvoice(UUID invoiceId) {
+    public List<PaymentResponse> findByInvoice(UUID invoiceId) {
         return paymentRepository.findByInvoiceId(invoiceId)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+            .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional
-    public PaymentResponse createPayment(CreatePaymentRequest request) {
-        Invoice invoice = invoiceRepository.findByIdAndIsDeletedFalse(request.getInvoiceId())
-                .orElseThrow(() -> new EntityNotFoundException("Invoice not found with id: " + request.getInvoiceId()));
-
-        postingPeriodEnforcer.enforcePostingAllowed(invoice.getEntity().name(), request.getPaymentDate());
-        postingPeriodEnforcer.enforceNoBackdating(request.getPaymentDate());
-
+    public PaymentResponse create(CreatePaymentRequest request) {
         Payment payment = Payment.builder()
-                .invoiceId(request.getInvoiceId())
-                .amount(request.getAmount())
-                .currency(request.getCurrency())
-                .paymentDate(request.getPaymentDate())
-                .method(request.getMethod())
-                .reference(request.getReference())
-                .exchangeRate(request.getExchangeRate())
-                .audEquivalent(request.getAudEquivalent())
-                .notes(request.getNotes())
-                .build();
-
-        payment.setCreatedAt(OffsetDateTime.now());
-        payment.setUpdatedAt(OffsetDateTime.now());
-
-        Payment saved = paymentRepository.save(payment);
-
-        fxRateLockingService.getLockForInvoice(invoice.getId()).ifPresent(lock -> {
-            BigDecimal actualBaseAmount = resolveActualBaseAmount(request, lock);
-            if (actualBaseAmount != null) {
-                BigDecimal fxGainLoss = fxRateLockingService.calculateFxGainLoss(
-                    invoice.getId(),
-                    request.getAmount(),
-                    lock,
-                    actualBaseAmount
-                );
-                fxRateLockingService.postFxGainLossToGL(
-                    invoice.getId(),
-                    fxGainLoss,
-                    lock.getBaseCurrency(),
-                    request.getPaymentDate()
-                );
-            } else {
-                log.warn("FX lock found for invoice {} but no base amount provided", invoice.getId());
-            }
-        });
-
-        // Update invoice paid amount
-        BigDecimal currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : BigDecimal.ZERO;
-        BigDecimal newPaid = currentPaid.add(request.getAmount());
-        invoice.setPaidAmount(newPaid);
-
-        // Update invoice status based on payment
-        if (newPaid.compareTo(invoice.getTotalAmount()) >= 0) {
-            invoice.setStatus(Invoice.InvoiceStatus.PAID);
-        } else if (newPaid.compareTo(BigDecimal.ZERO) > 0) {
-            invoice.setStatus(Invoice.InvoiceStatus.PARTIALLY_PAID);
-        }
-
-        invoice.setUpdatedAt(OffsetDateTime.now());
-        invoiceRepository.save(invoice);
-
-        // Post payment to GL: Debit Accounts Payable, Credit Cash/Bank
-        glPostingService.postInvoicePayment(
-            saved.getId(),
-            "PAY-" + saved.getId().toString().substring(0, 8).toUpperCase(),
-            request.getAmount(),
-            request.getCurrency(),
-            "Payment for invoice " + invoice.getInvoiceNumber()
-        );
-
-        return toResponse(saved);
-    }
-
-    private BigDecimal resolveActualBaseAmount(CreatePaymentRequest request, FxRateLock lock) {
-        if (request.getExchangeRate() != null) {
-            return request.getAmount().multiply(request.getExchangeRate());
-        }
-        if (request.getAudEquivalent() != null && "AUD".equalsIgnoreCase(lock.getBaseCurrency())) {
-            return request.getAudEquivalent();
-        }
-        return null;
+            .paymentNumber(generatePaymentNumber())
+            .customerId(request.getCustomerId())
+            .companyCode(request.getCompanyCode())
+            .paymentDate(request.getPaymentDate())
+            .amount(request.getAmount())
+            .currency(request.getCurrency())
+            .paymentMethod(request.getPaymentMethod())
+            .status("COMPLETED")
+            .build();
+        return toResponse(paymentRepository.save(payment));
     }
 
     @Transactional
-    public void deletePayment(UUID id) {
-        Payment payment = paymentRepository.findByIdAndIsDeletedFalse(id)
-                .orElseThrow(() -> new EntityNotFoundException("Payment not found with id: " + id));
+    public void delete(UUID id) {
+        paymentRepository.deleteById(id);
+    }
 
-        // Update invoice paid amount
-        Invoice invoice = invoiceRepository.findByIdAndIsDeletedFalse(payment.getInvoiceId())
-                .orElseThrow(() -> new EntityNotFoundException("Invoice not found"));
-
-        BigDecimal currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : BigDecimal.ZERO;
-        BigDecimal newPaid = currentPaid.subtract(payment.getAmount());
-        invoice.setPaidAmount(newPaid.max(BigDecimal.ZERO));
-
-        // Update invoice status
-        if (newPaid.compareTo(BigDecimal.ZERO) == 0) {
-            invoice.setStatus(Invoice.InvoiceStatus.SENT);
-        } else if (newPaid.compareTo(invoice.getTotalAmount()) < 0) {
-            invoice.setStatus(Invoice.InvoiceStatus.PARTIALLY_PAID);
-        }
-
-        invoice.setUpdatedAt(OffsetDateTime.now());
-        invoiceRepository.save(invoice);
-
-        payment.setIsDeleted(true);
-        payment.setUpdatedAt(OffsetDateTime.now());
-        paymentRepository.save(payment);
+    private String generatePaymentNumber() {
+        return "PAY-" + System.currentTimeMillis();
     }
 
     private PaymentResponse toResponse(Payment payment) {
         return PaymentResponse.builder()
-                .id(payment.getId())
-                .invoiceId(payment.getInvoiceId())
-                .amount(payment.getAmount())
-                .currency(payment.getCurrency())
-                .paymentDate(payment.getPaymentDate())
-                .method(payment.getMethod())
-                .reference(payment.getReference())
-                .exchangeRate(payment.getExchangeRate())
-                .audEquivalent(payment.getAudEquivalent())
-                .notes(payment.getNotes())
-                .createdAt(payment.getCreatedAt().toLocalDateTime())
-                .updatedAt(payment.getUpdatedAt().toLocalDateTime())
-                .build();
+            .id(payment.getId())
+            .paymentNumber(payment.getPaymentNumber())
+            .customerId(payment.getCustomerId())
+            .companyCode(payment.getCompanyCode())
+            .paymentDate(payment.getPaymentDate())
+            .amount(payment.getAmount())
+            .currency(payment.getCurrency())
+            .paymentMethod(payment.getPaymentMethod())
+            .status(payment.getStatus())
+            .build();
     }
 }

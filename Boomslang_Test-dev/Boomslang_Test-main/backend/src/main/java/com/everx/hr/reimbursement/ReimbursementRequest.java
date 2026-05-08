@@ -56,6 +56,15 @@ public class ReimbursementRequest extends BaseEntity {
     @Column(name = "approved_at")
     private OffsetDateTime approvedAt;
 
+    @Column(name = "paid_by")
+    private UUID paidBy;
+
+    @Column(name = "paid_at")
+    private OffsetDateTime paidAt;
+
+    @Column(name = "payment_reference", length = 120)
+    private String paymentReference;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 }

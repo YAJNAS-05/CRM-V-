@@ -13,12 +13,14 @@ export enum FieldJobType {
 export enum FieldJobStatus {
   DRAFT = 'DRAFT',
   SCHEDULED = 'SCHEDULED',
-  ENGINEER_ASSIGNED = 'ENGINEER_ASSIGNED',
+  ASSIGNED = 'ASSIGNED',
   IN_PROGRESS = 'IN_PROGRESS',
-  PENDING_SIGN_OFF = 'PENDING_SIGN_OFF',
+  PENDING_PARTS = 'PENDING_PARTS',
+  PENDING_CUSTOMER_APPROVAL = 'PENDING_CUSTOMER_APPROVAL',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
-  REVERSED = 'REVERSED'
+  REVERTED = 'REVERTED',
+  PENDING_SIGN_OFF = 'PENDING_SIGN_OFF'
 }
 
 export enum EngineerType {
@@ -78,74 +80,69 @@ export enum SiteReadiness {
 // ============================================================================
 
 export interface FieldJobDto {
-  fieldJobId?: FieldJobId;
-  version?: number;
+  id?: string;
   jobNumber: string;
-  jobType: FieldJobType;
-  jobStatus: FieldJobStatus;
+  title: string;
+  description?: string;
+  status: FieldJobStatus;
   priority: JobPriority;
-
-  // Linked entities
-  linkedEntity?: string;
-  linkedEquipmentSku?: string;
-  linkedLeadId?: string;
-  linkedPoId?: string;
-  linkedSalesOrderId?: string;
-  linkedShipmentId?: string;
-  linkedWarrantyId?: string;
-
-  // Site & Client Info
-  clientOrSellerName: string;
-  siteContactName: string;
-  siteContactPhone?: string;
-  siteContactEmail: string;
-  siteAddressLine1: string;
-  siteAddressLine2?: string;
-  siteCity: string;
-  siteCountry?: string;
-  siteTimezone?: string;
-
+  category?: string;
+  
+  // Customer Information
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  
+  // Location Information
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  
   // Scheduling
-  scheduledStartDate: string; // ISO date
-  scheduledEndDate: string; // ISO date
-  estimatedDurationDays?: number;
-  actualStartDate?: string;
-  actualEndDate?: string;
-  actualDurationDays?: number;
-
-  // Engineer Assignment
-  primaryEngineerType?: EngineerType;
-  primaryEngineerId?: string;
-  primaryEngineerName?: string;
-  secondaryEngineerId?: string;
-  secondaryEngineerName?: string;
-  engineerAssignedDate?: string;
-  engineerAccepted?: boolean;
-  engineerAcceptedDate?: string;
-
-  // Notes
-  internalNotes?: string;
-  clientBriefNotes?: string;
-
-  // Nested details (populated based on jobType)
-  siteAssessmentDetail?: SiteAssessmentDetailDto;
-  deInstallDetail?: DeInstallDetailDto;
-  installationDetail?: InstallationDetailDto;
-  ppmDetail?: PpmDetailDto;
-  repairDetail?: RepairDetailDto;
-
-  // Nested collections
-  costs?: FieldJobCostDto[];
-  checklist?: FieldJobChecklistDto;
-  travelLegs?: FieldJobTravelDto[];
-  report?: FieldJobReportDto;
-  signOff?: FieldJobSignOffDto;
-
+  scheduledDate?: string;
+  estimatedDuration?: number;
+  actualDuration?: number;
+  completionDate?: string;
+  
+  // Assignment
+  assignedTechnician?: TechnicianDto;
+  assignedTechnicianId?: string;
+  
+  // Financial Information
+  estimatedCost?: number;
+  actualCost?: number;
+  paymentStatus?: string;
+  
+  // Job Requirements
+  requiresParts: boolean;
+  requiresSpecialEquipment: boolean;
+  weatherDependent: boolean;
+  
+  // ERP Integration
+  erpWorkOrderId?: string;
+  crmLeadId?: string;
+  crmAccountId?: string;
+  
   // Audit
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
   updatedBy?: string;
+  
+  // Legacy compatibility
+  fieldJobId?: FieldJobId;
+  jobType?: FieldJobType;
+  jobStatus?: FieldJobStatus;
+  scheduledStartDate?: string;
+  scheduledEndDate?: string;
+  estimatedDurationDays?: number;
+  primaryEngineerId?: string;
+  primaryEngineerName?: string;
+  internalNotes?: string;
+  clientBriefNotes?: string;
+  siteCity?: string;
+  siteCountry?: string;
+  clientOrSellerName?: string;
 }
 
 // ============================================================================
@@ -402,6 +399,325 @@ export interface FieldJobTravelDto {
   visaRequired?: boolean;
   visaStatus?: string;
   travelNotes?: string;
+}
+
+// ============================================================================
+// NEW FIELD WORK DTOs (matching backend implementation)
+// ============================================================================
+
+export interface TechnicianDto {
+  id?: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  mobilePhone?: string;
+  profileImageUrl?: string;
+  status: TechnicianStatus;
+  level: TechnicianLevel;
+  skills?: string;
+  certifications?: string;
+  specializations?: string;
+  availableForFieldWork: boolean;
+  hasValidDriversLicense: boolean;
+  hasVehicle: boolean;
+  vehicleInfo?: string;
+  licenseNumber?: string;
+  licenseExpiryDate?: string;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  currentAddress?: string;
+  lastLocationUpdate?: string;
+  homeAddress: string;
+  homeLatitude?: number;
+  homeLongitude?: number;
+  workingRegion?: string;
+  workingRadiusRadius?: number;
+  workStartTime?: string;
+  workEndTime?: string;
+  availableWeekends: boolean;
+  availableHolidays: boolean;
+  jobsCompleted: number;
+  jobsInProgress: number;
+  averageRating?: number;
+  totalRatings: number;
+  totalEarnings?: number;
+  averageJobDuration?: number;
+  onTimeCompletionRate?: number;
+  customerSatisfactionScore?: number;
+  technicalSkills?: string;
+  softSkills?: string;
+  safetyTraining?: string;
+  equipmentTraining?: string;
+  assignedEquipment?: string;
+  assignedTools?: string;
+  assignedVehicle?: string;
+  smsNotificationsEnabled: boolean;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  preferredLanguage: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  medicalClearanceValid: boolean;
+  medicalClearanceExpiry?: string;
+  medicalConditions?: string;
+  allergies?: string;
+  lastSafetyTraining?: string;
+  lastTechnicalTraining?: string;
+  trainingRecords?: string;
+  gpsTrackingEnabled: boolean;
+  locationSharingEnabled: boolean;
+  locationUpdateInterval: number;
+  hrEmployeeId?: string;
+  payrollId?: string;
+  badgeNumber?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  lastModifiedBy?: string;
+}
+
+export enum TechnicianStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  ON_LEAVE = 'ON_LEAVE',
+  SUSPENDED = 'SUSPENDED',
+  TERMINATED = 'TERMINATED'
+}
+
+export enum TechnicianLevel {
+  JUNIOR = 'JUNIOR',
+  INTERMEDIATE = 'INTERMEDIATE',
+  SENIOR = 'SENIOR',
+  LEAD = 'LEAD',
+  MASTER = 'MASTER'
+}
+
+export interface GpsLocationDto {
+  id?: string;
+  technicianId: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  altitude?: number;
+  altitudeAccuracy?: number;
+  heading?: number;
+  speed?: number;
+  timestamp: string;
+  address?: string;
+  locationSource: GpsLocationSource;
+  locationContext: GpsLocationContext;
+  networkType?: GpsNetworkType;
+  batteryLevel?: number;
+  isCharging?: boolean;
+  deviceId?: string;
+  appVersion?: string;
+  createdAt?: string;
+}
+
+export enum GpsLocationSource {
+  GPS = 'GPS',
+  NETWORK = 'NETWORK',
+  PASSIVE = 'PASSIVE',
+  MANUAL = 'MANUAL'
+}
+
+export enum GpsLocationContext {
+  JOB_START = 'JOB_START',
+  JOB_END = 'JOB_END',
+  TRAVEL = 'TRAVEL',
+  BREAK = 'BREAK',
+  EMERGENCY = 'EMERGENCY',
+  REGULAR = 'REGULAR'
+}
+
+export enum GpsNetworkType {
+  WIFI = 'WIFI',
+  MOBILE = 'MOBILE',
+  NONE = 'NONE'
+}
+
+export interface FieldWorkAssetDto {
+  id?: string;
+  assetNumber: string;
+  name: string;
+  description?: string;
+  category: string;
+  status: AssetStatus;
+  condition: AssetCondition;
+  classification: AssetClassification;
+  criticality: AssetCriticality;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  assignedTechnicianId?: string;
+  assignedTechnician?: TechnicianDto;
+  purchaseDate?: string;
+  purchaseCost?: number;
+  currentValue?: number;
+  warrantyExpiry?: string;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
+  maintenanceInterval?: number;
+  usageHours?: number;
+  usageCount?: number;
+  requiresCalibration: boolean;
+  lastCalibrationDate?: string;
+  nextCalibrationDate?: string;
+  calibrationInterval?: number;
+  serialNumber?: string;
+  manufacturer?: string;
+  model?: string;
+  year?: number;
+  specifications?: string;
+  safetyRequirements?: string;
+  operatingInstructions?: string;
+  erpAssetId?: string;
+  erpLocation?: string;
+  erpStatus?: string;
+  lastSyncDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  lastModifiedBy?: string;
+}
+
+export enum AssetStatus {
+  AVAILABLE = 'AVAILABLE',
+  IN_USE = 'IN_USE',
+  MAINTENANCE = 'MAINTENANCE',
+  OUT_OF_SERVICE = 'OUT_OF_SERVICE',
+  RETIRED = 'RETIRED',
+  LOST = 'LOST',
+  DAMAGED = 'DAMAGED'
+}
+
+export enum AssetCondition {
+  EXCELLENT = 'EXCELLENT',
+  GOOD = 'GOOD',
+  FAIR = 'FAIR',
+  POOR = 'POOR',
+  CRITICAL = 'CRITICAL'
+}
+
+export enum AssetClassification {
+  TOOLS = 'TOOL',
+  EQUIPMENT = 'EQUIPMENT',
+  VEHICLE = 'VEHICLE',
+  SAFETY = 'SAFETY',
+  TESTING = 'TESTING',
+  CALIBRATION = 'CALIBRATION'
+}
+
+export enum AssetCriticality {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL'
+}
+
+export interface FieldJobNoteDto {
+  id?: string;
+  jobId: string;
+  noteType: NoteType;
+  visibility: NoteVisibility;
+  priority: NotePriority;
+  title?: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorRole?: string;
+  timestamp: string;
+  lastModified?: string;
+  requiresFollowUp: boolean;
+  followUpDate?: string;
+  followUpAssignedTo?: string;
+  followUpCompleted: boolean;
+  followUpCompletedDate?: string;
+  attachments?: string[];
+  mentionedTechnicians?: string[];
+  mentionedCustomers?: string[];
+  isStatusChange: boolean;
+  previousStatus?: FieldJobStatus;
+  newStatus?: FieldJobStatus;
+  isCustomerCommunication: boolean;
+  communicationMethod?: CommunicationMethod;
+  customerResponse?: string;
+  isSafetyNote: boolean;
+  safetyLevel?: SafetyLevel;
+  requiresApproval: boolean;
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: string;
+  approvedDate?: string;
+  isEscalation: boolean;
+  escalatedTo?: string;
+  escalationReason?: string;
+  parentNoteId?: string;
+  responseToNoteId?: string;
+  searchTags?: string[];
+  integrationReferences?: IntegrationReference[];
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  lastModifiedBy?: string;
+}
+
+export enum NoteType {
+  GENERAL = 'GENERAL',
+  STATUS_UPDATE = 'STATUS_UPDATE',
+  CUSTOMER_COMMUNICATION = 'CUSTOMER_COMMUNICATION',
+  TECHNICAL_NOTE = 'TECHNICAL_NOTE',
+  SAFETY_NOTE = 'SAFETY_NOTE',
+  PARTS_NOTE = 'PARTS_NOTE',
+  ESCALATION = 'ESCALATION',
+  FOLLOW_UP = 'FOLLOW_UP',
+  APPROVAL = 'APPROVAL'
+}
+
+export enum NoteVisibility {
+  INTERNAL = 'INTERNAL',
+  TECHNICIAN_ONLY = 'TECHNICIAN_ONLY',
+  CUSTOMER_VISIBLE = 'CUSTOMER_VISIBLE',
+  PUBLIC = 'PUBLIC'
+}
+
+export enum NotePriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT'
+}
+
+export enum CommunicationMethod {
+  PHONE = 'PHONE',
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
+  IN_PERSON = 'IN_PERSON',
+  VIDEO_CALL = 'VIDEO_CALL'
+}
+
+export enum SafetyLevel {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL'
+}
+
+export enum ApprovalStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED'
+}
+
+export interface IntegrationReference {
+  system: string;
+  referenceId: string;
+  referenceType: string;
+  url?: string;
+  lastSyncDate?: string;
 }
 
 // ============================================================================

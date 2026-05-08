@@ -1,13 +1,9 @@
 package com.everx.erp.suppliers;
 
-import com.everx.erp.suppliers.dto.CreateSupplierRequest;
-import com.everx.erp.suppliers.dto.SupplierDto;
-import com.everx.shared.dto.ApiResponse;
-import jakarta.validation.Valid;
+import com.everx.erp.suppliers.dto.SupplierResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
@@ -19,30 +15,29 @@ public class SupplierController {
 
     private final SupplierService supplierService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<SupplierDto>> createSupplier(@Valid @RequestBody CreateSupplierRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(supplierService.createSupplier(request), "Supplier created successfully"));
+    @GetMapping
+    public ResponseEntity<Page<SupplierResponse>> getAll(Pageable pageable) {
+        return ResponseEntity.ok(supplierService.findAll(pageable));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<SupplierDto>> getSupplierById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(supplierService.getSupplierById(id)));
+    public ResponseEntity<SupplierResponse> getById(@PathVariable UUID id) {
+        return ResponseEntity.ok(supplierService.findById(id));
     }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<Page<SupplierDto>>> getAllSuppliers(Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(supplierService.getAllSuppliers(pageable)));
+    @PostMapping
+    public ResponseEntity<SupplierResponse> create(@RequestBody Supplier supplier) {
+        return ResponseEntity.ok(supplierService.create(supplier));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<SupplierDto>> updateSupplier(@PathVariable UUID id, @Valid @RequestBody CreateSupplierRequest request) {
-        return ResponseEntity.ok(ApiResponse.ok(supplierService.updateSupplier(id, request), "Supplier updated successfully"));
+    public ResponseEntity<SupplierResponse> update(@PathVariable UUID id, @RequestBody Supplier request) {
+        return ResponseEntity.ok(supplierService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteSupplier(@PathVariable UUID id) {
-        supplierService.deleteSupplier(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Supplier deleted successfully"));
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        supplierService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

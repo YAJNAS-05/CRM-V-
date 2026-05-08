@@ -177,4 +177,22 @@ export const dashboardApi = {
 
   getOperationsMetrics: () =>
     axiosInstance.get<{ data: any }>('/v1/dashboards/operations/metrics'),
+
+  // Widget Management (for DashboardWidgetsPage)
+  getDashboards: () =>
+    axiosInstance.get<{ data: any[] }>('/v1/dashboards'),
+
+  addWidget: (dashboardId: string, widget: any) =>
+    axiosInstance.post(`/v1/dashboards/${dashboardId}/widgets`, widget),
+
+  removeWidget: (dashboardId: string, widgetId: string) =>
+    axiosInstance.delete(`/v1/dashboards/${dashboardId}/widgets/${widgetId}`),
+
+  saveLayout: (dashboardId: string, widgets: any[]) =>
+    axiosInstance.post(`/v1/dashboards/${dashboardId}/widgets/batch-update-positions`, {
+      updates: widgets.map((w, idx) => ({
+        widgetId: Number(w.id),
+        widgetOrder: idx,
+      })),
+    }),
 }

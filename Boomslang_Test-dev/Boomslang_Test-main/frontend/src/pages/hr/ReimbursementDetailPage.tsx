@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { employeeApi, reimbursementApi } from '../../api/hrApi'
+import { FeatureGate } from '../../components/rbac'
 import { Employee, ReimbursementRequest, ReimbursementStatus } from '../../types/hr'
 import { useAuthStore } from '../../store/authStore'
 
@@ -109,14 +110,15 @@ const ReimbursementDetailPage: React.FC = () => {
 
   const handleMarkPaid = async () => {
     if (!request || !id) return
+    if (!user?.id) {
+      toast.error('Missing payer identity')
+      return
+    }
     try {
       setSaving(true)
-      const response = await reimbursementApi.update(id, {
-        status: 'PAID',
-        notes: decisionNote || request.notes || undefined,
-      })
+      const response = await reimbursementApi.pay(id, user.id)
       setRequest(response.data.data)
-      toast.success('Marked as paid')
+      toast.success('Marked as paid and posted to finance')
     } catch (error) {
       console.error('Failed to mark reimbursement paid:', error)
       toast.error('Failed to mark reimbursement paid')
@@ -139,6 +141,7 @@ const ReimbursementDetailPage: React.FC = () => {
 
   const requester = resolveEmployee(request.requestedBy)
   const approver = resolveEmployee(request.approvedBy)
+  const payer = resolveEmployee(request.paidBy)
   const isRejected = request.status === 'REJECTED'
   const stepIndex = STATUS_STEPS.indexOf(request.status)
 
@@ -252,32 +255,73 @@ const ReimbursementDetailPage: React.FC = () => {
 
         <div className="space-y-4">
           <div className="rounded-lg border border-gray-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-gray-800 mb-4">Finance integration</h2>
+            <div className="grid gap-3 text-sm text-gray-600">
+              <div className="flex items-center justify-between">
+                <span>Status</span>
+                <span className="font-semibold text-gray-800">
+                  {request.status === 'PAID'
+                    ? 'Posted to GL'
+                    : request.status === 'APPROVED'
+                      ? 'Pending payment'
+                      : request.status === 'REJECTED'
+                        ? 'Rejected'
+                        : 'Awaiting approval'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Payment reference</span>
+                <span>{request.paymentReference || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Paid at</span>
+                <span>{request.paidAt ? new Date(request.paidAt).toLocaleDateString() : '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Paid by</span>
+                <span>
+                  {payer ? `${payer.firstName} ${payer.lastName}` : request.paidBy || '—'}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              Payments are posted to finance when reimbursements are marked as paid.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-gray-800 mb-4">Actions</h2>
             <div className="grid gap-3">
-              <button
-                type="button"
-                onClick={handleApprove}
-                disabled={saving || request.status !== 'SUBMITTED'}
-                className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                onClick={handleReject}
-                disabled={saving || request.status !== 'SUBMITTED'}
-                className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
-              >
-                Reject
-              </button>
-              <button
-                type="button"
-                onClick={handleMarkPaid}
-                disabled={saving || request.status !== 'APPROVED'}
-                className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              >
-                Mark Paid
-              </button>
+              <FeatureGate requiredPermission="HR_REIMBURSEMENT_APPROVE">
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={saving || request.status !== 'SUBMITTED'}
+                  className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Approve
+                </button>
+              </FeatureGate>
+              <FeatureGate requiredPermission="HR_REIMBURSEMENT_APPROVE">
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  disabled={saving || request.status !== 'SUBMITTED'}
+                  className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                >
+                  Reject
+                </button>
+              </FeatureGate>
+              <FeatureGate requiredPermission="HR_REIMBURSEMENT_APPROVE">
+                <button
+                  type="button"
+                  onClick={handleMarkPaid}
+                  disabled={saving || request.status !== 'APPROVED'}
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Mark Paid
+                </button>
+              </FeatureGate>
             </div>
           </div>
 

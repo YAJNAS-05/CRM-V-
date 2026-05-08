@@ -1,17 +1,12 @@
 package com.everx.finance.close;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.time.LocalDate;
+import org.springframework.stereotype.Repository;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
+@Repository
 public interface ThreeWayMatchExceptionRepository extends JpaRepository<ThreeWayMatchException, UUID> {
-
-    List<ThreeWayMatchException> findByPeriodEndAndIsDeletedFalse(LocalDate periodEnd);
-
-    List<ThreeWayMatchException> findByPeriodEndAndStatusAndIsDeletedFalse(LocalDate periodEnd, String status);
-
-    Optional<ThreeWayMatchException> findByInvoiceIdAndStatusAndIsDeletedFalse(UUID invoiceId, String status);
+    List<ThreeWayMatchException> findByCompanyCode(String companyCode);
+    List<ThreeWayMatchException> findByCompanyCodeAndStatus(String companyCode, String status);
 }

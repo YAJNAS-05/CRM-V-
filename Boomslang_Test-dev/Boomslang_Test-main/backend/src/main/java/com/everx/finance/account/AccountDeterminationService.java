@@ -1,56 +1,68 @@
 package com.everx.finance.account;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
-/**
- * Service for determining GL accounts based on transaction type and company.
- * Results are cached for performance.
- */
 @Service
-@Transactional(readOnly = true)
 @RequiredArgsConstructor
-@Slf4j
 public class AccountDeterminationService {
 
     private final AccountDeterminationRepository repository;
 
-    /**
-     * Get GL account for transaction type.
-     * Cached by company + transaction key + valuation class combination.
-     * 
-     * @param companyCode Company code (AU01, US01, JP01)
-     * @param transactionKey Transaction key (BSX, GBB, REV, etc.)
-     * @param valuationClass Valuation class (EQUIP, PARTS, SERVICE, etc.)
-     * @return GL account number as String
-     * @throws AccountDeterminationException if no account configured
-     */
-    @Cacheable(
-        value = "accountDetermination",
-        key = "#companyCode + '_' + #transactionKey + '_' + #valuationClass"
-    )
-    public String getGlAccount(String companyCode, String transactionKey, String valuationClass) {
-        return repository
-            .findActiveAccount(companyCode, transactionKey, valuationClass, LocalDate.now())
-            .map(AccountDetermination::getGlAccount)
-            .orElseThrow(() -> new AccountDeterminationException(
-                "No GL account configured for: " + companyCode + 
-                " / " + transactionKey + " / " + valuationClass +
-                ". Please configure in Finance → Account Determination."
-            ));
+    public List<AccountDetermination> findAll() {
+        return repository.findAll();
     }
 
-    /**
-     * Clear all cached account determinations.
-     * Called after creating, updating, or deleting account determination rules.
-     */
-    @CacheEvict(value = "accountDetermination", allEntries = true)
-    public void invalidateCache() {
-        log.debug("Account determination cache invalidated");
+    public AccountDetermination findById(UUID id) {
+        return repository.findById(id).orElseThrow(() -> new RuntimeException("Account determination not found"));
+    }
+
+    @Transactional
+    public AccountDetermination create(CreateAccountDeterminationRequest request) {
+        AccountDetermination entity = AccountDetermination.builder()
+            .companyCode(request.getCompanyCode())
+            .transactionKey(request.getTransactionKey())
+            .valuationClass(request.getValuationClass())
+            .glAccount(request.getGlAccount())
+            .description(request.getDescription())
+            .effectiveFrom(request.getEffectiveFrom() != null ? request.getEffectiveFrom() : LocalDate.now())
+            .effectiveTo(request.getEffectiveTo())
+            .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+            .build();
+        return repository.save(entity);
+    }
+
+    @Transactional
+    public AccountDetermination update(UUID id, AccountDetermination request) {
+        AccountDetermination existing = findById(id);
+        existing.setCompanyCode(request.getCompanyCode());
+        existing.setTransactionKey(request.getTransactionKey());
+        existing.setValuationClass(request.getValuationClass());
+        existing.setGlAccount(request.getGlAccount());
+        existing.setDescription(request.getDescription());
+        existing.setEffectiveFrom(request.getEffectiveFrom());
+        existing.setEffectiveTo(request.getEffectiveTo());
+        existing.setIsActive(request.getIsActive());
+        return repository.save(existing);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        repository.deleteById(id);
+    }
+
+    public AccountDeterminationResponse determineAccount(String companyCode, String transactionKey, String valuationClass) {
+        AccountDetermination det = repository.findByKeys(companyCode, transactionKey, valuationClass, LocalDate.now())
+            .orElseThrow(() -> new AccountDeterminationException("No account determination found"));
+        return AccountDeterminationResponse.builder()
+            .glAccount(det.getGlAccount())
+            .description(det.getDescription())
+            .transactionKey(det.getTransactionKey())
+            .valuationClass(det.getValuationClass())
+            .build();
     }
 }

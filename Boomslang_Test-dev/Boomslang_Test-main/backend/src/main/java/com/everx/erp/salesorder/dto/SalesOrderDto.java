@@ -1,32 +1,44 @@
 package com.everx.erp.salesorder.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class SalesOrderDto {
     private UUID id;
-    private String soNumber;
-    private UUID dealId;
-    private UUID accountId;
+    private String orderNumber;
+    private UUID customerId;
+    private String customerName;
+    private UUID contactId;
+    private String contactName;
+    private LocalDateTime orderDate;
+    private LocalDateTime expectedDeliveryDate;
     private String status;
-    private LocalDate orderDate;
-    private LocalDate expectedDelivery;
-    private LocalDate actualDelivery;
-    private String currency;
+    private String priority;
+    private BigDecimal subtotal;
+    private BigDecimal taxAmount;
+    private BigDecimal discountAmount;
     private BigDecimal totalAmount;
-    private String incoterms;
-    private String destinationCountry;
-    private String notes;
+    private String currency;
+    private String paymentTerms;
+    private String shippingMethod;
+    private String billingAddress;
+    private String shippingAddress;
     private List<SalesOrderItemDto> items;
-    private Instant createdAt;
-    private Instant updatedAt;
+    private String notes;
+    private UUID assignedTo;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private UUID createdBy;
+    private UUID updatedBy;
 }

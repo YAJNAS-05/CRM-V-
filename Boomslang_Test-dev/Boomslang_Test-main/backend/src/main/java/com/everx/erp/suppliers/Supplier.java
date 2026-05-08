@@ -3,36 +3,29 @@ package com.everx.erp.suppliers;
 import com.everx.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
+import java.util.UUID;
 
 @Entity
-@Table(name = "suppliers", schema = "everx_erp")
+@Table(name = "supplier", schema = "everx_erp")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@SuperBuilder
 public class Supplier extends BaseEntity {
-
-    @Column(name = "company_name", nullable = false, length = 255)
-    private String companyName;
-
-    @Column(length = 100)
-    private String country;
-
-    @Column(name = "contact_name", length = 255)
-    private String contactName;
-
-    @Column(length = 255)
+    @Column(name = "supplier_number", nullable = false, unique = true)
+    private String supplierNumber;
+    @Column(name = "name", nullable = false, length = 100)
+    private String name;
+    @Column(name = "contact_person", length = 100)
+    private String contactPerson;
+    @Column(name = "email", length = 100)
     private String email;
-
-    @Column(length = 20)
+    @Column(name = "phone", length = 20)
     private String phone;
-
-    @Column(name = "supplier_type", length = 50)
-    private String supplierType;
-
-    @Column(name = "payment_terms", columnDefinition = "TEXT")
-    private String paymentTerms;
-
-    @Column(columnDefinition = "TEXT")
-    private String notes;
+    @Column(name = "address", length = 200)
+    private String address;
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive;
 }

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { FeatureGate } from '../../components/rbac'
 import { employeeApi } from '../../api/hrApi'
 import { Employee, EmployeeStatus, EmploymentType } from '../../types/hr'
@@ -18,23 +19,42 @@ const SORT_OPTIONS = [
 
 const EmployeeListPage: React.FC = () => {
   const navigate = useNavigate()
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  
+  // State for filters and pagination
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<EmployeeStatus | ''>('')
   const [employmentTypeFilter, setEmploymentTypeFilter] = useState<EmploymentType | ''>('')
   const [sort, setSort] = useState('createdAt,desc')
 
-  useEffect(() => {
-    fetchEmployees()
-  }, [page, pageSize, search, statusFilter, employmentTypeFilter, sort])
+  // React Query for fetching employees
+  const { data: employeesData, isLoading, error, refetch } = useQuery({
+    queryKey: ['employees', page, pageSize, search, statusFilter, employmentTypeFilter, sort],
+    queryFn: async () => {
+      const response = await employeeApi.getAll(page, pageSize, {
+        search,
+        status: statusFilter || undefined,
+        employmentType: employmentTypeFilter || undefined,
+        sort: sort || undefined,
+      })
+      return response.data.data
+    },
+    onError: (error) => {
+      console.error('Failed to load employees:', error)
+      toast.error('Failed to load employees')
+    }
+  })
 
-  useEffect(() => {
+  // Extract data from React Query result
+  const employees = employeesData?.content || []
+  const totalPages = employeesData?.totalPages || 1
+  const totalItems = employeesData?.totalElements || 0
+
+  // Debounced search effect
+  React.useEffect(() => {
     const handler = setTimeout(() => {
       setSearch(searchInput.trim())
       setPage(0)
@@ -42,33 +62,6 @@ const EmployeeListPage: React.FC = () => {
 
     return () => clearTimeout(handler)
   }, [searchInput])
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true)
-      const response = await employeeApi.getAll(page, pageSize, {
-        search,
-        status: statusFilter || undefined,
-        employmentType: employmentTypeFilter || undefined,
-        sort: sort || undefined,
-      })
-      const data = response.data.data
-      if (data?.content) {
-        setEmployees(data.content)
-        setTotalPages(data.totalPages || 1)
-        setTotalItems(data.totalElements || data.content.length)
-      } else {
-        setEmployees([])
-        setTotalPages(1)
-        setTotalItems(0)
-      }
-    } catch (error) {
-      console.error('Failed to load employees:', error)
-      toast.error('Failed to load employees')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div>
@@ -168,7 +161,7 @@ const EmployeeListPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-16 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>

@@ -1,12 +1,11 @@
 package com.everx.finance.invoice.dto;
 
-import com.everx.finance.invoice.Invoice;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -14,17 +13,13 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateInvoiceRequest {
-    private String invoiceNumber;
-    private UUID soId;
-    private UUID poId;
-    private UUID accountId;
-    private Invoice.InvoiceEntity entity;
-    private Invoice.InvoiceType type;
-    private LocalDate issueDate;
-    private LocalDate dueDate;
-    private String currency;
-    private BigDecimal subtotal;
-    private BigDecimal taxAmount;
+    private UUID customerId;
+    private String companyCode;
+    private LocalDateTime invoiceDate;
+    private LocalDateTime dueDate;
     private BigDecimal totalAmount;
-    private String notes;
+    private BigDecimal taxAmount;
+    private String currency;
+    private String entity;
+    private String description;
 }

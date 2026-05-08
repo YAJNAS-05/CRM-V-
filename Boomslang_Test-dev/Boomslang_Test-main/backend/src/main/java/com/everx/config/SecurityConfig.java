@@ -88,6 +88,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/hr/**").hasAnyAuthority("HR_VIEW", "HR_CREATE", "HR_EDIT", "HR_DELETE")
                     .requestMatchers(HttpMethod.POST, "/api/v1/hr/**").hasAnyAuthority("HR_CREATE", "HR_EDIT")
                     .requestMatchers(HttpMethod.PUT, "/api/v1/hr/**").hasAnyAuthority("HR_EDIT")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/hr/reimbursements/**").hasAnyAuthority("HR_REIMBURSEMENT_APPROVE", "HR_EDIT")
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/hr/**").hasAnyAuthority("HR_EDIT")
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/hr/**").hasAnyAuthority("HR_DELETE")
                     .requestMatchers(HttpMethod.GET, "/api/v1/finance/**").hasAnyAuthority("FINANCE_VIEW", "FINANCE_CREATE", "FINANCE_EDIT", "FINANCE_DELETE")

@@ -1,24 +1,23 @@
 package com.everx.finance.invoice.dto;
 
-import com.everx.finance.invoice.Invoice;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateInvoiceRequest {
-    private Invoice.InvoiceStatus status;
-    private LocalDate issueDate;
-    private LocalDate dueDate;
-    private BigDecimal subtotal;
-    private BigDecimal taxAmount;
+    private LocalDateTime invoiceDate;
+    private LocalDateTime dueDate;
     private BigDecimal totalAmount;
-    private String pdfUrl;
-    private String notes;
+    private BigDecimal taxAmount;
+    private String currency;
+    private String entity;
+    private String description;
 }

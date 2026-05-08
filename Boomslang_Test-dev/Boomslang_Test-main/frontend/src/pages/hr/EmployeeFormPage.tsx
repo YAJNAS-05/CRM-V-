@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { departmentApi, employeeApi, positionApi } from '../../api/hrApi'
@@ -56,12 +57,79 @@ type FormTab = 'employment' | 'personal' | 'emergency' | 'address'
 const EmployeeFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const isEditing = Boolean(id)
 
   const [formTab, setFormTab] = useState<FormTab>('employment')
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [positions, setPositions] = useState<Position[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
+
+  // React Query for fetching departments, positions, and employees
+  const { data: departmentsData } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const response = await departmentApi.getAll(0, 100)
+      return response.data.data?.content || []
+    }
+  })
+
+  const { data: positionsData } = useQuery({
+    queryKey: ['positions'],
+    queryFn: async () => {
+      const response = await positionApi.getAll(0, 100)
+      return response.data.data?.content || []
+    }
+  })
+
+  const { data: employeesData } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const response = await employeeApi.getAll(0, 1000)
+      return response.data.data?.content || []
+    }
+  })
+
+  const { data: employeeData, isLoading: fetching } = useQuery({
+    queryKey: ['employee', id],
+    queryFn: async () => {
+      if (!id) return null
+      const response = await employeeApi.getById(id)
+      return response.data.data
+    },
+    enabled: isEditing
+  })
+
+  // React Query mutations
+  const createEmployeeMutation = useMutation({
+    mutationFn: (data: CreateEmployeeRequest) => employeeApi.create(data),
+    onSuccess: () => {
+      toast.success('Employee created successfully')
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      navigate('/hr/employees')
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to create employee'
+      toast.error(errorMessage)
+    }
+  })
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: CreateEmployeeRequest }) => 
+      employeeApi.update(id, data),
+    onSuccess: () => {
+      toast.success('Employee updated successfully')
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['employee', id] })
+      navigate('/hr/employees')
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'Failed to update employee'
+      toast.error(errorMessage)
+    }
+  })
+
+  const departments = departmentsData || []
+  const positions = positionsData || []
+  const employees = employeesData || []
 
   const [formData, setFormData] = useState<CreateEmployeeRequest>({
     employeeCode: '',
@@ -94,81 +162,43 @@ const EmployeeFormPage: React.FC = () => {
     addressPincode: '',
   })
 
-  const [loading, setLoading] = useState(false)
-  const [fetching, setFetching] = useState(isEditing)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({})
-
+  // Update form data when employee data is loaded
   useEffect(() => {
-    loadLookups()
-  }, [])
-
-  useEffect(() => {
-    if (isEditing && id) {
-      loadEmployee(id)
-    }
-  }, [id, isEditing])
-
-  const loadLookups = async () => {
-    try {
-      const [deptResponse, posResponse, empResponse] = await Promise.all([
-        departmentApi.getAll(0, 200),
-        positionApi.getAll(0, 200),
-        employeeApi.getAll(0, 200),
-      ])
-      setDepartments(deptResponse.data.data?.content || [])
-      setPositions(posResponse.data.data?.content || [])
-      setEmployees(empResponse.data.data?.content || [])
-    } catch (error) {
-      console.error('Failed to load HR lookups:', error)
-      toast.error('Failed to load lookup data')
-    }
-  }
-
-  const loadEmployee = async (employeeId: string) => {
-    try {
-      setFetching(true)
-      const response = await employeeApi.getById(employeeId)
-      if (response.data.data) {
-        const emp = response.data.data
-        setFormData({
-          employeeCode: emp.employeeCode,
-          firstName: emp.firstName,
-          lastName: emp.lastName,
-          email: emp.email,
-          phone: emp.phone || '',
-          departmentId: emp.departmentId || '',
-          positionId: emp.positionId || '',
-          managerId: emp.managerId || '',
-          employmentType: emp.employmentType,
-          status: emp.status || 'ACTIVE',
-          hireDate: emp.hireDate || '',
-          terminationDate: emp.terminationDate || '',
-          userId: emp.userId || '',
-          workLocation: emp.workLocation || 'OFFICE',
-          lifecycleStage: emp.lifecycleStage || 'PROBATION',
-          gender: emp.gender || '',
-          nationality: emp.nationality || '',
+    if (employeeData && isEditing) {
+      const emp = employeeData
+      setFormData({
+        employeeCode: emp.employeeCode,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        email: emp.email,
+        phone: emp.phone || '',
+        departmentId: emp.departmentId || '',
+        positionId: emp.positionId || '',
+        managerId: emp.managerId || '',
+        employmentType: emp.employmentType,
+        status: emp.status || 'ACTIVE',
+        hireDate: emp.hireDate || '',
+        terminationDate: emp.terminationDate || '',
+        userId: emp.userId || '',
+        workLocation: emp.workLocation || 'OFFICE',
+        lifecycleStage: emp.lifecycleStage || 'PROBATION',
+        gender: emp.gender || '',
+        nationality: emp.nationality || '',
           dateOfBirth: emp.dateOfBirth || '',
           probationEndDate: emp.probationEndDate || '',
           confirmationDate: emp.confirmationDate || '',
           avatarUrl: emp.avatarUrl || '',
           emergencyContactName: emp.emergencyContactName || '',
-          emergencyContactPhone: emp.emergencyContactPhone || '',
-          emergencyContactRelation: emp.emergencyContactRelation || '',
-          addressLine1: emp.addressLine1 || '',
-          addressCity: emp.addressCity || '',
-          addressState: emp.addressState || '',
-          addressCountry: emp.addressCountry || '',
-          addressPincode: emp.addressPincode || '',
-        })
-      }
-    } catch (error) {
-      console.error('Failed to load employee:', error)
-      toast.error('Failed to load employee')
-    } finally {
-      setFetching(false)
+        emergencyContactPhone: emp.emergencyContactPhone || '',
+        emergencyContactRelation: emp.emergencyContactRelation || '',
+        addressLine1: emp.addressLine1 || '',
+        addressCity: emp.addressCity || '',
+        addressState: emp.addressState || '',
+        addressCountry: emp.addressCountry || '',
+        addressPincode: emp.addressPincode || '',
+      })
     }
-  }
+  }, [employeeData, isEditing])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -200,47 +230,35 @@ const EmployeeFormPage: React.FC = () => {
     }
     setFieldErrors({})
 
-    try {
-      setLoading(true)
-      const payload: CreateEmployeeRequest = {
-        ...formData,
-        userId: normalizeOptionalId(formData.userId),
-        departmentId: normalizeOptionalId(formData.departmentId),
-        positionId: normalizeOptionalId(formData.positionId),
-        managerId: normalizeOptionalId(formData.managerId),
-        hireDate: normalizeOptionalDate(formData.hireDate),
-        terminationDate: normalizeOptionalDate(formData.terminationDate),
-        dateOfBirth: normalizeOptionalDate(formData.dateOfBirth),
-        probationEndDate: normalizeOptionalDate(formData.probationEndDate),
-        confirmationDate: normalizeOptionalDate(formData.confirmationDate),
-        phone: formData.phone || null,
-        gender: formData.gender || null,
-        nationality: formData.nationality || null,
-        avatarUrl: formData.avatarUrl || null,
-        emergencyContactName: formData.emergencyContactName || null,
-        emergencyContactPhone: formData.emergencyContactPhone || null,
-        emergencyContactRelation: formData.emergencyContactRelation || null,
-        addressLine1: formData.addressLine1 || null,
-        addressCity: formData.addressCity || null,
-        addressState: formData.addressState || null,
-        addressCountry: formData.addressCountry || null,
-        addressPincode: formData.addressPincode || null,
-      }
+    const payload: CreateEmployeeRequest = {
+      ...formData,
+      userId: normalizeOptionalId(formData.userId),
+      departmentId: normalizeOptionalId(formData.departmentId),
+      positionId: normalizeOptionalId(formData.positionId),
+      managerId: normalizeOptionalId(formData.managerId),
+      hireDate: normalizeOptionalDate(formData.hireDate),
+      terminationDate: normalizeOptionalDate(formData.terminationDate),
+      dateOfBirth: normalizeOptionalDate(formData.dateOfBirth),
+      probationEndDate: normalizeOptionalDate(formData.probationEndDate),
+      confirmationDate: normalizeOptionalDate(formData.confirmationDate),
+      phone: formData.phone || null,
+      gender: formData.gender || null,
+      nationality: formData.nationality || null,
+      avatarUrl: formData.avatarUrl || null,
+      emergencyContactName: formData.emergencyContactName || null,
+      emergencyContactPhone: formData.emergencyContactPhone || null,
+      emergencyContactRelation: formData.emergencyContactRelation || null,
+      addressLine1: formData.addressLine1 || null,
+      addressCity: formData.addressCity || null,
+      addressState: formData.addressState || null,
+      addressCountry: formData.addressCountry || null,
+      addressPincode: formData.addressPincode || null,
+    }
 
-      if (isEditing && id) {
-        await employeeApi.update(id, payload)
-        toast.success('Employee updated')
-      } else {
-        await employeeApi.create(payload)
-        toast.success('Employee created')
-      }
-
-      navigate('/hr/employees')
-    } catch (error) {
-      console.error('Failed to save employee:', error)
-      toast.error('Failed to save employee')
-    } finally {
-      setLoading(false)
+    if (isEditing && id) {
+      updateEmployeeMutation.mutate({ id, data: payload })
+    } else {
+      createEmployeeMutation.mutate(payload)
     }
   }
 
@@ -508,10 +526,10 @@ const EmployeeFormPage: React.FC = () => {
           </Link>
           <button
             type="submit"
-            disabled={loading}
+            disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
           >
-            {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Employee'}
+            {createEmployeeMutation.isPending || updateEmployeeMutation.isPending ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Employee'}
           </button>
         </div>
       </form>

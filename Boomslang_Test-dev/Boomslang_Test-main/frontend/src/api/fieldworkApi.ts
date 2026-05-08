@@ -1,6 +1,6 @@
 // File: src/api/fieldworkApi.ts
-// Field Work API Integration Layer
-// Provides type-safe communication with backend /api/field-jobs endpoints
+// Enhanced Field Work API Integration Layer
+// Provides type-safe communication with new backend /api/v1/fieldwork endpoints
 
 import api from './axiosInstance';
 import {
@@ -10,6 +10,10 @@ import {
   FieldJobTravelDto,
   FieldJobChecklistDto,
   FieldJobReportDto,
+  TechnicianDto,
+  GpsLocationDto,
+  FieldWorkAssetDto,
+  FieldJobNoteDto,
   ErrorResponse
 } from '../types/fieldwork';
 import { Page } from '../types';
@@ -163,278 +167,280 @@ const normalizeFieldJobsPage = (
 };
 
 /**
- * BASE FIELD JOB OPERATIONS
+ * ENHANCED FIELD WORK API - NEW BACKEND INTEGRATION
  */
 
 export const fieldworkApi = {
-  /**
-   * Create a new field job
-   * POST /api/field-jobs
-   * Falls back to test endpoint, then local fallback if backend is unavailable
-   */
-  createFieldJob: async (fieldJob: FieldJobDto): Promise<FieldJobDto> => {
-    if (isFieldJobsNetworkBlocked()) {
-      const localJob = createLocalFieldJob(fieldJob);
-      upsertLocalFieldJob(localJob);
-      // Track as pending change
-      useFieldworkPendingStore.getState().addPendingChange({
-        operation: 'CREATE',
-        jobId: localJob.fieldJobId ?? localJob.jobNumber ?? 'unknown',
-        data: localJob,
-      });
-      return localJob;
-    }
-
-    try {
-      const response = await api.post<FieldJobDto>('/field-jobs', fieldJob);
-      markFieldJobsNetworkAvailable();
-      return response.data;
-    } catch (error) {
-      console.warn('Main field job endpoint failed, trying test endpoint:', error);
-      try {
-        // Fallback to test endpoint
-        const testResponse = await api.post<any>('/field-jobs-test/create', {
-          jobType: fieldJob.jobType,
-          internalNotes: fieldJob.internalNotes,
-          priority: fieldJob.priority || 'ROUTINE'
-        });
-        markFieldJobsNetworkAvailable();
-        return testResponse.data as FieldJobDto;
-      } catch (testError) {
-        markFieldJobsNetworkUnavailable();
-        console.warn('Both create endpoints failed, using local fallback:', testError);
-        const localJob = createLocalFieldJob(fieldJob);
-        upsertLocalFieldJob(localJob);
-        // Track as pending change
-        useFieldworkPendingStore.getState().addPendingChange({
-          operation: 'CREATE',
-          jobId: localJob.fieldJobId ?? localJob.jobNumber ?? 'unknown',
-          data: localJob,
-        });
-        return localJob;
-      }
-    }
-  },
-
+  // FIELD JOBS - NEW BACKEND ENDPOINTS
   /**
    * Get paginated list of all field jobs
-   * GET /api/field-jobs?page={page}&size={size}
+   * GET /api/v1/fieldwork/jobs
    */
   getFieldJobs: async (page: number = 0, size: number = 20): Promise<Page<FieldJobDto>> => {
-    if (isFieldJobsNetworkBlocked()) {
-      return createLocalFieldJobsPage(page, size);
-    }
-
-    const fetchFromTestEndpoint = async (): Promise<Page<FieldJobDto>> => {
-      const testResponse = await api.get<any>(
-        `/field-jobs-test/list`,
-        { params: { page, size } }
-      );
-      return normalizeFieldJobsPage(testResponse.data, page, size);
-    };
-
-    const fetchFromMainEndpoint = async (): Promise<Page<FieldJobDto>> => {
-      const response = await api.get<Page<FieldJobDto>>(
-        `/field-jobs`,
-        { params: { page, size } }
-      );
-      return normalizeFieldJobsPage(response.data, page, size);
-    };
-
     try {
-      if (preferFieldJobsTestEndpoint) {
-        const testPage = await fetchFromTestEndpoint();
-        markFieldJobsNetworkAvailable();
-        return testPage;
-      }
-
-      const mainPage = await fetchFromMainEndpoint();
-      markFieldJobsNetworkAvailable();
-      return mainPage;
-    } catch (primaryError) {
-      if (preferFieldJobsTestEndpoint) {
-        console.warn('Test field job list endpoint unavailable, trying main endpoint:', primaryError);
-        try {
-          const mainPage = await fetchFromMainEndpoint();
-          preferFieldJobsTestEndpoint = false;
-          markFieldJobsNetworkAvailable();
-          return mainPage;
-        } catch (mainError) {
-          markFieldJobsNetworkUnavailable();
-          console.warn('Both list endpoints failed, using local fallback:', mainError);
-          return createLocalFieldJobsPage(page, size);
-        }
-      }
-
-      console.warn('Main field job endpoint failed, trying test endpoint:', primaryError);
-      try {
-        const testPage = await fetchFromTestEndpoint();
-        preferFieldJobsTestEndpoint = true;
-        markFieldJobsNetworkAvailable();
-        return testPage;
-      } catch (testError) {
-        markFieldJobsNetworkUnavailable();
-        console.warn('Both list endpoints failed, using local fallback:', testError);
-        return createLocalFieldJobsPage(page, size);
-      }
+      const response = await api.get<Page<FieldJobDto>>('/api/v1/fieldwork/jobs', {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching field jobs:', error);
+      throw error;
     }
   },
 
   /**
    * Get single field job by ID
-   * GET /api/field-jobs/{id}
+   * GET /api/v1/fieldwork/jobs/{jobId}
    */
   getFieldJobById: async (id: number | string): Promise<FieldJobDto> => {
-    const normalizedId = String(id);
-
-    if (isFieldJobsNetworkBlocked()) {
-      const localJob = readLocalFieldJobs().find((job) => {
-        const byFieldJobId = String(job.fieldJobId ?? '') === normalizedId;
-        const byJobNumber = String(job.jobNumber ?? '') === normalizedId;
-        return byFieldJobId || byJobNumber;
-      });
-
-      if (localJob) return localJob;
-      throw new Error(`Field job ${id} not found`);
-    }
-
     try {
-      const response = await api.get<FieldJobDto>(`/field-jobs/${id}`);
+      const response = await api.get<FieldJobDto>(`/api/v1/fieldwork/jobs/${id}`);
       return response.data;
     } catch (error) {
-      const localJob = readLocalFieldJobs().find((job) => {
-        const byFieldJobId = String(job.fieldJobId ?? '') === normalizedId;
-        const byJobNumber = String(job.jobNumber ?? '') === normalizedId;
-        return byFieldJobId || byJobNumber;
-      });
-
-      if (localJob) {
-        markFieldJobsNetworkUnavailable();
-        return localJob;
-      }
-
       console.error(`Error fetching field job ${id}:`, error);
       throw error;
     }
   },
 
   /**
-   * Update a field job (only DRAFT/SCHEDULED status)
-   * PUT /api/field-jobs/{id}
+   * Get field job by job number
+   * GET /api/v1/fieldwork/jobs/number/{jobNumber}
    */
-  updateFieldJob: async (id: number | string, fieldJob: FieldJobDto): Promise<FieldJobDto> => {
-    if (isFieldJobsNetworkBlocked()) {
-      const localJob = {
-        ...fieldJob,
-        fieldJobId: fieldJob.fieldJobId ?? id,
-        updatedAt: new Date().toISOString(),
-      };
-      upsertLocalFieldJob(localJob);
-      // Track as pending change
-      useFieldworkPendingStore.getState().addPendingChange({
-        operation: 'UPDATE',
-        jobId: id,
-        data: localJob,
-      });
-      return localJob;
-    }
-
+  getFieldJobByNumber: async (jobNumber: string): Promise<FieldJobDto> => {
     try {
-      const response = await api.put<FieldJobDto>(`/field-jobs/${id}`, fieldJob);
-      markFieldJobsNetworkAvailable();
+      const response = await api.get<FieldJobDto>(`/api/v1/fieldwork/jobs/number/${jobNumber}`);
       return response.data;
     } catch (error) {
-      markFieldJobsNetworkUnavailable();
-      const localJob = {
-        ...fieldJob,
-        fieldJobId: fieldJob.fieldJobId ?? id,
-        updatedAt: new Date().toISOString(),
-      };
-      upsertLocalFieldJob(localJob);
-      // Track as pending change
-      useFieldworkPendingStore.getState().addPendingChange({
-        operation: 'UPDATE',
-        jobId: id,
-        data: localJob,
-      });
-      return localJob;
+      console.error(`Error fetching field job ${jobNumber}:`, error);
+      throw error;
     }
   },
 
   /**
-   * Delete a field job (only DRAFT/SCHEDULED status)
-   * DELETE /api/field-jobs/{id}
+   * Create a new field job
+   * POST /api/v1/fieldwork/jobs
+   */
+  createFieldJob: async (fieldJob: any): Promise<FieldJobDto> => {
+    try {
+      const response = await api.post<FieldJobDto>('/api/v1/fieldwork/jobs', fieldJob);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating field job:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update a field job
+   * PUT /api/v1/fieldwork/jobs/{jobId}
+   */
+  updateFieldJob: async (id: number | string, fieldJob: FieldJobDto): Promise<FieldJobDto> => {
+    try {
+      const response = await api.put<FieldJobDto>(`/api/v1/fieldwork/jobs/${id}`, fieldJob);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating field job ${id}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a field job
+   * DELETE /api/v1/fieldwork/jobs/{jobId}
    */
   deleteFieldJob: async (id: number | string): Promise<void> => {
-    if (isFieldJobsNetworkBlocked()) {
-      removeLocalFieldJob(id);
-      // Track as pending change
-      useFieldworkPendingStore.getState().addPendingChange({
-        operation: 'DELETE',
-        jobId: id,
-        data: null,
-      });
-      return;
-    }
-
     try {
-      await api.delete(`/field-jobs/${id}`);
-      markFieldJobsNetworkAvailable();
+      await api.delete(`/api/v1/fieldwork/jobs/${id}`);
     } catch (error) {
-      markFieldJobsNetworkUnavailable();
-      removeLocalFieldJob(id);
-      // Track as pending change
-      useFieldworkPendingStore.getState().addPendingChange({
-        operation: 'DELETE',
-        jobId: id,
-        data: null,
-      });
+      console.error(`Error deleting field job ${id}:`, error);
+      throw error;
     }
   },
 
   /**
-   * Get all urgent (CRITICAL/EMERGENCY) jobs
-   * GET /api/field-jobs/urgent
+   * Update job status
+   * PUT /api/v1/fieldwork/jobs/{jobId}/status
+   */
+  updateJobStatus: async (jobId: string, statusUpdate: any): Promise<FieldJobDto> => {
+    try {
+      const response = await api.put<FieldJobDto>(`/api/v1/fieldwork/jobs/${jobId}/status`, statusUpdate);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating job status ${jobId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Search field jobs
+   * POST /api/v1/fieldwork/jobs/search
+   */
+  searchFieldJobs: async (searchRequest: any, page: number = 0, size: number = 20): Promise<Page<FieldJobDto>> => {
+    try {
+      const response = await api.post<Page<FieldJobDto>>('/api/v1/fieldwork/jobs/search', searchRequest, {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error searching field jobs:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get jobs by technician
+   * GET /api/v1/fieldwork/jobs/technician/{technicianId}
+   */
+  getJobsByTechnician: async (technicianId: string, status?: string): Promise<FieldJobDto[]> => {
+    try {
+      const response = await api.get<FieldJobDto[]>(`/api/v1/fieldwork/jobs/technician/${technicianId}`, {
+        params: status ? { status } : {}
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching jobs for technician ${technicianId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get overdue jobs
+   * GET /api/v1/fieldwork/jobs/overdue
+   */
+  getOverdueJobs: async (): Promise<FieldJobDto[]> => {
+    try {
+      const response = await api.get<FieldJobDto[]>('/api/v1/fieldwork/jobs/overdue');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching overdue jobs:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get jobs requiring attention
+   * GET /api/v1/fieldwork/jobs/attention
+   */
+  getJobsRequiringAttention: async (): Promise<FieldJobDto[]> => {
+    try {
+      const response = await api.get<FieldJobDto[]>('/api/v1/fieldwork/jobs/attention');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching jobs requiring attention:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all urgent (CRITICAL/EMERGENCY) jobs - combines overdue and attention jobs
    */
   getUrgentJobs: async (): Promise<FieldJobDto[]> => {
     try {
-      const response = await api.get<FieldJobDto[]>('/field-jobs/urgent');
-      return response.data;
+      const [overdue, attention] = await Promise.all([
+        fieldworkApi.getOverdueJobs(),
+        fieldworkApi.getJobsRequiringAttention()
+      ]);
+      return [...overdue, ...attention];
     } catch (error) {
       console.error('Error fetching urgent jobs:', error);
       throw error;
     }
   },
 
+  // GPS TRACKING API - NEW BACKEND ENDPOINTS
   /**
-   * WORKFLOW OPERATIONS
+   * Get all active technician locations
+   * GET /api/v1/fieldwork/gps/active-technicians
+   */
+  getActiveEngineerLocations: async (): Promise<any> => {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // Last 24 hours
+    try {
+      const response = await api.get<GpsLocationDto[]>('/api/v1/fieldwork/gps/active-technicians', {
+        params: { since }
+      });
+      return response;
+    } catch (error) {
+      console.error('Error fetching active technician locations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get technician route history
+   * GET /api/v1/fieldwork/gps/technician/{technicianId}/path
+   */
+  getEngineerRoute: async (engineerId: string, startDate: string, endDate: string): Promise<any> => {
+    try {
+      const response = await api.get<GpsLocationDto[]>(`/api/v1/fieldwork/gps/technician/${engineerId}/path`, {
+        params: { startDate, endDate }
+      });
+      return response;
+    } catch (error) {
+      console.error(`Error fetching route for technician ${engineerId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get latest technician location
+   * GET /api/v1/fieldwork/gps/technician/{technicianId}/latest
+   */
+  getLatestTechnicianLocation: async (technicianId: string): Promise<GpsLocationDto> => {
+    try {
+      const response = await api.get<GpsLocationDto>(`/api/v1/fieldwork/gps/technician/${technicianId}/latest`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching latest location for technician ${technicianId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Create GPS location
+   * POST /api/v1/fieldwork/gps/locations
+   */
+  createGpsLocation: async (location: any): Promise<GpsLocationDto> => {
+    try {
+      const response = await api.post<GpsLocationDto>('/api/v1/fieldwork/gps/locations', location);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating GPS location:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * WORKFLOW OPERATIONS - NEW BACKEND ENDPOINTS
    */
 
   /**
-   * Assign engineer to job (checks availability)
-   * PATCH /api/field-jobs/{id}/assign?engineerId={engineerId}
+   * Assign technician to job (checks availability)
+   * PUT /api/v1/fieldwork/jobs/{jobId}/status
    */
   assignEngineer: async (jobId: string | number, engineerId: string): Promise<FieldJobDto> => {
     try {
-      const response = await api.patch<FieldJobDto>(
-        `/field-jobs/${jobId}/assign`,
-        {},
-        { params: { engineerId } }
-      );
+      const response = await api.put<FieldJobDto>(`/api/v1/fieldwork/jobs/${jobId}/status`, {
+        newStatus: 'ASSIGNED',
+        updatedBy: 'system',
+        assignedTechnicianId: engineerId
+      });
       return response.data;
     } catch (error) {
-      console.error(`Error assigning engineer to job ${jobId}:`, error);
+      console.error(`Error assigning technician to job ${jobId}:`, error);
       throw error;
     }
   },
 
   /**
    * Start job (transition to IN_PROGRESS)
-   * PATCH /api/field-jobs/{id}/start
+   * PUT /api/v1/fieldwork/jobs/{jobId}/status
    */
   startJob: async (id: string | number): Promise<FieldJobDto> => {
     try {
-      const response = await api.patch<FieldJobDto>(`/field-jobs/${id}/start`, {});
+      const response = await api.put<FieldJobDto>(`/api/v1/fieldwork/jobs/${id}/status`, {
+        newStatus: 'IN_PROGRESS',
+        updatedBy: 'system'
+      });
       return response.data;
     } catch (error) {
       console.error(`Error starting job ${id}:`, error);
@@ -443,12 +449,15 @@ export const fieldworkApi = {
   },
 
   /**
-   * Complete job (transition to PENDING_SIGN_OFF, auto-generate report)
-   * PATCH /api/field-jobs/{id}/complete
+   * Complete job (transition to COMPLETED)
+   * PUT /api/v1/fieldwork/jobs/{jobId}/status
    */
   completeJob: async (id: string | number): Promise<FieldJobDto> => {
     try {
-      const response = await api.patch<FieldJobDto>(`/field-jobs/${id}/complete`, {});
+      const response = await api.put<FieldJobDto>(`/api/v1/fieldwork/jobs/${id}/status`, {
+        newStatus: 'COMPLETED',
+        updatedBy: 'system'
+      });
       return response.data;
     } catch (error) {
       console.error(`Error completing job ${id}:`, error);

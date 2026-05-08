@@ -320,6 +320,10 @@ export const reimbursementApi = {
     axiosInstance.put<ApiResponse<ReimbursementRequest>>(`/v1/hr/reimbursements/${id}`, data),
   approve: (id: string, approvedBy: string) =>
     axiosInstance.patch<ApiResponse<ReimbursementRequest>>(`/v1/hr/reimbursements/${id}/approve?approvedBy=${approvedBy}`),
+  pay: (id: string, paidBy: string, reference?: string) => {
+    const ref = reference ? `&reference=${encodeURIComponent(reference)}` : ''
+    return axiosInstance.patch<ApiResponse<ReimbursementRequest>>(`/v1/hr/reimbursements/${id}/pay?paidBy=${paidBy}${ref}`)
+  },
 }
 
 export const trainingApi = {

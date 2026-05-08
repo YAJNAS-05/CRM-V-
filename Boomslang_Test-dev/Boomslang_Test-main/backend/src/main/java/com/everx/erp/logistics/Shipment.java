@@ -3,66 +3,29 @@ package com.everx.erp.logistics;
 import com.everx.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
-import java.time.LocalDate;
+import lombok.experimental.SuperBuilder;
 import java.util.UUID;
 
 @Entity
-@Table(name = "shipments", schema = "everx_erp")
+@Table(name = "shipment", schema = "everx_erp")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@SuperBuilder
 public class Shipment extends BaseEntity {
-
-    @Column(name = "so_id")
-    private UUID soId;
-
-    @Column(name = "po_id")
-    private UUID poId;
-
-    @Column(name = "site_assessment_id")
-    private UUID siteAssessmentId;
-
-    @Column(name = "site_readiness_confirmed")
-    private Boolean siteReadinessConfirmed = false;
-
-    @Column(name = "tracking_number", length = 100)
-    private String trackingNumber;
-
-    @Column(length = 50)
+    @Column(name = "shipment_number", nullable = false, unique = true)
+    private String shipmentNumber;
+    @Column(name = "order_id")
+    private UUID orderId;
+    @Column(name = "carrier", length = 100)
     private String carrier;
-
-    @Column(name = "origin_country", length = 100)
-    private String originCountry;
-
-    @Column(name = "destination_country", length = 100)
-    private String destinationCountry;
-
-    @Column(nullable = false, length = 50)
-    private String status = "BOOKED";
-
-    @Column(name = "shipped_date")
-    private LocalDate shippedDate;
-
-    @Column(name = "estimated_arrival")
-    private LocalDate estimatedArrival;
-
-    @Column(name = "actual_arrival")
-    private LocalDate actualArrival;
-
-    @Column(name = "bill_of_lading_url", columnDefinition = "TEXT")
-    private String billOfLadingUrl;
-
-    @Column(name = "packing_list_url", columnDefinition = "TEXT")
-    private String packingListUrl;
-
-    @Column(name = "customs_declaration_url", columnDefinition = "TEXT")
-    private String customsDeclarationUrl;
-
-    @Column(name = "freight_cost", precision = 15, scale = 2)
-    private BigDecimal freightCost;
-
-    @Column(length = 3)
-    private String currency;
+    @Column(name = "tracking_number", length = 50)
+    private String trackingNumber;
+    @Column(name = "status", length = 20)
+    private String status;
+    @Column(name = "ship_date")
+    private java.time.LocalDate shipDate;
+    @Column(name = "delivery_date")
+    private java.time.LocalDate deliveryDate;
 }

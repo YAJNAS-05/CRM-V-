@@ -26,6 +26,9 @@ public class ReimbursementRequestDto {
     private ReimbursementStatus status;
     private UUID approvedBy;
     private OffsetDateTime approvedAt;
+    private UUID paidBy;
+    private OffsetDateTime paidAt;
+    private String paymentReference;
     private String notes;
     private Instant createdAt;
     private Instant updatedAt;

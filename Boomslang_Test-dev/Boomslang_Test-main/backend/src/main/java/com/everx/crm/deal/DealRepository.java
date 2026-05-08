@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,4 +41,23 @@ public interface DealRepository extends JpaRepository<Deal, UUID> {
         Page<Deal> search(@Param("query") String query, @Param("stage") String stage, Pageable pageable);
 
     long countByOwnerIdAndIsDeletedFalse(UUID ownerId);
+
+    // Forecasting queries
+    @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.ownerId = :ownerId AND d.stage NOT IN ('CLOSED_WON', 'CLOSED_LOST')")
+    List<Deal> findByOwnerIdAndNotClosed(@Param("ownerId") UUID ownerId);
+
+    @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.stage NOT IN ('CLOSED_WON', 'CLOSED_LOST')")
+    List<Deal> findAllActiveOpen();
+
+    @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.stage = 'CLOSED_WON' AND d.ownerId = :ownerId AND d.actualCloseDate >= :since")
+    List<Deal> findWonByOwnerSince(@Param("ownerId") UUID ownerId, @Param("since") LocalDate since);
+
+    @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.stage = 'CLOSED_WON' AND d.actualCloseDate >= :since")
+    List<Deal> findWonSince(@Param("since") LocalDate since);
+
+    @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.ownerId = :ownerId AND d.createdAt >= :since")
+    List<Deal> findCreatedByOwnerSince(@Param("ownerId") UUID ownerId, @Param("since") LocalDate since);
+
+    @Query("SELECT d FROM Deal d WHERE d.isDeleted = false AND d.createdAt >= :since")
+    List<Deal> findCreatedSince(@Param("since") LocalDate since);
 }

@@ -441,6 +441,9 @@ export interface ReimbursementRequest {
   status: ReimbursementStatus
   approvedBy?: string | null
   approvedAt?: string | null
+  paidBy?: string | null
+  paidAt?: string | null
+  paymentReference?: string | null
   notes?: string | null
   createdAt?: string
   updatedAt?: string
@@ -827,4 +830,106 @@ export interface Task {
   labels?: string[]
   createdAt?: string
   updatedAt?: string
+}
+
+// ---- OKR (Objectives and Key Results) ----
+export type OkrStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
+export type KeyResultStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'AT_RISK' | 'COMPLETED' | 'MISSED'
+export type OkrCategory = 'PROFESSIONAL' | 'PERSONAL' | 'TEAM' | 'COMPANY'
+
+export interface KeyResult {
+  id: string
+  objectiveId: string
+  title: string
+  description?: string | null
+  targetValue: number
+  currentValue: number
+  unit: string
+  status: KeyResultStatus
+  progress: number
+  startDate?: string | null
+  targetDate?: string | null
+  confidenceLevel?: number | null
+  weight: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface Objective {
+  id: string
+  employeeId: string
+  employeeName?: string | null
+  cycleId: string
+  cycleName?: string | null
+  title: string
+  description?: string | null
+  category: OkrCategory
+  status: OkrStatus
+  progress: number
+  weight: number
+  parentObjectiveId?: string | null
+  parentObjectiveTitle?: string | null
+  managerId?: string | null
+  managerName?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  isPublic: boolean
+  keyResults: KeyResult[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface OkrCycle {
+  id: string
+  name: string
+  description?: string | null
+  startDate: string
+  endDate: string
+  status: OkrStatus
+  isDefault: boolean
+  checkInFrequency: string
+  maxObjectivesPerEmployee: number
+  maxKeyResultsPerObjective: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateObjectiveRequest {
+  employeeId: string
+  cycleId: string
+  title: string
+  description?: string | null
+  category: OkrCategory
+  weight?: number
+  parentObjectiveId?: string | null
+  isPublic?: boolean
+  startDate?: string | null
+  endDate?: string | null
+  keyResults?: CreateKeyResultRequest[]
+}
+
+export interface CreateKeyResultRequest {
+  title: string
+  description?: string | null
+  targetValue: number
+  unit: string
+  startDate?: string | null
+  targetDate?: string | null
+  confidenceLevel?: number | null
+  weight?: number
+}
+
+export interface UpdateKeyResultProgressRequest {
+  currentValue: number
+  confidenceLevel?: number | null
+  notes?: string | null
+}
+
+export interface OkrDashboardDto {
+  totalObjectives: number
+  averageProgress: number
+  completedObjectives: number
+  atRiskObjectives: number
+  onTrackObjectives: number
+  behindObjectives: number
 }

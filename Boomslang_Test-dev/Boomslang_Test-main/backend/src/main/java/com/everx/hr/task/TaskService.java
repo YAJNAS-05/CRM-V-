@@ -2,9 +2,9 @@ package com.everx.hr.task;
 
 import com.everx.hr.employee.Employee;
 import com.everx.hr.employee.EmployeeRepository;
-import com.everx.hr.project.Project;
-import com.everx.hr.project.ProjectMemberRepository;
-import com.everx.hr.project.ProjectRepository;
+import com.everx.pm.project.Project;
+import com.everx.pm.project.ProjectMemberRepository;
+import com.everx.pm.project.ProjectRepository;
 import com.everx.hr.task.dto.CreateTaskRequest;
 import com.everx.hr.task.dto.TaskDto;
 import com.everx.hr.task.dto.UpdateTaskRequest;

@@ -1,38 +1,50 @@
 package com.everx.erp.salesorder.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateSalesOrderRequest {
-    @Size(max = 50)
-    private String soNumber;
-    private UUID dealId;
-    @NotNull(message = "Account ID is required")
-    private UUID accountId;
-    @NotBlank(message = "Status is required")
-    @Size(max = 50)
+    @NotNull(message = "Customer ID is required")
+    private UUID customerId;
+    
+    private UUID contactId;
+    
+    @NotBlank(message = "Order date is required")
+    private String orderDate;
+    
+    private String expectedDeliveryDate;
+    
     private String status;
-    private LocalDate orderDate;
-    private LocalDate expectedDelivery;
-    private LocalDate actualDelivery;
-    @Size(max = 3)
+    
+    private String priority;
+    
+    @NotNull(message = "Currency is required")
     private String currency;
-    private BigDecimal totalAmount;
-    @Size(max = 50)
-    private String incoterms;
-    @Size(max = 100)
-    private String destinationCountry;
-    private String notes;
+    
+    private String paymentTerms;
+    
+    private String shippingMethod;
+    
+    private String billingAddress;
+    
+    private String shippingAddress;
+    
     private List<CreateSalesOrderItemRequest> items;
+    
+    private String notes;
+    
+    private UUID assignedTo;
 }

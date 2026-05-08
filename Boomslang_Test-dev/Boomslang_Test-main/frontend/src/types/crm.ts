@@ -152,6 +152,16 @@ export interface LeadScore {
   createdAt: string
 }
 
+export interface LeadScoreCalculation {
+  leadId: string
+  activityScore: number
+  predictiveScore: number
+  totalScore: number
+  grade: string
+  qualificationStatus: string
+  nextBestAction: string
+}
+
 export interface ConvertQuoteRequest {
   notes?: string
 }
@@ -359,4 +369,60 @@ export interface ReportActivity {
   pendingActivities: number
   overdueActivities: number
   activitiesByType: Record<string, number>
+}
+
+// Pipeline Forecasting Types
+export interface ForecastSummaryDto {
+  totalPipelineValue: number
+  weightedForecast: number
+  bestCaseForecast: number
+  commitForecast: number
+  openDealCount: number
+}
+
+export interface StageForecastDto {
+  stage: string
+  dealCount: number
+  totalValue: number
+  weightedValue: number
+  probability: number
+  averageDaysInStage: number
+}
+
+export interface MonthlyForecastDto {
+  yearMonth: string
+  dealCount: number
+  totalValue: number
+  weightedValue: number
+}
+
+export interface QuarterlyForecastDto {
+  quarter: string
+  dealCount: number
+  totalValue: number
+  weightedValue: number
+}
+
+export interface PipelineTrendDto {
+  trendDirection: string
+  monthOverMonthChange: number
+  monthOverMonthChangePercent: number
+}
+
+export interface PipelineForecastDto {
+  summary: ForecastSummaryDto
+  byStage: StageForecastDto[]
+  byMonth: MonthlyForecastDto[]
+  byQuarter: QuarterlyForecastDto[]
+  trend: PipelineTrendDto
+  healthScore: number
+  recommendations: string[]
+}
+
+export interface SalesVelocityDto {
+  averageDaysToClose: number
+  averageDealSize: number
+  winRate: number
+  opportunitiesCreated: number
+  revenueVelocity: number
 }

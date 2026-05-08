@@ -1,12 +1,10 @@
 package com.everx.erp.fieldwork;
 
 public enum FieldJobStatus {
-    DRAFT,
+    PENDING,
     SCHEDULED,
-    ENGINEER_ASSIGNED,
     IN_PROGRESS,
-    PENDING_SIGN_OFF,
     COMPLETED,
     CANCELLED,
-    REVERSED
+    ON_HOLD
 }

@@ -1,6 +1,7 @@
 package com.everx.hr.reimbursement;
 
 import com.everx.finance.journal.GlPostingService;
+import com.everx.finance.journal.GlJournalEntryRepository;
 import com.everx.hr.ReimbursementStatus;
 import com.everx.hr.reimbursement.dto.CreateReimbursementRequest;
 import com.everx.hr.reimbursement.dto.ReimbursementRequestDto;
@@ -22,6 +23,7 @@ public class ReimbursementService {
 
     private final ReimbursementRepository reimbursementRepository;
     private final GlPostingService glPostingService;
+    private final GlJournalEntryRepository glJournalEntryRepository;
 
     @Transactional
     public ReimbursementRequestDto createReimbursement(CreateReimbursementRequest request) {
@@ -33,7 +35,8 @@ public class ReimbursementService {
         reimbursement.setRequestedBy(request.getRequestedBy());
         reimbursement.setRequesterEmail(request.getRequesterEmail());
         reimbursement.setAmount(request.getAmount());
-        reimbursement.setCurrency(request.getCurrency());
+        String currency = request.getCurrency();
+        reimbursement.setCurrency(currency == null || currency.trim().isEmpty() ? "AUD" : currency.trim());
         reimbursement.setCategory(request.getCategory());
         reimbursement.setRequestDate(request.getRequestDate());
         reimbursement.setDescription(request.getDescription());
@@ -69,6 +72,22 @@ public class ReimbursementService {
             throw new ValidationException("Reimbursement amount must be greater than zero");
         }
 
+        if (request.getStatus() != null && request.getStatus() != reimbursement.getStatus()) {
+            if (request.getStatus() == ReimbursementStatus.APPROVED) {
+                throw new ValidationException("Use the approval action to approve reimbursements.");
+            }
+            if (request.getStatus() == ReimbursementStatus.PAID) {
+                throw new ValidationException("Use the payment action to mark reimbursements as paid.");
+            }
+            if (request.getStatus() == ReimbursementStatus.REJECTED
+                    && reimbursement.getStatus() != ReimbursementStatus.SUBMITTED) {
+                throw new ValidationException("Only submitted reimbursements can be rejected.");
+            }
+            if (request.getStatus() == ReimbursementStatus.SUBMITTED) {
+                throw new ValidationException("Cannot revert reimbursement status to SUBMITTED.");
+            }
+        }
+
         if (request.getAmount() != null) reimbursement.setAmount(request.getAmount());
         if (request.getCurrency() != null) reimbursement.setCurrency(request.getCurrency());
         if (request.getCategory() != null) reimbursement.setCategory(request.getCategory());
@@ -84,21 +103,58 @@ public class ReimbursementService {
     public ReimbursementRequestDto approveReimbursement(UUID id, UUID approvedBy) {
         ReimbursementRequest reimbursement = reimbursementRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Reimbursement not found with id: " + id));
+        if (reimbursement.getStatus() != ReimbursementStatus.SUBMITTED) {
+            throw new ValidationException("Only submitted reimbursements can be approved.");
+        }
         reimbursement.setStatus(ReimbursementStatus.APPROVED);
         reimbursement.setApprovedBy(approvedBy);
         reimbursement.setApprovedAt(OffsetDateTime.now());
 
         ReimbursementRequest savedReimbursement = reimbursementRepository.save(reimbursement);
 
-        // Post to GL: Debit Expense, Credit Cash/Bank
-        glPostingService.postReimbursementExpense(
-            savedReimbursement.getId(),
-            "RMB-" + savedReimbursement.getId().toString().substring(0, 8).toUpperCase(),
-            savedReimbursement.getAmount(),
-            savedReimbursement.getCurrency(),
-            savedReimbursement.getCategory(),
-            "Reimbursement approved: " + savedReimbursement.getDescription()
-        );
+        return toDto(savedReimbursement);
+    }
+
+    @Transactional
+    public ReimbursementRequestDto payReimbursement(UUID id, UUID paidBy, String reference) {
+        ReimbursementRequest reimbursement = reimbursementRepository.findByIdAndIsDeletedFalse(id)
+                .orElseThrow(() -> new EntityNotFoundException("Reimbursement not found with id: " + id));
+
+        if (paidBy == null) {
+            throw new ValidationException("Paid-by user is required to mark reimbursement as paid.");
+        }
+
+        if (reimbursement.getStatus() != ReimbursementStatus.APPROVED) {
+            throw new ValidationException("Only approved reimbursements can be marked as paid.");
+        }
+
+        String currency = reimbursement.getCurrency();
+        if (currency == null || currency.trim().isEmpty()) {
+            throw new ValidationException("Currency is required to post reimbursement payment.");
+        }
+
+        String paymentReference = reference != null && !reference.trim().isEmpty()
+                ? reference.trim()
+                : "RMB-PAY-" + reimbursement.getId().toString().substring(0, 8).toUpperCase();
+
+        reimbursement.setStatus(ReimbursementStatus.PAID);
+        reimbursement.setPaidBy(paidBy);
+        reimbursement.setPaidAt(OffsetDateTime.now());
+        reimbursement.setPaymentReference(paymentReference);
+
+        ReimbursementRequest savedReimbursement = reimbursementRepository.save(reimbursement);
+
+        if (glJournalEntryRepository.findLatestBySourceAndRef("REIMBURSEMENT", savedReimbursement.getId().toString()).isEmpty()) {
+            // Post to GL: Debit Expense, Credit Cash/Bank
+            glPostingService.postReimbursementExpense(
+                savedReimbursement.getId(),
+                paymentReference,
+                savedReimbursement.getAmount(),
+                savedReimbursement.getCurrency(),
+                savedReimbursement.getCategory(),
+                "Reimbursement paid: " + savedReimbursement.getDescription()
+            );
+        }
 
         return toDto(savedReimbursement);
     }
@@ -116,6 +172,9 @@ public class ReimbursementService {
         dto.setStatus(reimbursement.getStatus());
         dto.setApprovedBy(reimbursement.getApprovedBy());
         dto.setApprovedAt(reimbursement.getApprovedAt());
+        dto.setPaidBy(reimbursement.getPaidBy());
+        dto.setPaidAt(reimbursement.getPaidAt());
+        dto.setPaymentReference(reimbursement.getPaymentReference());
         dto.setNotes(reimbursement.getNotes());
         if (reimbursement.getCreatedAt() != null) {
             dto.setCreatedAt(reimbursement.getCreatedAt().toInstant());

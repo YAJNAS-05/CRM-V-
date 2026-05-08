@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { configApi } from '../../api/configApi'
 import {
@@ -1469,7 +1469,7 @@ const ConfigStudioPage: React.FC = () => {
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{field.module} / {field.entity}</p>
                         <h3 className="text-lg font-bold text-slate-900">{field.label}</h3>
-                        <p className="text-sm text-slate-500">{field.fieldKey} • {field.dataType}</p>
+                        <p className="text-sm text-slate-500">{field.fieldKey} � {field.dataType}</p>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -1819,7 +1819,7 @@ const ConfigStudioPage: React.FC = () => {
                         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{layout.module} / {layout.entity}</p>
                         <h3 className="text-lg font-bold text-slate-900">{layout.name}</h3>
                         <p className="text-xs text-slate-500">
-                          Status: {layout.status || 'DRAFT'} • Version: {layout.versionNumber ?? 1}
+                          Status: {layout.status || 'DRAFT'} � Version: {layout.versionNumber ?? 1}
                         </p>
                         <p className="text-xs text-slate-500">Default: {layout.isDefault ? 'Yes' : 'No'}</p>
                         <p className="text-xs text-slate-500">Roles: {layout.appliesToRoles || 'All'}</p>
@@ -2138,7 +2138,7 @@ const ConfigStudioPage: React.FC = () => {
                           <div key={transition.id} className="flex flex-wrap items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-semibold text-slate-800">{transition.fromStatus}</span>
-                              <span className="text-slate-400">→</span>
+                              <span className="text-slate-400">?</span>
                               <span className="font-semibold text-slate-800">{transition.toStatus}</span>
                               {transition.actionLabel && (
                                 <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase text-slate-500">
@@ -2226,7 +2226,7 @@ const ConfigStudioPage: React.FC = () => {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{approval.module} / {approval.entity}</p>
-                      <h3 className="text-lg font-bold text-slate-900">{approval.fromStatus} → {approval.toStatus}</h3>
+                      <h3 className="text-lg font-bold text-slate-900">{approval.fromStatus} ? {approval.toStatus}</h3>
                       <p className="text-sm text-slate-500">Entity ID: {approval.entityId}</p>
                     </div>
                     <span className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">

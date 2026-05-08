@@ -58,6 +58,25 @@ export const adminApi = {
 
   deleteRole: (roleId: string) =>
     api.delete(`/v1/admin/roles/${roleId}`),
+
+  // Query Builder APIs
+  executeQuery: (sql: string) =>
+    api.post('/v1/admin/query/execute', { sql }),
+  
+  validateQuery: (sql: string) =>
+    api.post('/v1/admin/query/validate', { sql }),
+  
+  getTableSchema: (tableName: string) =>
+    api.get(`/v1/admin/query/schema/${tableName}`),
+  
+  getSavedQueries: () =>
+    api.get('/v1/admin/query/saved'),
+  
+  saveQuery: (name: string, description: string, sql: string) =>
+    api.post('/v1/admin/query/save', { name, description, sql }),
+  
+  deleteSavedQuery: (queryId: string) =>
+    api.delete(`/v1/admin/query/saved/${queryId}`),
 };
 
 export default api;

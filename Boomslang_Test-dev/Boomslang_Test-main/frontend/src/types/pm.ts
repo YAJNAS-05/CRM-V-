@@ -5,6 +5,7 @@ export interface Project {
   id: string
   projectCode: string
   projectName: string
+  name: string // Added for compatibility
   ownerId: string
   description?: string
   status: ProjectStatus
@@ -13,6 +14,8 @@ export interface Project {
   budget?: number
   currency?: string
   linkedFieldJobId?: string
+  progress?: number // Added for compatibility
+  memberCount?: number // Added for compatibility
   createdAt: string
   updatedAt: string
 }
@@ -37,6 +40,8 @@ export interface ProjectMember {
   projectId: string
   employeeId: string
   role: string
+  name?: string // Added for compatibility
+  email?: string // Added for compatibility
   createdAt: string
 }
 
@@ -71,4 +76,23 @@ export interface ProjectDetail {
   actualCost: number
   profitability: number
   profitMargin: number
+}
+
+// Task types for PM module
+export type TaskStatus = 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE'
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
+export interface Task {
+  id: string
+  title: string
+  description?: string
+  status: TaskStatus
+  priority: TaskPriority
+  assigneeId?: string
+  assigneeName?: string
+  projectId?: string
+  projectName?: string
+  dueDate?: string
+  createdAt: string
+  updatedAt: string
 }
