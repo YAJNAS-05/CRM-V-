@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="ServiceTicketsReport" pageWidth="842" pageHeight="595" orientation="Landscape" columnWidth="802" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7g">
+	<queryString language="SQL">
+		<![CDATA[SELECT ticket_number, customer_name, status, priority, assigned_to, created_date, cost, estimated_hours FROM service_tickets]]>
+	</queryString>
+	<field name="ticket_number" class="java.lang.String"/>
+	<field name="customer_name" class="java.lang.String"/>
+	<field name="status" class="java.lang.String"/>
+	<field name="priority" class="java.lang.String"/>
+	<field name="assigned_to" class="java.lang.String"/>
+	<field name="created_date" class="java.sql.Date"/>
+	<field name="cost" class="java.math.BigDecimal"/>
+	<field name="estimated_hours" class="java.lang.Double"/>
+	<title>
+		<band height="60" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="0" width="800" height="40" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7h"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="24" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Service Tickets by Status Report]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="0" y="40" width="800" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7i"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date())]]></textFieldExpression>
+			</textField>
+		</band>
+	</title>
+	<columnHeader>
+		<band height="30" splitType="Stretch">
+			<rectangle>
+				<reportElement x="0" y="0" width="800" height="30" backcolor="#E0E0E0" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7j"/>
+				<graphicElement>
+					<pen lineWidth="0.5"/>
+				</graphicElement>
+			</rectangle>
+			<staticText>
+				<reportElement x="10" y="5" width="80" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7k"/>
+				<text><![CDATA[Ticket #]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="100" y="5" width="100" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7l"/>
+				<text><![CDATA[Customer]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="210" y="5" width="70" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7m"/>
+				<text><![CDATA[Status]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="290" y="5" width="70" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7n"/>
+				<text><![CDATA[Priority]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="370" y="5" width="100" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7o"/>
+				<text><![CDATA[Assigned To]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="480" y="5" width="80" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7p"/>
+				<text><![CDATA[Created]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="570" y="5" width="80" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7q"/>
+				<text><![CDATA[Cost]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="660" y="5" width="140" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7r"/>
+				<text><![CDATA[Est. Hours]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="25" splitType="Stretch">
+			<textField>
+				<reportElement x="10" y="5" width="80" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7s"/>
+				<textFieldExpression><![CDATA[$F{ticket_number}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="100" y="5" width="100" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7t"/>
+				<textFieldExpression><![CDATA[$F{customer_name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="210" y="5" width="70" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7u"/>
+				<textFieldExpression><![CDATA[$F{status}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="290" y="5" width="70" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7v"/>
+				<textFieldExpression><![CDATA[$F{priority}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="370" y="5" width="100" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7w"/>
+				<textFieldExpression><![CDATA[$F{assigned_to}]]></textFieldExpression>
+			</textField>
+			<textField pattern="yyyy-MM-dd">
+				<reportElement x="480" y="5" width="80" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7x"/>
+				<textFieldExpression><![CDATA[$F{created_date}]]></textFieldExpression>
+			</textField>
+			<textField pattern="$#,##0.00">
+				<reportElement x="570" y="5" width="80" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7y"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{cost}]]></textFieldExpression>
+			</textField>
+			<textField pattern="0.00">
+				<reportElement x="660" y="5" width="140" height="15" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f7z"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$F{estimated_hours}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="20" splitType="Stretch">
+			<textField>
+				<reportElement x="0" y="0" width="400" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f8a"/>
+				<textElement textAlignment="Left"/>
+				<textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="400" y="0" width="400" height="20" uuid="d4g04f5c-69g0-6b2e-0e4d-2b3c4d5e6f8b"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[" of " + $V{PAGE_COUNT}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+</jasperReport>

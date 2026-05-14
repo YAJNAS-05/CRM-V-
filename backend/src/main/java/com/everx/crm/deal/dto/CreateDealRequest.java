@@ -1,0 +1,34 @@
+package com.everx.crm.deal.dto;
+
+import com.everx.crm.deal.DealStage;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class CreateDealRequest {
+
+    @NotBlank(message = "Deal name is required")
+    private String name;
+
+    private DealStage stage;
+    private BigDecimal amount;
+    private Integer probability;
+    private LocalDate expectedCloseDate;
+    private String leadSource;
+    private UUID accountId;
+    private UUID primaryContactId;
+    private String description;
+    private String nextStep;
+    private String campaignSource;
+    private UUID ownerId;
+}

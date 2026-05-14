@@ -1,0 +1,322 @@
+package com.everx.erp.logistics;
+
+import com.everx.erp.equipment.Equipment;
+import com.everx.erp.equipment.EquipmentRepository;
+import com.everx.erp.equipment.EquipmentStatus;
+import com.everx.erp.salesorder.SalesOrder;
+import com.everx.erp.salesorder.SalesOrderItem;
+import com.everx.erp.salesorder.SalesOrderRepository;
+import com.everx.erp.warranty.Warranty;
+import com.everx.erp.warranty.WarrantyRepository;
+import com.everx.erp.logistics.siteassessment.SiteAssessmentService;
+import com.everx.erp.logistics.dto.CreateShipmentRequest;
+import com.everx.erp.logistics.dto.ShipmentDto;
+import com.everx.shared.exception.EntityNotFoundException;
+import com.everx.shared.exception.ValidationException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ShipmentService {
+
+    private final ShipmentRepository shipmentRepository;
+    private final SalesOrderRepository salesOrderRepository;
+    private final EquipmentRepository equipmentRepository;
+    private final WarrantyRepository warrantyRepository;
+    private final SiteAssessmentService siteAssessmentService;
+
+    @Transactional
+    public ShipmentDto createShipment(CreateShipmentRequest request) {
+        // WORKFLOW RULE: No shipment without a confirmed Sales Order
+        if (request.getSoId() == null) {
+            throw new ValidationException("Shipment must be linked to a Sales Order. No shipment can be created without a confirmed Sales Order.");
+        }
+
+        if (request.getSiteAssessmentId() == null) {
+            throw new ValidationException("Shipment is blocked. Site assessment must be linked and READY before shipment creation.");
+        }
+
+        siteAssessmentService.requireReadyById(request.getSiteAssessmentId());
+        requireConfirmedSalesOrder(request.getSoId());
+
+        Shipment shipment = new Shipment();
+        shipment.setSoId(request.getSoId());
+        shipment.setPoId(request.getPoId());
+        shipment.setSiteAssessmentId(request.getSiteAssessmentId());
+        shipment.setSiteReadinessConfirmed(true);
+        shipment.setTrackingNumber(request.getTrackingNumber());
+        shipment.setCarrier(request.getCarrier());
+        shipment.setOriginCountry(request.getOriginCountry());
+        shipment.setDestinationCountry(request.getDestinationCountry());
+        shipment.setStatus(request.getStatus());
+        shipment.setShippedDate(request.getShippedDate());
+        shipment.setEstimatedArrival(request.getEstimatedArrival());
+        shipment.setActualArrival(request.getActualArrival());
+        shipment.setBillOfLadingUrl(request.getBillOfLadingUrl());
+        shipment.setPackingListUrl(request.getPackingListUrl());
+        shipment.setCustomsDeclarationUrl(request.getCustomsDeclarationUrl());
+        shipment.setFreightCost(request.getFreightCost());
+        shipment.setCurrency(request.getCurrency());
+        Shipment saved = shipmentRepository.save(shipment);
+        applyStatusCascade(saved, null, saved.getStatus(), request.getConditionOnDelivery());
+        return toDto(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public ShipmentDto getShipmentById(UUID id) {
+        return toDto(shipmentRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Shipment not found with id: " + id)));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ShipmentDto> getAllShipments(Pageable pageable) {
+        return shipmentRepository.findAllNotDeleted(pageable).map(this::toDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ShipmentDto> getShipmentsByStatus(String status, Pageable pageable) {
+        return shipmentRepository.findByStatus(status, pageable).map(this::toDto);
+    }
+
+    @Transactional
+    public ShipmentDto updateShipment(UUID id, CreateShipmentRequest request) {
+        Shipment shipment = shipmentRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Shipment not found with id: " + id));
+        String oldStatus = shipment.getStatus();
+        if (request.getSoId() != null) {
+            requireConfirmedSalesOrder(request.getSoId());
+            shipment.setSoId(request.getSoId());
+        }
+        if (request.getPoId() != null) shipment.setPoId(request.getPoId());
+        if (request.getSiteAssessmentId() != null) {
+            siteAssessmentService.requireReadyById(request.getSiteAssessmentId());
+            shipment.setSiteAssessmentId(request.getSiteAssessmentId());
+            shipment.setSiteReadinessConfirmed(true);
+        }
+        if (request.getSiteReadinessConfirmed() != null) shipment.setSiteReadinessConfirmed(request.getSiteReadinessConfirmed());
+        if (request.getTrackingNumber() != null) shipment.setTrackingNumber(request.getTrackingNumber());
+        if (request.getCarrier() != null) shipment.setCarrier(request.getCarrier());
+        if (request.getOriginCountry() != null) shipment.setOriginCountry(request.getOriginCountry());
+        if (request.getDestinationCountry() != null) shipment.setDestinationCountry(request.getDestinationCountry());
+        if (request.getStatus() != null) shipment.setStatus(request.getStatus());
+        if (request.getShippedDate() != null) shipment.setShippedDate(request.getShippedDate());
+        if (request.getEstimatedArrival() != null) shipment.setEstimatedArrival(request.getEstimatedArrival());
+        if (request.getActualArrival() != null) shipment.setActualArrival(request.getActualArrival());
+        if (request.getBillOfLadingUrl() != null) shipment.setBillOfLadingUrl(request.getBillOfLadingUrl());
+        if (request.getPackingListUrl() != null) shipment.setPackingListUrl(request.getPackingListUrl());
+        if (request.getCustomsDeclarationUrl() != null) shipment.setCustomsDeclarationUrl(request.getCustomsDeclarationUrl());
+        if (request.getFreightCost() != null) shipment.setFreightCost(request.getFreightCost());
+        if (request.getCurrency() != null) shipment.setCurrency(request.getCurrency());
+        Shipment updated = shipmentRepository.save(shipment);
+        applyStatusCascade(updated, oldStatus, updated.getStatus(), request.getConditionOnDelivery());
+        return toDto(updated);
+    }
+
+    private SalesOrder requireConfirmedSalesOrder(UUID soId) {
+        SalesOrder salesOrder = salesOrderRepository.findByIdAndNotDeleted(soId)
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + soId));
+
+        if (!"CONFIRMED".equalsIgnoreCase(salesOrder.getStatus())) {
+            throw new ValidationException("Shipment can be created only for CONFIRMED sales orders. Current status: " + salesOrder.getStatus());
+        }
+
+        return salesOrder;
+    }
+
+    @Transactional
+    public void deleteShipment(UUID id) {
+        Shipment shipment = shipmentRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Shipment not found with id: " + id));
+        shipment.softDelete();
+        shipmentRepository.save(shipment);
+    }
+
+    @Transactional
+    public ShipmentDto updateStatus(UUID id, String status) {
+        Shipment shipment = shipmentRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Shipment not found with id: " + id));
+
+        shipment.setStatus(status);
+        Shipment updated = shipmentRepository.save(shipment);
+
+        if ("IN_TRANSIT".equalsIgnoreCase(status)) {
+            updateEquipmentByShipmentSalesOrder(updated, EquipmentStatus.IN_TRANSIT);
+        }
+
+        return toDto(updated);
+    }
+
+    @Transactional
+    public ShipmentDto deliverShipment(UUID id, boolean clientSignatureObtained, String conditionOnDelivery) {
+        Shipment shipment = shipmentRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Shipment not found with id: " + id));
+
+        if (!clientSignatureObtained) {
+            throw new ValidationException("Delivery sign-off is required to complete shipment");
+        }
+
+        if (!"GOOD".equalsIgnoreCase(conditionOnDelivery) && !"DAMAGED".equalsIgnoreCase(conditionOnDelivery)) {
+            throw new ValidationException("conditionOnDelivery must be GOOD or DAMAGED");
+        }
+
+        shipment.setStatus("DELIVERED");
+        if (shipment.getActualArrival() == null) {
+            shipment.setActualArrival(LocalDate.now());
+        }
+
+        Shipment saved = shipmentRepository.save(shipment);
+
+        if ("GOOD".equalsIgnoreCase(conditionOnDelivery)) {
+            updateEquipmentByShipmentSalesOrder(saved, EquipmentStatus.INSTALLED);
+            if (saved.getSoId() != null) {
+                SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(saved.getSoId())
+                        .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + saved.getSoId()));
+                so.setStatus("INSTALLED");
+                salesOrderRepository.save(so);
+                createWarrantiesForSalesOrder(so, saved.getActualArrival());
+            }
+        } else if ("DAMAGED".equalsIgnoreCase(conditionOnDelivery)) {
+            updateEquipmentByShipmentSalesOrder(saved, EquipmentStatus.UNDER_MAINTENANCE);
+        }
+
+        return toDto(saved);
+    }
+
+    /**
+     * Central status cascade: fires whenever shipment status changes.
+     * Ensures equipment status, SO status, and warranties stay in sync.
+     */
+    private void applyStatusCascade(Shipment shipment, String oldStatus, String newStatus, String conditionOnDelivery) {
+        if (newStatus == null) return;
+        if (oldStatus != null && oldStatus.equalsIgnoreCase(newStatus)) return;
+
+        if ("IN_TRANSIT".equalsIgnoreCase(newStatus)) {
+            updateEquipmentByShipmentSalesOrder(shipment, EquipmentStatus.IN_TRANSIT);
+
+        } else if ("DELIVERED".equalsIgnoreCase(newStatus)) {
+            if (shipment.getActualArrival() == null) {
+                shipment.setActualArrival(LocalDate.now());
+                shipmentRepository.save(shipment);
+            }
+            boolean isDamaged = "DAMAGED".equalsIgnoreCase(conditionOnDelivery);
+            if (isDamaged) {
+                updateEquipmentByShipmentSalesOrder(shipment, EquipmentStatus.UNDER_MAINTENANCE);
+            } else {
+                updateEquipmentByShipmentSalesOrder(shipment, EquipmentStatus.INSTALLED);
+                if (shipment.getSoId() != null) {
+                    SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(shipment.getSoId()).orElse(null);
+                    if (so != null) {
+                        so.setStatus("INSTALLED");
+                        salesOrderRepository.save(so);
+                        createWarrantiesForSalesOrder(so, shipment.getActualArrival());
+                    }
+                }
+            }
+
+        } else if ("CANCELLED".equalsIgnoreCase(newStatus) || "RETURNED".equalsIgnoreCase(newStatus)) {
+            revertEquipmentToStock(shipment);
+        }
+    }
+
+    /**
+     * Reverts equipment linked via SO back to IN_WAREHOUSE when shipment is cancelled or returned.
+     */
+    private void revertEquipmentToStock(Shipment shipment) {
+        if (shipment.getSoId() == null) return;
+        SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(shipment.getSoId()).orElse(null);
+        if (so == null || so.getItems() == null) return;
+        for (SalesOrderItem item : so.getItems()) {
+            if (item.getEquipmentId() == null) continue;
+            Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId()).orElse(null);
+            if (equipment == null) continue;
+            if (equipment.getStatus() == EquipmentStatus.IN_TRANSIT
+                    || equipment.getStatus() == EquipmentStatus.RESERVED) {
+                equipment.setStatus(EquipmentStatus.IN_WAREHOUSE);
+                equipmentRepository.save(equipment);
+            }
+        }
+    }
+
+    private void updateEquipmentByShipmentSalesOrder(Shipment shipment, EquipmentStatus status) {
+        if (shipment.getSoId() == null) {
+            return;
+        }
+
+        SalesOrder so = salesOrderRepository.findByIdAndNotDeleted(shipment.getSoId())
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found with id: " + shipment.getSoId()));
+
+        if (so.getItems() == null) {
+            return;
+        }
+
+        for (SalesOrderItem item : so.getItems()) {
+            if (item.getEquipmentId() == null) {
+                continue;
+            }
+
+            Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId())
+                    .orElseThrow(() -> new EntityNotFoundException("Equipment not found with id: " + item.getEquipmentId()));
+            equipment.setStatus(status);
+            equipmentRepository.save(equipment);
+        }
+    }
+
+    private void createWarrantiesForSalesOrder(SalesOrder so, LocalDate startDate) {
+        if (so.getItems() == null) {
+            return;
+        }
+
+        for (SalesOrderItem item : so.getItems()) {
+            if (item.getEquipmentId() == null) {
+                continue;
+            }
+
+            boolean hasWarranty = !warrantyRepository.findByEquipmentId(item.getEquipmentId()).isEmpty();
+            if (hasWarranty) {
+                continue;
+            }
+
+            Warranty warranty = new Warranty();
+            warranty.setEquipmentId(item.getEquipmentId());
+            warranty.setSoId(so.getId());
+            warranty.setAccountId(so.getAccountId());
+            warranty.setStartDate(startDate);
+            warranty.setEndDate(startDate.plusMonths(12));
+            warranty.setType("PARTS_AND_LABOUR");
+            warranty.setStatus("ACTIVE");
+            warranty.setNotes("Auto-created on shipment delivery sign-off");
+            warrantyRepository.save(warranty);
+        }
+    }
+
+    private ShipmentDto toDto(Shipment shipment) {
+        ShipmentDto dto = new ShipmentDto();
+        dto.setId(shipment.getId());
+        dto.setSoId(shipment.getSoId());
+        dto.setPoId(shipment.getPoId());
+        dto.setSiteAssessmentId(shipment.getSiteAssessmentId());
+        dto.setSiteReadinessConfirmed(shipment.getSiteReadinessConfirmed());
+        dto.setTrackingNumber(shipment.getTrackingNumber());
+        dto.setCarrier(shipment.getCarrier());
+        dto.setOriginCountry(shipment.getOriginCountry());
+        dto.setDestinationCountry(shipment.getDestinationCountry());
+        dto.setStatus(shipment.getStatus());
+        dto.setShippedDate(shipment.getShippedDate());
+        dto.setEstimatedArrival(shipment.getEstimatedArrival());
+        dto.setActualArrival(shipment.getActualArrival());
+        dto.setBillOfLadingUrl(shipment.getBillOfLadingUrl());
+        dto.setPackingListUrl(shipment.getPackingListUrl());
+        dto.setCustomsDeclarationUrl(shipment.getCustomsDeclarationUrl());
+        dto.setFreightCost(shipment.getFreightCost());
+        dto.setCurrency(shipment.getCurrency());
+        dto.setCreatedAt(shipment.getCreatedAt().toInstant());
+        dto.setUpdatedAt(shipment.getUpdatedAt().toInstant());
+        return dto;
+    }
+}

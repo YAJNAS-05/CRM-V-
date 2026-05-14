@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="InventoryStockReport" pageWidth="842" pageHeight="595" orientation="Landscape" columnWidth="802" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="a1e91c29-36d7-41fc-a6f1-8e2f0d0e8c9a">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="New Data Adapter"/>
+	<queryString language="SQL">
+		<![CDATA[SELECT item_code, name, category, current_stock, location, status, unit_cost FROM inventory_items]]>
+	</queryString>
+	<field name="item_code" class="java.lang.String"/>
+	<field name="name" class="java.lang.String"/>
+	<field name="category" class="java.lang.String"/>
+	<field name="current_stock" class="java.lang.Integer"/>
+	<field name="location" class="java.lang.String"/>
+	<field name="status" class="java.lang.String"/>
+	<field name="unit_cost" class="java.math.BigDecimal"/>
+	<title>
+		<band height="60" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="0" width="800" height="40" uuid="12345678-1234-1234-1234-123456789012"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="24" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Inventory Stock Report]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="0" y="40" width="800" height="20" uuid="12345678-1234-1234-1234-123456789013"/>
+				<textElement textAlignment="Center">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date())]]></textFieldExpression>
+			</textField>
+		</band>
+	</title>
+	<columnHeader>
+		<band height="30" splitType="Stretch">
+			<rectangle>
+				<reportElement x="0" y="0" width="800" height="30" backcolor="#E0E0E0" uuid="12345678-1234-1234-1234-123456789014"/>
+				<graphicElement>
+					<pen lineWidth="0.5"/>
+				</graphicElement>
+			</rectangle>
+			<staticText>
+				<reportElement x="10" y="5" width="80" height="20" uuid="12345678-1234-1234-1234-123456789015"/>
+				<text><![CDATA[Item Code]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="100" y="5" width="150" height="20" uuid="12345678-1234-1234-1234-123456789016"/>
+				<text><![CDATA[Item Name]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="260" y="5" width="80" height="20" uuid="12345678-1234-1234-1234-123456789017"/>
+				<text><![CDATA[Category]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="350" y="5" width="80" height="20" uuid="12345678-1234-1234-1234-123456789018"/>
+				<text><![CDATA[Stock Qty]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="440" y="5" width="100" height="20" uuid="12345678-1234-1234-1234-123456789019"/>
+				<text><![CDATA[Location]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="550" y="5" width="80" height="20" uuid="12345678-1234-1234-1234-123456789020"/>
+				<text><![CDATA[Status]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="650" y="5" width="130" height="20" uuid="12345678-1234-1234-1234-123456789021"/>
+				<text><![CDATA[Unit Cost]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="25" splitType="Stretch">
+			<textField>
+				<reportElement x="10" y="5" width="80" height="15" uuid="12345678-1234-1234-1234-123456789022"/>
+				<textFieldExpression><![CDATA[$F{item_code}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="100" y="5" width="150" height="15" uuid="12345678-1234-1234-1234-123456789023"/>
+				<textFieldExpression><![CDATA[$F{name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="260" y="5" width="80" height="15" uuid="12345678-1234-1234-1234-123456789024"/>
+				<textFieldExpression><![CDATA[$F{category}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="350" y="5" width="80" height="15" uuid="12345678-1234-1234-1234-123456789025"/>
+				<textFieldExpression><![CDATA[$F{current_stock}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="440" y="5" width="100" height="15" uuid="12345678-1234-1234-1234-123456789026"/>
+				<textFieldExpression><![CDATA[$F{location}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="550" y="5" width="80" height="15" uuid="12345678-1234-1234-1234-123456789027"/>
+				<textFieldExpression><![CDATA[$F{status}]]></textFieldExpression>
+			</textField>
+			<textField pattern="$#,##0.00;-$#,##0.00">
+				<reportElement x="650" y="5" width="130" height="15" uuid="12345678-1234-1234-1234-123456789028"/>
+				<textFieldExpression><![CDATA[$F{unit_cost}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="20" splitType="Stretch">
+			<textField>
+				<reportElement x="0" y="0" width="400" height="20" uuid="12345678-1234-1234-1234-123456789029"/>
+				<textElement textAlignment="Left"/>
+				<textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="400" y="0" width="400" height="20" uuid="12345678-1234-1234-1234-123456789030"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[" of " + $V{PAGE_COUNT}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+</jasperReport>

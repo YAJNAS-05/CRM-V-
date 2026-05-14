@@ -1,0 +1,94 @@
+package com.everx.auth.controller;
+
+import com.everx.auth.dto.LoginRequest;
+import com.everx.auth.dto.LoginResponse;
+import com.everx.auth.dto.RefreshTokenRequest;
+import com.everx.auth.dto.UserDto;
+import com.everx.auth.entity.User;
+import com.everx.auth.service.AuthService;
+import com.everx.shared.dto.ApiResponse;
+import com.everx.shared.exception.EntityNotFoundException;
+import com.everx.shared.exception.ValidationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@Validated
+@Slf4j
+public class AuthController {
+
+    @Autowired
+    private AuthService authService;
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+        log.info("Login request for email: {}", request.getEmail());
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Login successful"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("Token refresh request");
+        LoginResponse response = authService.refreshAccessToken(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.ok(response, "Token refreshed successfully"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Object>> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("Logout request");
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.okMessage("Logout successful"));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserDto>> me(Authentication authentication) {
+        UUID subjectId = extractUserId(authentication);
+        if (subjectId == null) {
+            throw new ValidationException("Authentication required");
+        }
+
+        User user;
+        try {
+            user = authService.getCurrentUser(subjectId);
+        } catch (EntityNotFoundException ignored) {
+            user = authService.getCurrentUserByAuthId(subjectId);
+        }
+
+        return ResponseEntity.ok(ApiResponse.ok(UserDto.fromEntity(user), "Current user retrieved successfully"));
+    }
+
+    private UUID extractUserId(Authentication authentication) {
+        if (authentication == null) {
+            return null;
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UUID uuid) {
+            return uuid;
+        }
+
+        if (principal instanceof String subject) {
+            try {
+                return UUID.fromString(subject);
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<ApiResponse<Object>> health() {
+        return ResponseEntity.ok(ApiResponse.okMessage("Auth service is healthy"));
+    }
+}

@@ -1,0 +1,12 @@
+package com.everx.erp.service;
+
+public enum ServiceType {
+    PREVENTIVE_MAINTENANCE,
+    CORRECTIVE_MAINTENANCE,
+    INSTALLATION,
+    DEINSTALLATION,
+    EMERGENCY_REPAIR,
+    SOFTWARE_UPDATE,
+    CONSULTATION,
+    OTHER
+}

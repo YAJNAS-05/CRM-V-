@@ -1,0 +1,404 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import { invoiceApi, paymentApi } from '../../api/financeApi'
+import { Invoice, InvoiceStatus, Payment, PaymentMethod } from '../../types/finance'
+import { toast } from 'sonner'
+import { exportToExcel, getExportDateStamp } from '../../utils/exportToExcel'
+import FinanceModuleHeader from '../../components/finance/FinanceModuleHeader'
+
+const extractPayload = <T,>(payload: unknown): T | null => {
+  if (payload === null || payload === undefined) return null
+  if (typeof payload !== 'object') return payload as T
+  const wrapped = payload as { data?: unknown }
+  return (wrapped.data ?? payload) as T
+}
+
+const extractList = <T,>(payload: unknown): T[] => {
+  const data = extractPayload<unknown>(payload)
+  if (!data) return []
+  if (Array.isArray(data)) return data as T[]
+  if (typeof data === 'object') {
+    const content = (data as { content?: unknown }).content
+    return Array.isArray(content) ? (content as T[]) : []
+  }
+  return []
+}
+
+const defaultPaymentDate = new Date().toISOString().split('T')[0]
+
+const PaymentListPage: React.FC = () => {
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [page, setPage] = useState(0)
+  const pageSize = 20
+  const [form, setForm] = useState({
+    invoiceId: '',
+    amount: '',
+    paymentDate: defaultPaymentDate,
+    method: PaymentMethod.WIRE_TRANSFER,
+    reference: '',
+    notes: '',
+  })
+
+  const invoiceLookup = useMemo(() => {
+    return invoices.reduce<Record<string, Invoice>>((acc, invoice) => {
+      acc[invoice.id] = invoice
+      return acc
+    }, {})
+  }, [invoices])
+
+  const selectedInvoice = form.invoiceId ? invoiceLookup[form.invoiceId] : null
+  const selectedOutstanding = selectedInvoice
+    ? Math.max((selectedInvoice.totalAmount || 0) - (selectedInvoice.paidAmount || 0), 0)
+    : 0
+
+  useEffect(() => {
+    fetchPayments()
+  }, [page])
+
+  useEffect(() => {
+    if (showCreateModal) {
+      fetchOpenInvoices()
+    }
+  }, [showCreateModal])
+
+  const fetchPayments = async () => {
+    try {
+      setIsLoading(true)
+      const response = await paymentApi.getAll(page, pageSize)
+      setPayments(extractList<Payment>(response.data))
+    } catch (error) {
+      toast.error('Failed to load payments')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchOpenInvoices = async () => {
+    try {
+      const response = await invoiceApi.getAll(0, 200)
+      const allInvoices = extractList<Invoice>(response.data)
+      const payableInvoices = allInvoices.filter((invoice) => {
+        const outstanding = (invoice.totalAmount || 0) - (invoice.paidAmount || 0)
+        return outstanding > 0 && invoice.status !== InvoiceStatus.CANCELLED
+      })
+      setInvoices(payableInvoices)
+    } catch (error) {
+      toast.error('Failed to load invoices for payment')
+      setInvoices([])
+    }
+  }
+
+  const resetCreateForm = () => {
+    setForm({
+      invoiceId: '',
+      amount: '',
+      paymentDate: defaultPaymentDate,
+      method: PaymentMethod.WIRE_TRANSFER,
+      reference: '',
+      notes: '',
+    })
+  }
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false)
+    resetCreateForm()
+  }
+
+  const handleCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!form.invoiceId) {
+      toast.error('Select an invoice')
+      return
+    }
+
+    const amount = Number(form.amount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Enter a valid payment amount')
+      return
+    }
+
+    if (selectedOutstanding > 0 && amount > selectedOutstanding) {
+      toast.error('Payment cannot exceed outstanding amount')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      await paymentApi.create({
+        invoiceId: form.invoiceId,
+        amount,
+        paymentDate: form.paymentDate,
+        method: form.method,
+        currency: selectedInvoice?.currency,
+        reference: form.reference || undefined,
+        notes: form.notes || undefined,
+      })
+      toast.success('Payment recorded successfully')
+      closeCreateModal()
+      fetchPayments()
+      fetchOpenInvoices()
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to create payment')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleExport = () => {
+    const rows = payments.map((payment) => ({
+      InvoiceNumber: invoiceLookup[payment.invoiceId]?.invoiceNumber || payment.invoiceId,
+      InvoiceId: payment.invoiceId,
+      PaymentDate: payment.paymentDate,
+      Method: payment.method || '',
+      Reference: payment.reference || '',
+      Amount: payment.amount,
+      Currency: payment.currency || '',
+      ExchangeRate: payment.exchangeRate || 0,
+      AudEquivalent: payment.audEquivalent || 0,
+      Notes: payment.notes || '',
+    }))
+
+    exportToExcel(rows, {
+      fileName: `EVERX_Payments_${getExportDateStamp()}.xlsx`,
+      sheetName: 'Payments',
+    })
+  }
+
+  if (isLoading && payments.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-lg text-gray-600">Loading transactions...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <FinanceModuleHeader
+        eyebrow="Collections"
+        title="Payment transactions"
+        subtitle="Capture and monitor payment receipts with invoice linkage, currency conversion, and cleaner controls."
+        actions={
+          <>
+            <button
+              onClick={handleExport}
+              disabled={payments.length === 0}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Export
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700"
+            >
+              Record Payment
+            </button>
+          </>
+        }
+        metrics={[
+          { label: 'Total Records', value: payments.length },
+          { label: 'Open Invoices', value: invoices.length },
+          { label: 'Current Page', value: page + 1 },
+          { label: 'Page Size', value: pageSize },
+        ]}
+      />
+
+      <div className="finance-table-shell">
+        <table className="min-w-full">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Invoice</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Date</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Method</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Reference</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Amount</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">AUD Equiv.</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {payments.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-20 text-center text-gray-400">
+                  <p className="text-lg">No payments recorded yet.</p>
+                </td>
+              </tr>
+            ) : (
+              payments.map((payment) => (
+                <tr key={payment.id} className="hover:bg-indigo-50/30 transition-colors">
+                  <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">
+                    {invoiceLookup[payment.invoiceId]?.invoiceNumber || `${payment.invoiceId.slice(0, 8)}...`}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{payment.paymentDate}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    <span className="px-2 py-0.5 rounded-md bg-gray-100 border text-[10px] font-bold uppercase">
+                      {payment.method}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500 italic truncate max-w-[200px]">
+                    {payment.reference || '-'}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-mono font-bold text-gray-900">
+                      {payment.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="ml-1 text-[10px] font-bold text-gray-400">{payment.currency}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="group relative inline-block">
+                      <span className="text-sm font-medium text-indigo-600 border-b border-dotted border-indigo-300">
+                        ${payment.audEquivalent?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                      <div className="absolute hidden group-hover:block bg-gray-900 text-white text-[10px] py-1 px-2 rounded -left-1/2 -top-8 whitespace-nowrap z-10 shadow-lg">
+                        Rate: {payment.exchangeRate} AUD/{payment.currency}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="finance-toolbar flex items-center justify-between p-4">
+        <button
+          onClick={() => setPage(Math.max(0, page - 1))}
+          disabled={page === 0}
+          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <div className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+          Page {page + 1}
+        </div>
+        <button
+          onClick={() => setPage(page + 1)}
+          disabled={payments.length < pageSize}
+          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl">
+            <h2 className="text-2xl font-bold mb-5">Record Payment</h2>
+            <form onSubmit={handleCreatePayment} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Invoice</label>
+                <select
+                  required
+                  value={form.invoiceId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, invoiceId: e.target.value }))}
+                  className="pm-select text-sm"
+                >
+                  <option value="">Select invoice</option>
+                  {invoices.map((invoice) => {
+                    const outstanding = Math.max((invoice.totalAmount || 0) - (invoice.paidAmount || 0), 0)
+                    return (
+                      <option key={invoice.id} value={invoice.id}>
+                        {invoice.invoiceNumber} - Outstanding {outstanding.toFixed(2)} {invoice.currency || ''}
+                      </option>
+                    )
+                  })}
+                </select>
+                {invoices.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No open invoices available for payment.</p>
+                )}
+              </div>
+
+              {selectedInvoice && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-sm text-indigo-800">
+                  Outstanding: {selectedOutstanding.toFixed(2)} {selectedInvoice.currency || ''}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={form.amount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+                    className="pm-input text-sm"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.paymentDate}
+                    onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                    className="pm-input text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Method</label>
+                <select
+                  value={form.method}
+                  onChange={(e) => setForm((prev) => ({ ...prev, method: e.target.value as PaymentMethod }))}
+                  className="pm-select text-sm"
+                >
+                  {Object.values(PaymentMethod).map((method) => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference</label>
+                <input
+                  type="text"
+                  value={form.reference}
+                  onChange={(e) => setForm((prev) => ({ ...prev, reference: e.target.value }))}
+                  className="pm-input text-sm"
+                  placeholder="Bank ref / transaction id"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className="pm-textarea text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving || invoices.length === 0}
+                  className="flex-1 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Record Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default PaymentListPage
