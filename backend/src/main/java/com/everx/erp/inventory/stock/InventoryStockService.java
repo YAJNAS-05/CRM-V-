@@ -14,6 +14,7 @@ import com.everx.erp.inventory.transfer.InventoryTransferRepository;
 import com.everx.erp.inventory.transfer.InventoryTransferStatus;
 import com.everx.erp.inventory.transfer.dto.CreateInventoryTransferRequest;
 import com.everx.erp.inventory.transfer.dto.InventoryTransferDto;
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class InventoryStockService {
     private final InventoryBinRepository inventoryBinRepository;
     private final InventoryLedgerRepository inventoryLedgerRepository;
     private final InventoryTransferRepository inventoryTransferRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     @Transactional
     public InventoryLedgerEntryDto adjustStock(CreateStockAdjustmentRequest request) {
@@ -203,11 +205,10 @@ public class InventoryStockService {
     }
 
     private String generateTransferNumber() {
-        String candidate = "TRF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        while (inventoryTransferRepository.existsByTransferNumber(candidate)) {
-            candidate = "TRF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        }
-        return candidate;
+        return documentNumberGenerator.generate(
+                "TRF",
+                inventoryTransferRepository::existsByTransferNumber
+        );
     }
 
     private String normalizeLocation(String requested, String fallback) {

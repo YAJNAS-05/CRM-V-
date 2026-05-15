@@ -3,6 +3,7 @@ package com.everx.hr.leave;
 import com.everx.hr.LeaveStatus;
 import com.everx.hr.LeaveType;
 import com.everx.hr.employee.EmployeeRepository;
+import com.everx.hr.security.HrAccessControlService;
 import com.everx.hr.leave.dto.CreateLeaveRequest;
 import com.everx.hr.leave.dto.LeaveRequestDto;
 import com.everx.hr.leave.dto.UpdateLeaveRequest;
@@ -29,12 +30,15 @@ public class LeaveService {
     private final EmployeeRepository employeeRepository;
     private final LeavePolicyService leavePolicyService;
     private final LeaveBalanceService leaveBalanceService;
+    private final HrAccessControlService hrAccessControlService;
 
     @Transactional
     public LeaveRequestDto createLeaveRequest(CreateLeaveRequest request) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
             throw new ValidationException("Leave end date cannot be before start date");
         }
+
+        hrAccessControlService.assertCanAccessEmployee(request.getEmployeeId());
 
         var employee = employeeRepository.findByIdAndNotDeleted(request.getEmployeeId())
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found with id: " + request.getEmployeeId()));
@@ -74,6 +78,7 @@ public class LeaveService {
     public LeaveRequestDto getLeaveRequest(UUID id) {
         LeaveRequest leave = leaveRequestRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Leave request not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(leave.getEmployeeId());
         return toDto(leave);
     }
 
@@ -85,12 +90,20 @@ public class LeaveService {
                                                   UUID employeeId,
                                                   LocalDate startDate,
                                                   LocalDate endDate) {
-        return leaveRequestRepository.findAllFiltered(search, status, leaveType, employeeId, startDate, endDate, pageable)
+        UUID scopedEmployeeId = employeeId;
+        if (!hrAccessControlService.hasOrgOrTeamScope()) {
+            scopedEmployeeId = hrAccessControlService.requireCurrentEmployeeId();
+        } else if (employeeId != null) {
+            hrAccessControlService.assertCanAccessEmployee(employeeId);
+        }
+
+        return leaveRequestRepository.findAllFiltered(search, status, leaveType, scopedEmployeeId, startDate, endDate, pageable)
                 .map(this::toDto);
     }
 
     @Transactional(readOnly = true)
     public List<LeaveRequestDto> getLeaveRequestsByEmployee(UUID employeeId) {
+        hrAccessControlService.assertCanAccessEmployee(employeeId);
         return leaveRequestRepository.findByEmployeeIdAndIsDeletedFalse(employeeId).stream().map(this::toDto).toList();
     }
 
@@ -98,6 +111,7 @@ public class LeaveService {
     public LeaveRequestDto updateLeaveRequest(UUID id, UpdateLeaveRequest request) {
         LeaveRequest leave = leaveRequestRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Leave request not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(leave.getEmployeeId());
 
         LeaveStatus previousStatus = leave.getStatus();
         LeaveType oldType = leave.getLeaveType();
@@ -121,29 +135,34 @@ public class LeaveService {
             leaveBalanceService.applyPending(leave.getEmployeeId(), newType, newDays, policy);
         }
 
+        if (request.getStatus() != null) {
+            throw new ValidationException("Use dedicated endpoints for leave status transitions");
+        }
+
         if (request.getLeaveType() != null) leave.setLeaveType(request.getLeaveType());
         if (request.getStartDate() != null) leave.setStartDate(request.getStartDate());
         if (request.getEndDate() != null) leave.setEndDate(request.getEndDate());
-        if (request.getStatus() != null) leave.setStatus(request.getStatus());
         if (request.getNotes() != null) leave.setNotes(request.getNotes());
 
-        if (request.getStatus() != null && previousStatus == LeaveStatus.REQUESTED && leave.getStatus() == LeaveStatus.APPROVED) {
-            LeavePolicy policy = leavePolicyService.getActivePolicy(leave.getLeaveType(), leave.getStartDate());
-            leaveBalanceService.approve(leave.getEmployeeId(), leave.getLeaveType(), newDays, policy);
-        } else if (request.getStatus() != null && previousStatus == LeaveStatus.REQUESTED
-                && (leave.getStatus() == LeaveStatus.REJECTED || leave.getStatus() == LeaveStatus.CANCELLED)) {
-            leaveBalanceService.rollbackPending(leave.getEmployeeId(), leave.getLeaveType(), newDays);
+        if (previousStatus != leave.getStatus()) {
+            throw new ValidationException("Leave status update must be done via workflow endpoints");
         }
 
         return toDto(leaveRequestRepository.save(leave));
     }
 
     @Transactional
-    public LeaveRequestDto approveLeaveRequest(UUID id, UUID approvedBy) {
+    public LeaveRequestDto approveLeaveRequest(UUID id) {
         LeaveRequest leave = leaveRequestRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Leave request not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(leave.getEmployeeId());
+        if (leave.getStatus() != LeaveStatus.REQUESTED) {
+            throw new ValidationException("Only REQUESTED leave requests can be approved");
+        }
+
+        UUID approverId = hrAccessControlService.resolveCurrentApproverId();
         leave.setStatus(LeaveStatus.APPROVED);
-        leave.setApprovedBy(approvedBy);
+        leave.setApprovedBy(approverId);
         leave.setApprovedAt(OffsetDateTime.now());
 
         LeavePolicy policy = leavePolicyService.getActivePolicy(leave.getLeaveType(), leave.getStartDate());
@@ -157,6 +176,7 @@ public class LeaveService {
     public LeaveRequestDto cancelLeaveRequest(UUID id) {
         LeaveRequest leave = leaveRequestRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Leave request not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(leave.getEmployeeId());
 
         if (leave.getStatus() == LeaveStatus.APPROVED) {
             throw new ValidationException("Approved leave requests cannot be cancelled");

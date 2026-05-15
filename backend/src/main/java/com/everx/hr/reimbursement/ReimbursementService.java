@@ -1,6 +1,7 @@
 package com.everx.hr.reimbursement;
 
 import com.everx.hr.ReimbursementStatus;
+import com.everx.hr.security.HrAccessControlService;
 import com.everx.hr.reimbursement.dto.CreateReimbursementRequest;
 import com.everx.hr.reimbursement.dto.ReimbursementRequestDto;
 import com.everx.hr.reimbursement.dto.UpdateReimbursementRequest;
@@ -20,12 +21,15 @@ import java.util.UUID;
 public class ReimbursementService {
 
     private final ReimbursementRepository reimbursementRepository;
+    private final HrAccessControlService hrAccessControlService;
 
     @Transactional
     public ReimbursementRequestDto createReimbursement(CreateReimbursementRequest request) {
         if (request.getAmount() == null || request.getAmount().signum() <= 0) {
             throw new ValidationException("Reimbursement amount must be greater than zero");
         }
+
+        hrAccessControlService.assertCanAccessUserScopedResource(request.getRequestedBy());
 
         ReimbursementRequest reimbursement = new ReimbursementRequest();
         reimbursement.setRequestedBy(request.getRequestedBy());
@@ -44,6 +48,7 @@ public class ReimbursementService {
     public ReimbursementRequestDto getReimbursement(UUID id) {
         ReimbursementRequest reimbursement = reimbursementRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Reimbursement not found with id: " + id));
+        hrAccessControlService.assertCanAccessUserScopedResource(reimbursement.getRequestedBy());
         return toDto(reimbursement);
     }
 
@@ -54,7 +59,14 @@ public class ReimbursementService {
                                                            UUID requestedBy,
                                                            java.time.LocalDate startDate,
                                                            java.time.LocalDate endDate) {
-        return reimbursementRepository.findAllFiltered(search, status, requestedBy, startDate, endDate, pageable)
+        UUID scopedRequestedBy = requestedBy;
+        if (!hrAccessControlService.hasOrgOrTeamScope()) {
+            scopedRequestedBy = hrAccessControlService.requireCurrentUserId();
+        } else if (requestedBy != null) {
+            hrAccessControlService.assertCanAccessUserScopedResource(requestedBy);
+        }
+
+        return reimbursementRepository.findAllFiltered(search, status, scopedRequestedBy, startDate, endDate, pageable)
                 .map(this::toDto);
     }
 
@@ -62,6 +74,7 @@ public class ReimbursementService {
     public ReimbursementRequestDto updateReimbursement(UUID id, UpdateReimbursementRequest request) {
         ReimbursementRequest reimbursement = reimbursementRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Reimbursement not found with id: " + id));
+        hrAccessControlService.assertCanAccessUserScopedResource(reimbursement.getRequestedBy());
 
         if (request.getAmount() != null && request.getAmount().signum() <= 0) {
             throw new ValidationException("Reimbursement amount must be greater than zero");
@@ -72,18 +85,38 @@ public class ReimbursementService {
         if (request.getCategory() != null) reimbursement.setCategory(request.getCategory());
         if (request.getRequestDate() != null) reimbursement.setRequestDate(request.getRequestDate());
         if (request.getDescription() != null) reimbursement.setDescription(request.getDescription());
-        if (request.getStatus() != null) reimbursement.setStatus(request.getStatus());
+        if (request.getStatus() != null) {
+            if (request.getStatus() == ReimbursementStatus.REJECTED) {
+                if (reimbursement.getStatus() != ReimbursementStatus.SUBMITTED) {
+                    throw new ValidationException("Only SUBMITTED reimbursements can be rejected");
+                }
+                reimbursement.setStatus(ReimbursementStatus.REJECTED);
+            } else if (request.getStatus() == ReimbursementStatus.PAID) {
+                if (reimbursement.getStatus() != ReimbursementStatus.APPROVED) {
+                    throw new ValidationException("Only APPROVED reimbursements can be marked PAID");
+                }
+                reimbursement.setStatus(ReimbursementStatus.PAID);
+            } else {
+                throw new ValidationException("Use dedicated approve endpoint for approval transitions");
+            }
+        }
         if (request.getNotes() != null) reimbursement.setNotes(request.getNotes());
 
         return toDto(reimbursementRepository.save(reimbursement));
     }
 
     @Transactional
-    public ReimbursementRequestDto approveReimbursement(UUID id, UUID approvedBy) {
+    public ReimbursementRequestDto approveReimbursement(UUID id) {
         ReimbursementRequest reimbursement = reimbursementRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Reimbursement not found with id: " + id));
+        hrAccessControlService.assertCanAccessUserScopedResource(reimbursement.getRequestedBy());
+        if (reimbursement.getStatus() != ReimbursementStatus.SUBMITTED) {
+            throw new ValidationException("Only SUBMITTED reimbursements can be approved");
+        }
+
+        UUID approverId = hrAccessControlService.resolveCurrentApproverId();
         reimbursement.setStatus(ReimbursementStatus.APPROVED);
-        reimbursement.setApprovedBy(approvedBy);
+        reimbursement.setApprovedBy(approverId);
         reimbursement.setApprovedAt(OffsetDateTime.now());
         return toDto(reimbursementRepository.save(reimbursement));
     }

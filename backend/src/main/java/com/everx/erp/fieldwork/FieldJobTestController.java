@@ -4,6 +4,7 @@ import com.everx.erp.fieldwork.dto.CreateFieldJobRequest;
 import com.everx.erp.fieldwork.dto.FieldJobDto;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import java.time.OffsetDateTime;
 @RestController
 @RequestMapping("/api/field-jobs-test")
 @RequiredArgsConstructor
+@Profile({"dev", "test", "h2"})
 public class FieldJobTestController {
 
     private final FieldJobService fieldJobService;

@@ -300,11 +300,10 @@ public class SalesOrderService {
     }
 
     private String generateWorkflowInvoiceNumber(String soNumber) {
-        String seed = soNumber == null ? "SO" : soNumber.replaceAll("[^A-Za-z0-9]", "");
-        if (seed.length() > 8) {
-            seed = seed.substring(seed.length() - 8);
-        }
-        return "INV-WF-" + LocalDate.now().getYear() + "-" + seed + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return documentNumberGenerator.generate(
+                "INV-WF",
+                candidate -> invoiceRepository.findByInvoiceNumberAndIsDeletedFalse(candidate).isPresent()
+        );
     }
 
     private String generateSalesOrderNumber() {

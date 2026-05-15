@@ -3,14 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { employeeApi, reimbursementApi } from '../../api/hrApi'
 import { Employee, ReimbursementRequest, ReimbursementStatus } from '../../types/hr'
-import { useAuthStore } from '../../store/authStore'
 
 const STATUS_STEPS: ReimbursementStatus[] = ['SUBMITTED', 'APPROVED', 'PAID']
 
 const ReimbursementDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user } = useAuthStore()
   const [request, setRequest] = useState<ReimbursementRequest | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [decisionNote, setDecisionNote] = useState('')
@@ -72,13 +70,9 @@ const ReimbursementDetailPage: React.FC = () => {
 
   const handleApprove = async () => {
     if (!request || !id) return
-    if (!user?.id) {
-      toast.error('Missing approver identity')
-      return
-    }
     try {
       setSaving(true)
-      const response = await reimbursementApi.approve(id, user.id)
+      const response = await reimbursementApi.approve(id)
       setRequest(response.data.data)
       toast.success('Reimbursement approved')
     } catch (error) {

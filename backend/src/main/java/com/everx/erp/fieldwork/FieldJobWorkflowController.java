@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -17,8 +18,10 @@ import java.util.UUID;
 public class FieldJobWorkflowController {
 
     private final FieldJobService fieldJobService;
+    private final FieldJobOperationsService operationsService;
 
     @PatchMapping("/{jobId}/assign")
+    @PreAuthorize("hasAuthority('FIELDWORK_EDIT')")
     public ResponseEntity<?> assignEngineer(
             @PathVariable UUID jobId,
             @RequestParam UUID engineerId,
@@ -34,6 +37,7 @@ public class FieldJobWorkflowController {
     }
 
     @PatchMapping("/{jobId}/start")
+    @PreAuthorize("hasAuthority('FIELDWORK_EDIT')")
     public ResponseEntity<?> startFieldJob(@PathVariable UUID jobId) {
         try {
             FieldJobDto updated = fieldJobService.startJob(jobId);
@@ -45,17 +49,14 @@ public class FieldJobWorkflowController {
     }
 
     @PatchMapping("/{jobId}/complete")
-    public ResponseEntity<?> completeFieldJob(
+        @PreAuthorize("hasAuthority('FIELDWORK_EDIT')")
+        public ResponseEntity<?> completeFieldJob(
             @PathVariable UUID jobId,
             @RequestParam(required = false) String completionNotes) {
         try {
             FieldJobDto completedJob = fieldJobService.completeFieldJob(jobId, completionNotes);
-            return ResponseEntity.ok(new FieldJobCompletionResponse(
-                    "success",
-                    "Field job completed",
-                    completedJob,
-                    completedJob.getLinkedInvoiceId() != null ? "Invoice created" : null
-            ));
+            operationsService.ensureReportForJob(jobId);
+            return ResponseEntity.ok(completedJob);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new FieldJobCompletionResponse("error", e.getMessage(), null, null));

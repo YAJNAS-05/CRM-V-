@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -26,28 +27,33 @@ public class PayrollController {
     private final PayrollService payrollService;
 
     @PutMapping("/payroll-profiles")
+    @PreAuthorize("hasAnyAuthority('HR_PAYROLL_PROFILE_CREATE','HR_PAYROLL_PROFILE_EDIT')")
     public ResponseEntity<ApiResponse<PayrollProfileDto>> upsertPayrollProfile(
             @Valid @RequestBody UpdatePayrollProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(payrollService.upsertPayrollProfile(request), "Payroll profile saved"));
     }
 
     @GetMapping("/payroll-profiles/{employeeId}")
+    @PreAuthorize("hasAuthority('HR_PAYROLL_PROFILE_VIEW')")
     public ResponseEntity<ApiResponse<PayrollProfileDto>> getPayrollProfile(@PathVariable UUID employeeId) {
         return ResponseEntity.ok(ApiResponse.ok(payrollService.getPayrollProfileByEmployee(employeeId)));
     }
 
     @PostMapping("/payroll-runs")
+    @PreAuthorize("hasAuthority('HR_PAYROLL_RUN_CREATE')")
     public ResponseEntity<ApiResponse<PayrollRunDto>> createPayrollRun(@Valid @RequestBody CreatePayrollRunRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(payrollService.createPayrollRun(request), "Payroll run created"));
     }
 
     @GetMapping("/payroll-runs/{id}")
+    @PreAuthorize("hasAuthority('HR_PAYROLL_RUN_VIEW')")
     public ResponseEntity<ApiResponse<PayrollRunDto>> getPayrollRun(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(payrollService.getPayrollRun(id)));
     }
 
     @GetMapping("/payroll-runs")
+    @PreAuthorize("hasAuthority('HR_PAYROLL_RUN_VIEW')")
     public ResponseEntity<ApiResponse<Page<PayrollRunDto>>> getPayrollRuns(
             @RequestParam(required = false) PayrollRunStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -58,11 +64,13 @@ public class PayrollController {
     }
 
     @PatchMapping("/payroll-runs/{id}/approve")
+    @PreAuthorize("hasAuthority('HR_PAYROLL_RUN_EDIT')")
     public ResponseEntity<ApiResponse<PayrollRunDto>> approvePayrollRun(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(payrollService.approvePayrollRun(id), "Payroll run approved"));
     }
 
     @PatchMapping("/payroll-runs/{id}/pay")
+    @PreAuthorize("hasAuthority('HR_PAYROLL_RUN_EDIT')")
     public ResponseEntity<ApiResponse<PayrollRunDto>> markPayrollRunPaid(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(payrollService.markPayrollRunPaid(id), "Payroll run marked paid"));
     }

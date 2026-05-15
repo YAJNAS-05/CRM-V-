@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { usePermissions } from '../../hooks/usePermissions'
+import { usePermissions as useSupabaseRBAC } from '../../hooks/useRBAC'
 
 interface SidebarProps {
   collapsed: boolean
@@ -82,6 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
   const showCollapsed = collapsed && !mobileOpen
   const user = useAuthStore((state) => state.user)
   const { hasAnyRole } = usePermissions()
+  const { can: canModuleView } = useSupabaseRBAC()
   const userPermissions = user?.permissions || []
   const [menuQuery, setMenuQuery] = useState('')
   const [activeFlyout, setActiveFlyout] = useState<string | null>(null)
@@ -118,6 +120,22 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
     FINANCE: ['FINANCE_VIEW'],
     FIELDWORK: ['FIELDWORK_VIEW'],
     REPORTING: ['REPORT_VIEW'],
+  }
+
+  const moduleKeyMap: Record<string, string> = {
+    CRM: 'crm',
+    ERP: 'pm',
+    HR: 'hr',
+    FINANCE: 'finance',
+    FIELDWORK: 'fieldwork',
+    SETTINGS: 'admin',
+  }
+
+  const itemModuleActionMap: Record<string, { module: string; action: string }> = {
+    '/admin/users': { module: 'admin', action: 'view' },
+    '/admin/roles': { module: 'admin', action: 'view' },
+    '/admin/invite': { module: 'admin', action: 'create' },
+    '/admin/audit': { module: 'admin', action: 'view' },
   }
 
   const toggleSection = (title: string) => {
@@ -335,11 +353,13 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
           }
 
           const requiredModulePermissions = moduleViewPermissions[group.title]
+          const moduleKey = moduleKeyMap[group.title]
+          const hasSupabaseModuleAccess = moduleKey ? canModuleView(moduleKey, 'view') : false
           if (!requiredModulePermissions || requiredModulePermissions.length === 0) {
             return true
           }
 
-          return requiredModulePermissions.some((permission) =>
+          return hasSupabaseModuleAccess || requiredModulePermissions.some((permission) =>
             userPermissions.includes(permission)
           )
         })
@@ -352,7 +372,12 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
             }
 
             if (item.requiredPermission) {
-              return userPermissions.includes(item.requiredPermission)
+              const mappedPermission = itemModuleActionMap[item.path]
+              const hasSupabaseItemAccess = mappedPermission
+                ? canModuleView(mappedPermission.module, mappedPermission.action)
+                : false
+
+              return hasSupabaseItemAccess || userPermissions.includes(item.requiredPermission)
             }
 
             const inferredPermissions = inferRequiredPermissionsForPath(item.path)

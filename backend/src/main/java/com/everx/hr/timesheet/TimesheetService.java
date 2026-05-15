@@ -2,6 +2,7 @@ package com.everx.hr.timesheet;
 
 import com.everx.hr.TimesheetStatus;
 import com.everx.hr.employee.EmployeeRepository;
+import com.everx.hr.security.HrAccessControlService;
 import com.everx.hr.timeentry.TimeEntry;
 import com.everx.hr.timeentry.TimeEntryRepository;
 import com.everx.hr.timesheet.dto.CreateTimesheetRequest;
@@ -29,9 +30,11 @@ public class TimesheetService {
     private final TimesheetRepository timesheetRepository;
     private final EmployeeRepository employeeRepository;
     private final TimeEntryRepository timeEntryRepository;
+    private final HrAccessControlService hrAccessControlService;
 
     @Transactional
     public TimesheetDto createTimesheet(CreateTimesheetRequest request) {
+        hrAccessControlService.assertCanAccessEmployee(request.getEmployeeId());
         employeeRepository.findByIdAndNotDeleted(request.getEmployeeId())
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found with id: " + request.getEmployeeId()));
 
@@ -56,6 +59,7 @@ public class TimesheetService {
     public TimesheetDto getTimesheetById(UUID id) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(timesheet.getEmployeeId());
         return toDto(timesheet);
     }
 
@@ -65,11 +69,19 @@ public class TimesheetService {
                                             TimesheetStatus status,
                                             LocalDate startDate,
                                             LocalDate endDate) {
-        return timesheetRepository.findAllFiltered(employeeId, status, startDate, endDate, pageable).map(this::toDto);
+        UUID scopedEmployeeId = employeeId;
+        if (!hrAccessControlService.hasOrgOrTeamScope()) {
+            scopedEmployeeId = hrAccessControlService.requireCurrentEmployeeId();
+        } else if (employeeId != null) {
+            hrAccessControlService.assertCanAccessEmployee(employeeId);
+        }
+
+        return timesheetRepository.findAllFiltered(scopedEmployeeId, status, startDate, endDate, pageable).map(this::toDto);
     }
 
     @Transactional(readOnly = true)
     public List<TimesheetDto> getTimesheetsByEmployee(UUID employeeId) {
+        hrAccessControlService.assertCanAccessEmployee(employeeId);
         return timesheetRepository.findByEmployeeIdAndIsDeletedFalse(employeeId).stream().map(this::toDto).toList();
     }
 
@@ -77,6 +89,11 @@ public class TimesheetService {
     public TimesheetDto updateTimesheet(UUID id, UpdateTimesheetRequest request) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(timesheet.getEmployeeId());
+
+        if (request.getStatus() != null) {
+            throw new ValidationException("Use submit/approve/reject endpoints for timesheet status updates");
+        }
 
         if (request.getFieldJobId() != null) timesheet.setFieldJobId(request.getFieldJobId());
         if (request.getWorkDate() != null) {
@@ -90,7 +107,6 @@ public class TimesheetService {
             timesheet.setTotalBillableHours(BigDecimal.ZERO);
         }
         if (request.getNotes() != null) timesheet.setNotes(request.getNotes());
-        if (request.getStatus() != null) timesheet.setStatus(request.getStatus());
 
         return toDto(timesheetRepository.save(timesheet));
     }
@@ -99,6 +115,7 @@ public class TimesheetService {
     public TimesheetDto submitTimesheet(UUID id) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(timesheet.getEmployeeId());
         if (timesheet.getStatus() != TimesheetStatus.DRAFT) {
             throw new ValidationException("Only DRAFT timesheets can be submitted");
         }
@@ -107,14 +124,16 @@ public class TimesheetService {
     }
 
     @Transactional
-    public TimesheetDto approveTimesheet(UUID id, UUID approvedBy) {
+    public TimesheetDto approveTimesheet(UUID id) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(timesheet.getEmployeeId());
         if (timesheet.getStatus() != TimesheetStatus.SUBMITTED) {
             throw new ValidationException("Only SUBMITTED timesheets can be approved");
         }
+        UUID approverId = hrAccessControlService.resolveCurrentApproverId();
         timesheet.setStatus(TimesheetStatus.APPROVED);
-        timesheet.setApprovedBy(approvedBy);
+        timesheet.setApprovedBy(approverId);
         timesheet.setApprovedAt(OffsetDateTime.now());
         return toDto(timesheetRepository.save(timesheet));
     }
@@ -123,6 +142,7 @@ public class TimesheetService {
     public TimesheetDto rejectTimesheet(UUID id, String notes) {
         Timesheet timesheet = timesheetRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet not found with id: " + id));
+        hrAccessControlService.assertCanAccessEmployee(timesheet.getEmployeeId());
         if (timesheet.getStatus() != TimesheetStatus.SUBMITTED) {
             throw new ValidationException("Only SUBMITTED timesheets can be rejected");
         }
@@ -135,6 +155,7 @@ public class TimesheetService {
 
     @Transactional
     public Timesheet getOrCreateDailyTimesheet(UUID employeeId, LocalDate workDate) {
+        hrAccessControlService.assertCanAccessEmployee(employeeId);
         return timesheetRepository.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employeeId, workDate)
                 .orElseGet(() -> {
                     Timesheet timesheet = new Timesheet();

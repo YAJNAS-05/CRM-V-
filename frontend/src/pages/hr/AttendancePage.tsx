@@ -12,9 +12,10 @@ const SAMPLE_HISTORY: AttendancePunch[] = [
   { id: '4', employeeId: 'me', punchIn: '2026-04-11T09:15:00Z', punchOut: '2026-04-11T18:00:00Z', workDate: '2026-04-11', totalHours: 8.75 },
   { id: '5', employeeId: 'me', punchIn: '2026-04-10T08:55:00Z', punchOut: '2026-04-10T17:05:00Z', workDate: '2026-04-10', totalHours: 8.17 },
 ]
+const HR_ATTENDANCE_DEMO_MODE = import.meta.env.VITE_HR_ATTENDANCE_DEMO_MODE === 'true'
 
 const AttendancePage: React.FC = () => {
-  const [punchHistory, setPunchHistory] = useState<AttendancePunch[]>(SAMPLE_HISTORY)
+  const [punchHistory, setPunchHistory] = useState<AttendancePunch[]>(HR_ATTENDANCE_DEMO_MODE ? SAMPLE_HISTORY : [])
   const [currentPunch, setCurrentPunch] = useState<AttendancePunch | null>(null)
   const [currentTime, setCurrentTime] = useState(nowStr())
   const [notes, setNotes] = useState('')
@@ -40,6 +41,10 @@ const AttendancePage: React.FC = () => {
   }
 
   const handlePunchIn = () => {
+    if (!HR_ATTENDANCE_DEMO_MODE) {
+      toast.info('Attendance demo mode is disabled. Connect the backend endpoint to enable live punch tracking.')
+      return
+    }
     const newPunch: AttendancePunch = {
       id: String(Date.now()),
       employeeId: 'me',
@@ -54,6 +59,10 @@ const AttendancePage: React.FC = () => {
   }
 
   const handlePunchOut = () => {
+    if (!HR_ATTENDANCE_DEMO_MODE) {
+      toast.info('Attendance demo mode is disabled')
+      return
+    }
     if (!currentPunch) return
     const punchOut = new Date().toISOString()
     const inTime = new Date(currentPunch.punchIn).getTime()
@@ -75,6 +84,11 @@ const AttendancePage: React.FC = () => {
         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 font-semibold">Time & Attendance</p>
         <h1 className="text-2xl font-bold text-slate-900 mt-2">Attendance</h1>
         <p className="text-sm text-slate-600 mt-1">Track your daily punch-in and punch-out times.</p>
+        {!HR_ATTENDANCE_DEMO_MODE && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Demo dataset is disabled. Enable VITE_HR_ATTENDANCE_DEMO_MODE=true for local simulation mode.
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}

@@ -30,9 +30,10 @@ type NewCandidateForm = {
 }
 
 const EMPTY_FORM: NewCandidateForm = { firstName: '', lastName: '', email: '', phone: '', positionTitle: '', source: '' }
+const HR_CANDIDATE_DEMO_MODE = import.meta.env.VITE_HR_CANDIDATE_DEMO_MODE === 'true'
 
 const CandidatePipelinePage: React.FC = () => {
-  const [candidates, setCandidates] = useState<Candidate[]>(SAMPLE_CANDIDATES)
+  const [candidates, setCandidates] = useState<Candidate[]>(HR_CANDIDATE_DEMO_MODE ? SAMPLE_CANDIDATES : [])
   const [showAddModal, setShowAddModal] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [form, setForm] = useState<NewCandidateForm>(EMPTY_FORM)
@@ -55,12 +56,21 @@ const CandidatePipelinePage: React.FC = () => {
   const handleDragOver = (e: React.DragEvent) => e.preventDefault()
   const handleDrop = (stage: CandidateStage) => {
     if (!draggedId) return
+    if (!HR_CANDIDATE_DEMO_MODE) {
+      toast.info('Candidate pipeline is read-only until backend integration is enabled')
+      setDraggedId(null)
+      return
+    }
     setCandidates((prev) => prev.map((c) => c.id === draggedId ? { ...c, stage } : c))
     toast.success(`Candidate moved to ${stage}`)
     setDraggedId(null)
   }
 
   const handleAdd = () => {
+    if (!HR_CANDIDATE_DEMO_MODE) {
+      toast.info('Candidate creation is disabled outside demo mode')
+      return
+    }
     if (!form.firstName || !form.lastName || !form.email) {
       toast.error('First name, last name and email are required')
       return
@@ -109,6 +119,11 @@ const CandidatePipelinePage: React.FC = () => {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
+          {!HR_CANDIDATE_DEMO_MODE && (
+            <div className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Demo dataset is disabled. Enable VITE_HR_CANDIDATE_DEMO_MODE=true for local showcase mode.
+            </div>
+          )}
           <input
             type="text"
             value={search}

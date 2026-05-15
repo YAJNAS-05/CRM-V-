@@ -42,10 +42,31 @@ export default function PurchaseOrderDetailPage() {
     setFormData(prev => prev ? { ...prev, [name]: value } : null)
   }
 
+const PO_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SHIPPED', 'DELIVERED', 'CANCELLED']
   const handleSave = async () => {
     if (!formData) return
     try {
-      const response = await purchaseOrderApi.update(id!, formData)
+      const response = await purchaseOrderApi.update(id!, {
+        poNumber: formData.poNumber || null,
+        supplierId: formData.supplierId,
+        status: formData.status,
+        orderDate: formData.orderDate || null,
+        expectedDelivery: formData.expectedDelivery || null,
+        actualDelivery: formData.actualDelivery || null,
+        currency: formData.currency || null,
+        totalAmount: formData.totalAmount ?? null,
+        paymentMethod: formData.paymentMethod || null,
+        shippingDocs: formData.shippingDocs || [],
+        notes: formData.notes || null,
+        items: (formData.items || []).map((item) => ({
+          equipmentId: item.equipmentId || null,
+          sparePartId: item.sparePartId || null,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice ?? null,
+          lineTotal: item.lineTotal ?? null,
+        })),
+      })
       if (response.data.success) {
         setPo(response.data.data)
         setEditMode(false)
@@ -61,7 +82,7 @@ export default function PurchaseOrderDetailPage() {
       try {
         await purchaseOrderApi.delete(id!)
         alert('Purchase order deleted successfully')
-        navigate('/erp/purchaseorders')
+        navigate('/erp/purchase-orders')
       } catch (err) {
         alert('Error: ' + (err instanceof Error ? err.message : 'Unknown error'))
       }
@@ -114,16 +135,14 @@ export default function PurchaseOrderDetailPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">PO Date</label>
-              <input type="date" name="poDate" value={displayData?.poDate || ''} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100" />
+              <input type="date" name="orderDate" value={displayData?.orderDate || ''} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Status</label>
               <select name="status" value={displayData?.status || 'DRAFT'} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100">
-                <option value="DRAFT">Draft</option>
-                <option value="SENT">Sent</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="RECEIVED">Received</option>
-                <option value="CLOSED">Closed</option>
+                {PO_STATUSES.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -145,8 +164,8 @@ export default function PurchaseOrderDetailPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Payment Terms</label>
-              <input type="text" name="paymentTerms" value={displayData?.paymentTerms || ''} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100" />
+              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <input type="text" name="paymentMethod" value={displayData?.paymentMethod || ''} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100" />
             </div>
           </div>
         </div>
@@ -155,6 +174,7 @@ export default function PurchaseOrderDetailPage() {
       <div className="mt-6 bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Notes</h2>
         <textarea name="notes" value={displayData?.notes || ''} onChange={handleInputChange} disabled={!editMode} className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-100" rows={4} />
+          <button onClick={() => navigate('/erp/purchase-orders')} className="px-4 py-2 bg-gray-600 text-white rounded">Back</button>
       </div>
     </div>
   )

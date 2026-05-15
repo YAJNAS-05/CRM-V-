@@ -96,11 +96,11 @@ public class Task {
     @Builder.Default
     private Boolean isPrivate = false;
 
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "json")
     @Builder.Default
     private String metadata = "{}";
 
-    @Column(columnDefinition = "text[]")
+    @Column(columnDefinition = "text array")
     @Builder.Default
     private List<String> tags = new ArrayList<>();
 

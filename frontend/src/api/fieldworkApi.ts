@@ -15,7 +15,27 @@ import {
 import { Page } from '../types';
 
 const ENABLE_FIELD_JOBS_API = import.meta.env.VITE_ENABLE_FIELD_JOBS_API !== 'false';
-const ENABLE_FIELD_JOBS_TEST_FALLBACK = import.meta.env.VITE_ENABLE_FIELD_JOBS_TEST_FALLBACK === 'true';
+const ENABLE_FIELD_JOBS_TEST_FALLBACK = import.meta.env.DEV && import.meta.env.VITE_ENABLE_FIELD_JOBS_TEST_FALLBACK === 'true';
+
+const unwrapApiPayload = <T>(payload: any): T => {
+  if (payload?.data?.data !== undefined) {
+    return payload.data.data as T;
+  }
+
+  if (payload?.data?.job !== undefined) {
+    return payload.data.job as T;
+  }
+
+  if (payload?.data !== undefined) {
+    return payload.data as T;
+  }
+
+  if (payload?.job !== undefined) {
+    return payload.job as T;
+  }
+
+  return payload as T;
+};
 
 const normalizeFieldJobsPage = (
   payload: any,
@@ -79,7 +99,7 @@ export const fieldworkApi = {
 
     try {
       const response = await api.post<FieldJobDto>('/field-jobs', fieldJob);
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       if (!ENABLE_FIELD_JOBS_TEST_FALLBACK) {
         throw error;
@@ -90,7 +110,7 @@ export const fieldworkApi = {
         internalNotes: fieldJob.internalNotes,
         priority: fieldJob.priority || 'ROUTINE'
       });
-      return testResponse.data as FieldJobDto;
+      return unwrapApiPayload<FieldJobDto>(testResponse.data);
     }
   },
 
@@ -150,7 +170,7 @@ export const fieldworkApi = {
   getFieldJobById: async (id: number | string): Promise<FieldJobDto> => {
     try {
       const response = await api.get<FieldJobDto>(`/field-jobs/${id}`);
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       console.error(`Error fetching field job ${id}:`, error);
       throw error;
@@ -164,7 +184,7 @@ export const fieldworkApi = {
   updateFieldJob: async (id: number | string, fieldJob: FieldJobDto): Promise<FieldJobDto> => {
     try {
       const response = await api.put<FieldJobDto>(`/field-jobs/${id}`, fieldJob);
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       console.error(`Error updating field job ${id}:`, error);
       throw error;
@@ -191,7 +211,7 @@ export const fieldworkApi = {
   getUrgentJobs: async (): Promise<FieldJobDto[]> => {
     try {
       const response = await api.get<FieldJobDto[]>('/field-jobs/urgent');
-      return response.data;
+      return unwrapApiPayload<FieldJobDto[]>(response.data);
     } catch (error) {
       console.error('Error fetching urgent jobs:', error);
       throw error;
@@ -213,7 +233,7 @@ export const fieldworkApi = {
         {},
         { params: { engineerId } }
       );
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       console.error(`Error assigning engineer to job ${jobId}:`, error);
       throw error;
@@ -227,7 +247,7 @@ export const fieldworkApi = {
   startJob: async (id: string | number): Promise<FieldJobDto> => {
     try {
       const response = await api.patch<FieldJobDto>(`/field-jobs/${id}/start`, {});
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       console.error(`Error starting job ${id}:`, error);
       throw error;
@@ -241,7 +261,7 @@ export const fieldworkApi = {
   completeJob: async (id: string | number): Promise<FieldJobDto> => {
     try {
       const response = await api.patch<FieldJobDto>(`/field-jobs/${id}/complete`, {});
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       console.error(`Error completing job ${id}:`, error);
       throw error;
@@ -256,7 +276,7 @@ export const fieldworkApi = {
   processSignOff: async (id: string | number, signOff: FieldJobSignOffDto): Promise<FieldJobDto> => {
     try {
       const response = await api.post<FieldJobDto>(`/field-jobs/${id}/sign-off`, signOff);
-      return response.data;
+      return unwrapApiPayload<FieldJobDto>(response.data);
     } catch (error) {
       console.error(`Error processing sign-off for job ${id}:`, error);
       throw error;
@@ -277,7 +297,7 @@ export const fieldworkApi = {
         `/field-jobs/${jobId}/costs`,
         cost
       );
-      return response.data;
+      return unwrapApiPayload<FieldJobCostDto>(response.data);
     } catch (error) {
       console.error(`Error adding cost to job ${jobId}:`, error);
       throw error;
@@ -291,7 +311,7 @@ export const fieldworkApi = {
   getJobCosts: async (jobId: string | number): Promise<FieldJobCostDto[]> => {
     try {
       const response = await api.get<FieldJobCostDto[]>(`/field-jobs/${jobId}/costs`);
-      return response.data;
+      return unwrapApiPayload<FieldJobCostDto[]>(response.data);
     } catch (error) {
       console.error(`Error fetching costs for job ${jobId}:`, error);
       throw error;
@@ -308,7 +328,7 @@ export const fieldworkApi = {
         `/field-jobs/${jobId}/costs/${costId}`,
         cost
       );
-      return response.data;
+      return unwrapApiPayload<FieldJobCostDto>(response.data);
     } catch (error) {
       console.error(`Error updating cost ${costId}:`, error);
       throw error;
@@ -329,7 +349,7 @@ export const fieldworkApi = {
         `/field-jobs/${jobId}/travel`,
         travel
       );
-      return response.data;
+      return unwrapApiPayload<FieldJobTravelDto>(response.data);
     } catch (error) {
       console.error(`Error adding travel to job ${jobId}:`, error);
       throw error;
@@ -343,7 +363,7 @@ export const fieldworkApi = {
   getJobTravel: async (jobId: string | number): Promise<FieldJobTravelDto[]> => {
     try {
       const response = await api.get<FieldJobTravelDto[]>(`/field-jobs/${jobId}/travel`);
-      return response.data;
+      return unwrapApiPayload<FieldJobTravelDto[]>(response.data);
     } catch (error) {
       console.error(`Error fetching travel for job ${jobId}:`, error);
       throw error;
@@ -361,7 +381,7 @@ export const fieldworkApi = {
   getChecklist: async (jobId: string | number): Promise<FieldJobChecklistDto> => {
     try {
       const response = await api.get<FieldJobChecklistDto>(`/field-jobs/${jobId}/checklist`);
-      return response.data;
+      return unwrapApiPayload<FieldJobChecklistDto>(response.data);
     } catch (error) {
       console.error(`Error fetching checklist for job ${jobId}:`, error);
       throw error;
@@ -378,7 +398,7 @@ export const fieldworkApi = {
         `/field-jobs/${jobId}/checklist/submit`,
         checklist
       );
-      return response.data;
+      return unwrapApiPayload<FieldJobChecklistDto>(response.data);
     } catch (error) {
       console.error(`Error submitting checklist for job ${jobId}:`, error);
       throw error;
@@ -396,7 +416,7 @@ export const fieldworkApi = {
   getReport: async (jobId: string | number): Promise<FieldJobReportDto> => {
     try {
       const response = await api.get<FieldJobReportDto>(`/field-jobs/${jobId}/report`);
-      return response.data;
+      return unwrapApiPayload<FieldJobReportDto>(response.data);
     } catch (error) {
       console.error(`Error fetching report for job ${jobId}:`, error);
       throw error;
@@ -427,6 +447,9 @@ export const fieldworkApi = {
    * Parse API error response
    */
   parseError: (error: any): string => {
+    if (error.response?.data?.message) {
+      return error.response.data.message;
+    }
     if (error.response?.data?.error) {
       return error.response.data.error;
     }

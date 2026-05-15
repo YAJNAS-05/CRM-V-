@@ -6,6 +6,7 @@ import com.everx.crm.contact.Contact;
 import com.everx.crm.contact.ContactRepository;
 import com.everx.crm.deal.Deal;
 import com.everx.crm.deal.DealRepository;
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.erp.salesorder.SalesOrder;
 import com.everx.erp.salesorder.SalesOrderRepository;
 import com.everx.shared.exception.ValidationException;
@@ -29,6 +30,7 @@ public class CRMERPLinkingService {
     private final AccountRepository accountRepository;
     private final ContactRepository contactRepository;
     private final SalesOrderRepository salesOrderRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     /**
      * Converts a CRM Deal into an ERP Sales Order
@@ -152,9 +154,10 @@ public class CRMERPLinkingService {
     // ==================== Helper Methods ====================
 
     private String generateSalesOrderNumber(Deal deal) {
-        return "SO-" + java.time.LocalDate.now().getYear() + "-" + 
-               deal.getId().toString().substring(0, 8).toUpperCase() + "-" +
-               (int)(Math.random() * 1000);
+        return documentNumberGenerator.generate(
+                "SO",
+                candidate -> salesOrderRepository.findBySoNumber(candidate).isPresent()
+        );
     }
 
     private String mapSOStatusToDealStage(String soStatus) {

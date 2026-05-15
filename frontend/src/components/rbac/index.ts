@@ -1,3 +1,6 @@
 export { FeatureGate, RoleBasedView, PermissionView, AdminOnly, ManagerOnly } from './FeatureGate'
 export { usePermissions, ROLES, PERMISSIONS, ROLE_DASHBOARD_MAP, ROLE_LANDING_MAP } from '../../hooks/usePermissions'
 export type { RoleName, PermissionName, DataScope } from '../../hooks/usePermissions'
+export { PermissionGate } from './PermissionGate'
+export { ModuleGuard } from './ModuleGuard'
+export { usePermissions as useRBACPermissions, useUsers, useRoles } from '../../hooks/useRBAC'

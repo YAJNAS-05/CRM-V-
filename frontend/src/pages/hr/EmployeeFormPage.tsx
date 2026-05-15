@@ -192,9 +192,9 @@ const EmployeeFormPage: React.FC = () => {
       }
 
       navigate('/hr/employees')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save employee:', error)
-      toast.error('Failed to save employee')
+      toast.error(error?.response?.data?.message || 'Failed to save employee')
     } finally {
       setLoading(false)
     }

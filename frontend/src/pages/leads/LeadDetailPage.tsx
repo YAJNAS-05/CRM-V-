@@ -119,8 +119,8 @@ const LeadDetailPage: React.FC<LeadDetailPageProps> = ({ isNew = false }) => {
       }
 
       navigate('/crm/leads')
-    } catch {
-      toast.error(isNew ? 'Failed to create lead' : 'Failed to update lead')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || (isNew ? 'Failed to create lead' : 'Failed to update lead'))
     } finally {
       setSaving(false)
     }

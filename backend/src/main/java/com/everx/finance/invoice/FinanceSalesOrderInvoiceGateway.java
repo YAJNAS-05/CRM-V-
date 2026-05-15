@@ -1,5 +1,6 @@
 package com.everx.finance.invoice;
 
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.erp.salesorder.SalesOrder;
 import com.everx.erp.workflow.SalesOrderInvoiceGateway;
 import lombok.RequiredArgsConstructor;
@@ -8,7 +9,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 /**
  * Finance-side implementation of ERP invoice workflow boundary.
@@ -18,6 +18,7 @@ import java.util.UUID;
 public class FinanceSalesOrderInvoiceGateway implements SalesOrderInvoiceGateway {
 
     private final InvoiceRepository invoiceRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     @Override
     public void createFinalInvoiceForSalesOrder(SalesOrder so, String invoiceType) {
@@ -44,7 +45,9 @@ public class FinanceSalesOrderInvoiceGateway implements SalesOrderInvoiceGateway
     }
 
     private String generateInvoiceNumber() {
-        return "INV-" + LocalDate.now().getYear() + "-"
-                + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        return documentNumberGenerator.generate(
+            "INV-SO",
+            candidate -> invoiceRepository.findByInvoiceNumberAndIsDeletedFalse(candidate).isPresent()
+        );
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -27,17 +28,20 @@ public class LeaveController {
     private final LeaveService leaveService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_CREATE')")
     public ResponseEntity<ApiResponse<LeaveRequestDto>> createLeaveRequest(@Valid @RequestBody CreateLeaveRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(leaveService.createLeaveRequest(request), "Leave request created"));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_VIEW')")
     public ResponseEntity<ApiResponse<LeaveRequestDto>> getLeaveRequest(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(leaveService.getLeaveRequest(id)));
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_VIEW')")
     public ResponseEntity<ApiResponse<Page<LeaveRequestDto>>> getLeaveRequests(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) LeaveStatus status,
@@ -51,11 +55,13 @@ public class LeaveController {
     }
 
     @GetMapping("/employee/{employeeId}")
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_VIEW')")
     public ResponseEntity<ApiResponse<List<LeaveRequestDto>>> getLeaveRequestsByEmployee(@PathVariable UUID employeeId) {
         return ResponseEntity.ok(ApiResponse.ok(leaveService.getLeaveRequestsByEmployee(employeeId)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_CREATE') or hasAuthority('HR_EDIT')")
     public ResponseEntity<ApiResponse<LeaveRequestDto>> updateLeaveRequest(
             @PathVariable UUID id,
             @RequestBody UpdateLeaveRequest request) {
@@ -63,13 +69,13 @@ public class LeaveController {
     }
 
     @PatchMapping("/{id}/approve")
-    public ResponseEntity<ApiResponse<LeaveRequestDto>> approveLeaveRequest(
-            @PathVariable UUID id,
-            @RequestParam UUID approvedBy) {
-        return ResponseEntity.ok(ApiResponse.ok(leaveService.approveLeaveRequest(id, approvedBy), "Leave request approved"));
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_APPROVE')")
+    public ResponseEntity<ApiResponse<LeaveRequestDto>> approveLeaveRequest(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(leaveService.approveLeaveRequest(id), "Leave request approved"));
     }
 
     @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('HR_LEAVE_REQUEST_CREATE') or hasAuthority('HR_EDIT')")
     public ResponseEntity<ApiResponse<LeaveRequestDto>> cancelLeaveRequest(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(leaveService.cancelLeaveRequest(id), "Leave request cancelled"));
     }

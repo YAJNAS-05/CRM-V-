@@ -4,9 +4,11 @@ import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.fieldwork.dto.CreateFieldJobRequest;
 import com.everx.erp.fieldwork.dto.FieldJobDto;
 import com.everx.erp.fieldwork.dto.UpdateFieldJobRequest;
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.erp.warranty.Warranty;
 import com.everx.erp.warranty.WarrantyRepository;
 import com.everx.finance.invoice.Invoice;
+import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.finance.invoice.InvoiceService;
 import com.everx.finance.invoice.dto.CreateInvoiceRequest;
 import com.everx.shared.exception.EntityNotFoundException;
@@ -32,6 +34,8 @@ public class FieldJobService {
     private final EquipmentRepository equipmentRepository;
     private final WarrantyRepository warrantyRepository;
     private final InvoiceService invoiceService;
+    private final InvoiceRepository invoiceRepository;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     @Transactional
     public FieldJobDto createFieldJob(CreateFieldJobRequest request) {
@@ -92,6 +96,13 @@ public class FieldJobService {
         FieldJob job = fieldJobRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Field job not found with id: " + id));
 
+        if (request.getJobStatus() == FieldJobStatus.PENDING_SIGN_OFF) {
+            throw new ValidationException("Use the complete workflow to move a job to pending sign-off");
+        }
+        if (request.getJobStatus() == FieldJobStatus.COMPLETED) {
+            throw new ValidationException("Use the sign-off workflow to finalize a field job");
+        }
+
         if (request.getJobNumber() != null && !request.getJobNumber().equals(job.getJobNumber())) {
             if (fieldJobRepository.findByJobNumber(request.getJobNumber()).isPresent()) {
                 throw new ValidationException("Field job with job number " + request.getJobNumber() + " already exists");
@@ -100,10 +111,7 @@ public class FieldJobService {
         }
 
         updateIfPresent(request.getJobType(), job::setJobType);
-        updateIfPresent(request.getJobStatus(), status -> {
-            job.setJobStatus(status);
-            applyCompletionIfNeeded(job, status, null);
-        });
+        updateIfPresent(request.getJobStatus(), job::setJobStatus);
         updateIfPresent(request.getPriority(), job::setPriority);
 
         updateIfPresent(request.getLinkedEntity(), job::setLinkedEntity);
@@ -169,8 +177,6 @@ public class FieldJobService {
         updateIfPresent(request.getCostActual(), job::setCostActual);
         updateIfPresent(request.getCurrency(), job::setCurrency);
 
-        applyCompletionIfNeeded(job, job.getJobStatus(), request.getActualEndDate());
-
         FieldJob saved = fieldJobRepository.save(job);
         return toDto(saved);
     }
@@ -180,11 +186,26 @@ public class FieldJobService {
         FieldJob job = fieldJobRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Field job not found with id: " + id));
 
+        if (job.getJobStatus() != FieldJobStatus.IN_PROGRESS && job.getJobStatus() != FieldJobStatus.ENGINEER_ASSIGNED
+                && job.getJobStatus() != FieldJobStatus.SCHEDULED) {
+            throw new ValidationException("Only scheduled or in-progress jobs can be completed");
+        }
+
         if (completionNotes != null && (job.getInternalNotes() == null || job.getInternalNotes().isBlank())) {
             job.setInternalNotes(completionNotes);
         }
 
-        applyCompletionIfNeeded(job, FieldJobStatus.COMPLETED, OffsetDateTime.now());
+        transitionToPendingSignOff(job, OffsetDateTime.now());
+        FieldJob saved = fieldJobRepository.save(job);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public FieldJobDto markJobCompleted(UUID id) {
+        FieldJob job = fieldJobRepository.findByIdAndNotDeleted(id)
+                .orElseThrow(() -> new EntityNotFoundException("Field job not found with id: " + id));
+
+        finalizeCompletedJob(job, OffsetDateTime.now());
         FieldJob saved = fieldJobRepository.save(job);
         return toDto(saved);
     }
@@ -193,6 +214,10 @@ public class FieldJobService {
     public FieldJobDto assignEngineer(UUID id, UUID engineerId, EngineerType engineerType, String engineerName) {
         FieldJob job = fieldJobRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Field job not found with id: " + id));
+
+        if (job.getJobStatus() == FieldJobStatus.COMPLETED || job.getJobStatus() == FieldJobStatus.CANCELLED) {
+            throw new ValidationException("Cannot assign engineer to a closed field job");
+        }
 
         job.setPrimaryEngineerId(engineerId);
         job.setPrimaryEngineerType(engineerType != null ? engineerType : EngineerType.INTERNAL);
@@ -208,6 +233,10 @@ public class FieldJobService {
     public FieldJobDto startJob(UUID id) {
         FieldJob job = fieldJobRepository.findByIdAndNotDeleted(id)
                 .orElseThrow(() -> new EntityNotFoundException("Field job not found with id: " + id));
+
+        if (job.getJobStatus() != FieldJobStatus.ENGINEER_ASSIGNED && job.getJobStatus() != FieldJobStatus.SCHEDULED) {
+            throw new ValidationException("Only assigned or scheduled jobs can be started");
+        }
 
         job.setJobStatus(FieldJobStatus.IN_PROGRESS);
         if (job.getActualStartDate() == null) {
@@ -310,12 +339,7 @@ public class FieldJobService {
         }
     }
 
-    private void applyCompletionIfNeeded(FieldJob job, FieldJobStatus status, OffsetDateTime completedAt) {
-        if (status != FieldJobStatus.COMPLETED) {
-            return;
-        }
-
-        job.setJobStatus(FieldJobStatus.COMPLETED);
+    private void transitionToPendingSignOff(FieldJob job, OffsetDateTime completedAt) {
         if (job.getActualStartDate() == null) {
             job.setActualStartDate(job.getScheduledStartDate());
         }
@@ -327,6 +351,13 @@ public class FieldJobService {
             long days = java.time.Duration.between(job.getActualStartDate(), job.getActualEndDate()).toDays();
             job.setActualDurationDays((int) Math.max(days, 0));
         }
+
+        job.setJobStatus(FieldJobStatus.PENDING_SIGN_OFF);
+    }
+
+    private void finalizeCompletedJob(FieldJob job, OffsetDateTime completedAt) {
+        transitionToPendingSignOff(job, completedAt);
+        job.setJobStatus(FieldJobStatus.COMPLETED);
 
         if (Boolean.TRUE.equals(job.getBillable())) {
             createInvoiceIfRequired(job);
@@ -370,10 +401,13 @@ public class FieldJobService {
     }
 
     private String generateInvoiceNumber(FieldJob job) {
-        return "INV-FJ-" + job.getJobNumber();
+        return documentNumberGenerator.generate(
+                "INV-FJ",
+                candidate -> invoiceRepository.findByInvoiceNumberAndIsDeletedFalse(candidate).isPresent()
+        );
     }
 
-    private FieldJobDto toDto(FieldJob job) {
+    FieldJobDto toDto(FieldJob job) {
         FieldJobDto dto = new FieldJobDto();
         dto.setFieldJobId(job.getId());
         dto.setVersion(job.getVersion());

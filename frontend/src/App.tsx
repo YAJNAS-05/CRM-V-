@@ -10,6 +10,7 @@ import SignupPage from './pages/auth/SignupPage'
 import OAuthCallbackPage from './pages/auth/OAuthCallbackPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
+import OrganizationSetupPage from './pages/onboarding/OrganizationSetupPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
 import NotificationPanel from './components/NotificationPanel'
 
@@ -88,9 +89,10 @@ import TechnicianDashboardPage from './pages/fieldwork/TechnicianDashboardPage'
 import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage'
 import { ReportListPage } from './pages/reports/ReportListPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
-import UserManagementPage from './pages/admin/UserManagementPage'
-import RoleManagementPage from './pages/admin/RoleManagementPage'
-import InviteUserPage from './pages/admin/InviteUserPage'
+import AdminUsersPage from './pages/admin/users'
+import AdminRolesPage from './pages/admin/roles'
+import RoleDetailPage from './pages/admin/roles/[id]'
+import { usePermissions as useSupabaseRBAC } from './hooks/useRBAC'
 
 // Inventory Pages
 import InventoryList from './pages/erp/inventory/InventoryList'
@@ -455,6 +457,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   )
 }
 
+const AdminAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = useAuthStore((state) => state.user)
+  const { can, loading } = useSupabaseRBAC()
+  const legacyPermissions = user?.permissions || []
+  const hasLegacyAdminAccess = ['ADMIN_VIEW', 'USER_VIEW', 'ROLE_VIEW'].some((permission) =>
+    legacyPermissions.includes(permission)
+  )
+
+  if (loading && !hasLegacyAdminAccess) {
+    return null
+  }
+
+  if (can('admin', 'view') || hasLegacyAdminAccess) {
+    return <>{children}</>
+  }
+
+  return <Navigate to="/unauthorized" replace />
+}
+
 const NotFoundPage: React.FC = () => {
   return (
     <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -481,6 +502,26 @@ const NotFoundPage: React.FC = () => {
   )
 }
 
+const UnauthorizedPage: React.FC = () => {
+  return (
+    <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-600">403</p>
+      <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Unauthorized</h1>
+      <p className="mt-2 text-sm text-slate-600">
+        You do not have permission to view this page.
+      </p>
+      <div className="mt-6">
+        <Link
+          to="/dashboard"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Go to dashboard
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -496,12 +537,34 @@ function App() {
         <Route path="/auth/callback" element={<OAuthCallbackPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route
+          path="/admin/rbac/users"
+          element={<Navigate to="/admin/users" replace />}
+        />
+        <Route
+          path="/admin/rbac/roles"
+          element={<Navigate to="/admin/roles" replace />}
+        />
+        <Route
+          path="/admin/rbac/roles/:id"
+          element={<Navigate to="/admin/roles" replace />}
+        />
 
         <Route
           path="/profile"
           element={
             <ProtectedRoute>
               <UserProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/org/setup"
+          element={
+            <ProtectedRoute>
+              <OrganizationSetupPage />
             </ProtectedRoute>
           }
         />
@@ -1997,24 +2060,40 @@ function App() {
         <Route
           path="/admin/users"
           element={
-            <ProtectedRoute requiredPermissions={['USER_VIEW']}>
-              <UserManagementPage />
+            <ProtectedRoute>
+              <AdminAccessGate>
+                <AdminUsersPage />
+              </AdminAccessGate>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/roles"
           element={
-            <ProtectedRoute requiredPermissions={['ROLE_VIEW']}>
-              <RoleManagementPage />
+            <ProtectedRoute>
+              <AdminAccessGate>
+                <AdminRolesPage />
+              </AdminAccessGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles/:id"
+          element={
+            <ProtectedRoute>
+              <AdminAccessGate>
+                <RoleDetailPage />
+              </AdminAccessGate>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/invite"
           element={
-            <ProtectedRoute requiredRoles={["SUPER_ADMIN","ADMIN"]}>
-              <InviteUserPage />
+            <ProtectedRoute>
+              <AdminAccessGate>
+                <Navigate to="/admin/users" replace />
+              </AdminAccessGate>
             </ProtectedRoute>
           }
         />

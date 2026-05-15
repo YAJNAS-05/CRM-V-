@@ -33,5 +33,8 @@ public interface FieldJobRepository extends JpaRepository<FieldJob, UUID> {
     @Query("SELECT f FROM FieldJob f WHERE f.isDeleted = false AND f.jobStatus NOT IN ('COMPLETED', 'CANCELLED')")
     List<FieldJob> findOpenJobs();
 
+    @Query("SELECT f FROM FieldJob f WHERE f.isDeleted = false AND f.priority IN ('CRITICAL', 'EMERGENCY') ORDER BY f.scheduledStartDate ASC")
+    List<FieldJob> findUrgentJobs();
+
     long countByCreatedByAndIsDeletedFalse(UUID createdBy);
 }

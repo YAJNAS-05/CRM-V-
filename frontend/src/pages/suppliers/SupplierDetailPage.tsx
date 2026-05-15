@@ -4,6 +4,39 @@ import { supplierApi } from '../../api/erpApi'
 import { Supplier } from '../../types/erp'
 import { FeatureGate } from '../../components/rbac'
 
+interface SupplierFormData {
+  companyName: string
+  country: string
+  contactName: string
+  email: string
+  phone: string
+  supplierType: string
+  paymentTerms: string
+  notes: string
+}
+
+const toSupplierFormData = (supplier: Supplier): SupplierFormData => ({
+  companyName: supplier.companyName || '',
+  country: supplier.country || '',
+  contactName: supplier.contactName || '',
+  email: supplier.email || '',
+  phone: supplier.phone || '',
+  supplierType: supplier.supplierType || '',
+  paymentTerms: supplier.paymentTerms || '',
+  notes: supplier.notes || '',
+})
+
+const toSupplierPayload = (formData: SupplierFormData) => ({
+  companyName: formData.companyName.trim(),
+  country: formData.country.trim() || undefined,
+  contactName: formData.contactName.trim() || undefined,
+  email: formData.email.trim() || undefined,
+  phone: formData.phone.trim() || undefined,
+  supplierType: formData.supplierType.trim() || undefined,
+  paymentTerms: formData.paymentTerms.trim() || undefined,
+  notes: formData.notes.trim() || undefined,
+})
+
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -11,7 +44,7 @@ export default function SupplierDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
-  const [formData, setFormData] = useState<Supplier | null>(null)
+  const [formData, setFormData] = useState<SupplierFormData | null>(null)
 
   useEffect(() => {
     if (id) {
@@ -26,7 +59,7 @@ export default function SupplierDetailPage() {
       const response = await supplierApi.getById(id!)
       if (response.data.success && response.data.data) {
         setSupplier(response.data.data)
-        setFormData(response.data.data)
+        setFormData(toSupplierFormData(response.data.data))
       } else {
         setError('Failed to fetch supplier')
       }
@@ -46,9 +79,10 @@ export default function SupplierDetailPage() {
   const handleSave = async () => {
     if (!formData) return
     try {
-      const response = await supplierApi.update(id!, formData)
+      const response = await supplierApi.update(id!, toSupplierPayload(formData))
       if (response.data.success) {
         setSupplier(response.data.data)
+        setFormData(toSupplierFormData(response.data.data))
         setEditMode(false)
         alert('Supplier updated successfully')
       }
@@ -115,7 +149,7 @@ export default function SupplierDetailPage() {
               <button
                 onClick={() => {
                   setEditMode(false)
-                  setFormData(supplier)
+                  setFormData(supplier ? toSupplierFormData(supplier) : null)
                 }}
                 className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               >
@@ -240,35 +274,18 @@ export default function SupplierDetailPage() {
 
       {/* Additional Details */}
       <div className="mt-6 bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Payment & Business Terms</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="text-xl font-semibold mb-4">Business Terms</h2>
+        <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Currency</label>
-            <select
-              name="currency"
-              value={displayData?.currency || 'USD'}
+            <label className="block text-sm font-medium text-gray-700">Payment Terms</label>
+            <input
+              type="text"
+              name="paymentTerms"
+              value={displayData?.paymentTerms || ''}
               onChange={handleInputChange}
               disabled={!editMode}
               className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
-            >
-              <option value="AUD">AUD (Australian Dollar)</option>
-              <option value="USD">USD (US Dollar)</option>
-              <option value="JPY">JPY (Japanese Yen)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Payment Method</label>
-            <select
-              name="paymentMethod"
-              value={displayData?.paymentMethod || 'TT'}
-              onChange={handleInputChange}
-              disabled={!editMode}
-              className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
-            >
-              <option value="TT">TT (Transfer)</option>
-              <option value="LC">LC (Letter of Credit)</option>
-              <option value="INSTALLMENT">Installment</option>
-            </select>
+            />
           </div>
         </div>
         <div className="mt-4">
@@ -290,7 +307,7 @@ export default function SupplierDetailPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-gray-600">Status</p>
-              <p className="text-lg font-semibold">{supplier.active ? '✅ Active' : '❌ Inactive'}</p>
+              <p className="text-lg font-semibold">Recorded</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Created</p>

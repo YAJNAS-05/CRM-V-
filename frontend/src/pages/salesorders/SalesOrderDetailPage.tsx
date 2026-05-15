@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { salesOrderApi } from '../../api/erpApi'
 import { FeatureGate } from '../../components/rbac'
 
+const SO_STATUSES = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'CANCELLED']
+
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -36,13 +38,33 @@ export default function SalesOrderDetailPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev: any) => prev ? { ...prev, [name]: value } : null)
+    setFormData((prev: any) => (prev ? { ...prev, [name]: value } : null))
   }
 
   const handleSave = async () => {
     if (!formData) return
     try {
-      const response = await salesOrderApi.update(id!, formData)
+      const response = await salesOrderApi.update(id!, {
+        soNumber: formData.soNumber || null,
+        dealId: formData.dealId || null,
+        accountId: formData.accountId,
+        status: formData.status,
+        orderDate: formData.orderDate || null,
+        expectedDelivery: formData.expectedDelivery || null,
+        actualDelivery: formData.actualDelivery || null,
+        currency: formData.currency || null,
+        totalAmount: formData.totalAmount ?? null,
+        incoterms: formData.incoterms || null,
+        destinationCountry: formData.destinationCountry || null,
+        notes: formData.notes || null,
+        items: (formData.items || []).map((item: any) => ({
+          equipmentId: item.equipmentId || null,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice ?? null,
+          lineTotal: item.lineTotal ?? null,
+        })),
+      })
+
       if (response.data?.success) {
         setSo(response.data.data)
         setEditMode(false)
@@ -57,7 +79,7 @@ export default function SalesOrderDetailPage() {
     if (confirm('Delete this sales order?')) {
       try {
         await salesOrderApi.delete(id!)
-        navigate('/erp/salesorders')
+        navigate('/erp/sales-orders')
       } catch (err) {
         alert('Error: ' + (err instanceof Error ? err.message : 'Unknown error'))
       }
@@ -130,7 +152,7 @@ export default function SalesOrderDetailPage() {
               </FeatureGate>
             </>
           )}
-          <button onClick={() => navigate('/erp/salesorders')} className="px-4 py-2 bg-gray-600 text-white rounded">Back</button>
+          <button onClick={() => navigate('/erp/sales-orders')} className="px-4 py-2 bg-gray-600 text-white rounded">Back</button>
         </div>
       </div>
 
@@ -171,11 +193,9 @@ export default function SalesOrderDetailPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700">Status</label>
               <select name="status" value={displayData?.status || 'DRAFT'} onChange={handleInputChange} disabled={!editMode} className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-100">
-                <option value="DRAFT">Draft</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="IN_LOGISTICS">In Logistics</option>
-                <option value="INSTALLED">Installed</option>
-                <option value="COMPLETE">Complete</option>
+                {SO_STATUSES.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </div>
           </div>

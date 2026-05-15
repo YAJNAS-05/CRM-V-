@@ -10,7 +10,6 @@ const LeaveRequestDetailPage: React.FC = () => {
   const [leaveRequest, setLeaveRequest] = useState<LeaveRequest | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
-  const [approverId, setApproverId] = useState('')
   const [decisionNote, setDecisionNote] = useState('')
 
   useEffect(() => {
@@ -24,13 +23,10 @@ const LeaveRequestDetailPage: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    if (leaveRequest?.approvedBy) {
-      setApproverId(leaveRequest.approvedBy)
-    }
     if (leaveRequest?.notes) {
       setDecisionNote(leaveRequest.notes)
     }
-  }, [leaveRequest?.approvedBy, leaveRequest?.notes])
+  }, [leaveRequest?.notes])
 
   const fetchLeaveRequest = async (requestId: string) => {
     try {
@@ -56,13 +52,9 @@ const LeaveRequestDetailPage: React.FC = () => {
 
   const handleApprove = async () => {
     if (!id) return
-    if (!approverId) {
-      toast.error('Approver ID is required')
-      return
-    }
 
     try {
-      const response = await leaveRequestApi.approve(id, approverId)
+      const response = await leaveRequestApi.approve(id)
       setLeaveRequest(response.data.data || null)
       toast.success('Leave request approved')
     } catch (error) {
@@ -201,24 +193,6 @@ const LeaveRequestDetailPage: React.FC = () => {
         <div className="shell-card p-5">
           <h2 className="text-sm font-semibold text-slate-900">Approval decision</h2>
           <div className="mt-4 space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-[0.12em]">
-                Approver
-              </label>
-              <select
-                value={approverId}
-                onChange={(e) => setApproverId(e.target.value)}
-                disabled={leaveRequest.status !== 'REQUESTED'}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              >
-                <option value="">Select approver</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.firstName} {employee.lastName}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-[0.12em]">
                 Decision notes

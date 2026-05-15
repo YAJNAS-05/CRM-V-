@@ -10,6 +10,7 @@ import com.everx.erp.spareparts.SparePart;
 import com.everx.erp.spareparts.SparePartRepository;
 import com.everx.erp.warranty.Warranty;
 import com.everx.erp.warranty.WarrantyRepository;
+import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.finance.invoice.InvoiceService;
 import com.everx.finance.invoice.dto.CreateInvoiceRequest;
 import com.everx.finance.invoice.Invoice;
@@ -36,6 +37,7 @@ public class ServiceTicketService {
     private final WarrantyRepository warrantyRepository;
     private final SparePartRepository sparePartRepository;
     private final DocumentNumberGenerator documentNumberGenerator;
+    private final InvoiceRepository invoiceRepository;
 
     @Transactional
     public ServiceTicketDto createServiceTicket(CreateServiceTicketRequest request) {
@@ -221,7 +223,10 @@ public class ServiceTicketService {
     }
 
     private String generateInvoiceNumberForServiceTicket(ServiceTicket ticket) {
-        return "INV-TKT-" + ticket.getTicketNumber();
+        return documentNumberGenerator.generate(
+                "INV-TKT",
+                candidate -> invoiceRepository.findByInvoiceNumberAndIsDeletedFalse(candidate).isPresent()
+        );
     }
 
     private String generateServiceTicketNumber() {

@@ -32,6 +32,30 @@ type ContactFormData = z.infer<typeof contactSchema>
 
 interface ContactDetailPageProps { isNew?: boolean }
 
+const normalizeOptionalString = (value?: string) => {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
+}
+
+const toContactPayload = (data: ContactFormData) => ({
+  accountId: normalizeOptionalString(data.accountId),
+  salutation: normalizeOptionalString(data.salutation),
+  firstName: data.firstName.trim(),
+  lastName: data.lastName.trim(),
+  email: normalizeOptionalString(data.email),
+  phone: normalizeOptionalString(data.phone),
+  mobile: normalizeOptionalString(data.mobile),
+  jobTitle: normalizeOptionalString(data.jobTitle),
+  department: normalizeOptionalString(data.department),
+  mailingStreet: normalizeOptionalString(data.mailingStreet),
+  mailingCity: normalizeOptionalString(data.mailingCity),
+  mailingState: normalizeOptionalString(data.mailingState),
+  mailingZip: normalizeOptionalString(data.mailingZip),
+  mailingCountry: normalizeOptionalString(data.mailingCountry),
+  linkedinUrl: normalizeOptionalString(data.linkedinUrl),
+  description: normalizeOptionalString(data.description),
+})
+
 const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -102,11 +126,13 @@ const ContactDetailPage: React.FC<ContactDetailPageProps> = ({ isNew = false }) 
   const onSubmit = async (data: ContactFormData) => {
     setIsLoading(true)
     try {
+      const payload = toContactPayload(data)
+
       if (isNew) {
-        await contactApi.create(data)
+        await contactApi.create(payload)
         toast.success('Contact created')
       } else {
-        await contactApi.update(id!, data)
+        await contactApi.update(id!, payload)
         toast.success('Contact updated')
       }
       navigate('/crm/contacts')

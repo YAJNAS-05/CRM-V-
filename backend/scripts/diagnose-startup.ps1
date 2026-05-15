@@ -1,7 +1,8 @@
 param(
     [string]$Profile = "h2",
     [string]$SupabaseUrl = "https://epkxbbcmztgrefxfrdvh.supabase.co",
-    [string]$SupabaseServiceRoleKey = "local-dev-placeholder"
+    [string]$SupabaseServiceRoleKey = "local-dev-placeholder",
+    [int]$ServerPort = 8080
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,9 +27,10 @@ $env:SUPABASE_SERVICE_ROLE_KEY = $SupabaseServiceRoleKey
 
 Write-Host "Starting backend diagnostics..."
 Write-Host "Profile: $Profile"
+Write-Host "ServerPort: $ServerPort"
 Write-Host "Log file: $logFile"
 
-mvn spring-boot:run "-Dspring-boot.run.profiles=$Profile" "-Dspring.main.banner-mode=off" "-Dlogging.level.root=INFO" *>&1 | Tee-Object -FilePath $logFile
+mvn spring-boot:run "-Dspring-boot.run.profiles=$Profile" "-Dspring.main.banner-mode=off" "-Dlogging.level.root=INFO" "-Dserver.port=$ServerPort" *>&1 | Tee-Object -FilePath $logFile
 $exitCode = $LASTEXITCODE
 
 Write-Host ""
@@ -38,7 +40,7 @@ Write-Host "Exit code: $exitCode"
 if (Test-Path $logFile) {
     Write-Host ""
     Write-Host "Potential root-cause lines:"
-    Select-String -Path $logFile -Pattern "APPLICATION FAILED TO START|Caused by:|Error creating bean|UnsatisfiedDependencyException|UnknownEntityException|SUPABASE_URL must be set|Port 8080 was already in use" -CaseSensitive:$false |
+    Select-String -Path $logFile -Pattern "APPLICATION FAILED TO START|Error creating bean|UnsatisfiedDependencyException|UnknownEntityException|SUPABASE_URL must be set|Port [0-9]+ was already in use|Description:|Action:" -CaseSensitive:$false |
         Select-Object -First 25 |
         ForEach-Object { Write-Host $_.Line }
 

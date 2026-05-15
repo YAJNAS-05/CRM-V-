@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -26,17 +27,20 @@ public class TimesheetController {
     private final TimesheetService timesheetService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_CREATE')")
     public ResponseEntity<ApiResponse<TimesheetDto>> createTimesheet(@Valid @RequestBody CreateTimesheetRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(timesheetService.createTimesheet(request), "Timesheet created"));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_VIEW')")
     public ResponseEntity<ApiResponse<TimesheetDto>> getTimesheet(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(timesheetService.getTimesheetById(id)));
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_VIEW')")
     public ResponseEntity<ApiResponse<Page<TimesheetDto>>> getTimesheets(
             @RequestParam(required = false) UUID employeeId,
             @RequestParam(required = false) TimesheetStatus status,
@@ -48,11 +52,13 @@ public class TimesheetController {
     }
 
     @GetMapping("/employee/{employeeId}")
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_VIEW')")
     public ResponseEntity<ApiResponse<List<TimesheetDto>>> getTimesheetsByEmployee(@PathVariable UUID employeeId) {
         return ResponseEntity.ok(ApiResponse.ok(timesheetService.getTimesheetsByEmployee(employeeId)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_CREATE') or hasAuthority('HR_EDIT')")
     public ResponseEntity<ApiResponse<TimesheetDto>> updateTimesheet(
             @PathVariable UUID id,
             @RequestBody UpdateTimesheetRequest request) {
@@ -60,18 +66,19 @@ public class TimesheetController {
     }
 
     @PatchMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_CREATE')")
     public ResponseEntity<ApiResponse<TimesheetDto>> submitTimesheet(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(timesheetService.submitTimesheet(id), "Timesheet submitted"));
     }
 
     @PatchMapping("/{id}/approve")
-    public ResponseEntity<ApiResponse<TimesheetDto>> approveTimesheet(
-            @PathVariable UUID id,
-            @RequestParam UUID approvedBy) {
-        return ResponseEntity.ok(ApiResponse.ok(timesheetService.approveTimesheet(id, approvedBy), "Timesheet approved"));
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_APPROVE')")
+    public ResponseEntity<ApiResponse<TimesheetDto>> approveTimesheet(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(timesheetService.approveTimesheet(id), "Timesheet approved"));
     }
 
     @PatchMapping("/{id}/reject")
+    @PreAuthorize("hasAuthority('HR_TIMESHEET_APPROVE')")
     public ResponseEntity<ApiResponse<TimesheetDto>> rejectTimesheet(
             @PathVariable UUID id,
             @RequestParam(required = false) String notes) {

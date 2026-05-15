@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { Mail, Code, Users } from 'lucide-react'
 
 const signupSchema = z.object({
+  organizationName: z.string().min(2, 'Organization name must be at least 2 characters'),
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   phone: z.string().optional(),
@@ -45,6 +46,7 @@ const SignupPage: React.FC = () => {
         password: data.password,
         options: {
           data: {
+            org_name: data.organizationName,
             full_name: data.fullName,
             phone: data.phone || '',
           },
@@ -87,10 +89,10 @@ const SignupPage: React.FC = () => {
           supabaseSession.refresh_token || ''
         )
         
-        toast.success('Account created successfully! Check your email for verification.')
-        navigate('/dashboard')
+        toast.success('Account created successfully! Let\'s finish organization setup.')
+        navigate('/org/setup')
       } else {
-        toast.success('Account created! Please check your email to verify and then log in.')
+        toast.success('Organization account created! Please check your email to verify and then log in.')
         navigate('/auth/login')
       }
     } catch (error: any) {
@@ -176,6 +178,21 @@ const SignupPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Organization Name
+              </label>
+              <input
+                type="text"
+                {...register('organizationName')}
+                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                placeholder="Acme Corporation"
+              />
+              {errors.organizationName && (
+                <p className="mt-1.5 text-sm text-red-500">{errors.organizationName.message}</p>
+              )}
+            </div>
+
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Full Name

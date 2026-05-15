@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ public class ReimbursementController {
     private final ReimbursementService reimbursementService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_CREATE')")
     public ResponseEntity<ApiResponse<ReimbursementRequestDto>> createReimbursement(
             @Valid @RequestBody CreateReimbursementRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -32,11 +34,13 @@ public class ReimbursementController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_VIEW')")
     public ResponseEntity<ApiResponse<ReimbursementRequestDto>> getReimbursement(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(reimbursementService.getReimbursement(id)));
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_VIEW')")
     public ResponseEntity<ApiResponse<Page<ReimbursementRequestDto>>> getReimbursements(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) ReimbursementStatus status,
@@ -49,6 +53,7 @@ public class ReimbursementController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_CREATE') or hasAuthority('HR_EDIT')")
     public ResponseEntity<ApiResponse<ReimbursementRequestDto>> updateReimbursement(
             @PathVariable UUID id,
             @RequestBody UpdateReimbursementRequest request) {
@@ -57,10 +62,9 @@ public class ReimbursementController {
     }
 
     @PatchMapping("/{id}/approve")
-    public ResponseEntity<ApiResponse<ReimbursementRequestDto>> approveReimbursement(
-            @PathVariable UUID id,
-            @RequestParam UUID approvedBy) {
+    @PreAuthorize("hasAuthority('HR_REIMBURSEMENT_APPROVE')")
+    public ResponseEntity<ApiResponse<ReimbursementRequestDto>> approveReimbursement(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(
-                reimbursementService.approveReimbursement(id, approvedBy), "Reimbursement approved"));
+                reimbursementService.approveReimbursement(id), "Reimbursement approved"));
     }
 }

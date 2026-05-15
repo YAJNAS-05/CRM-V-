@@ -1,5 +1,6 @@
 package com.everx.finance.invoice;
 
+import com.everx.erp.numbering.DocumentNumberGenerator;
 import com.everx.finance.invoice.dto.CreateInvoiceRequest;
 import com.everx.finance.invoice.dto.InvoiceResponse;
 import com.everx.finance.invoice.dto.UpdateInvoiceRequest;
@@ -36,6 +37,7 @@ public class InvoiceService {
     private final PostingPeriodEnforcer postingPeriodEnforcer;
     private final FxRateLockingService fxRateLockingService;
     private final GlPostingService glPostingService;
+    private final DocumentNumberGenerator documentNumberGenerator;
 
     private static final Set<Invoice.InvoiceStatus> IMMUTABLE_STATUSES = new HashSet<>(List.of(
         Invoice.InvoiceStatus.SENT,
@@ -217,20 +219,16 @@ public class InvoiceService {
     }
 
     private String generateInvoiceNumber(Invoice.InvoiceEntity entity) {
-        LocalDate now = LocalDate.now();
-        int year = now.getYear();
-        LocalDate yearStart = LocalDate.of(year, 1, 1);
-        
-        long count = invoiceRepository.countByEntityAndIssueDateAfter(entity, yearStart);
-        long sequence = count + 1;
-        
         String entityCode = switch (entity) {
             case AUSTRALIA -> "AU";
             case USA -> "US";
             case JAPAN -> "JP";
         };
-        
-        return String.format("INV-%s-%d-%05d", entityCode, year, sequence);
+
+        return documentNumberGenerator.generate(
+                "INV-" + entityCode,
+                candidate -> invoiceRepository.findByInvoiceNumberAndIsDeletedFalse(candidate).isPresent()
+        );
     }
 
     public InvoiceResponse toResponse(Invoice invoice) {

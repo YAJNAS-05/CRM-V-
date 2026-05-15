@@ -62,15 +62,15 @@ public class Project {
     @Column(name = "owner_id")
     private UUID ownerId;
 
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "json")
     @Builder.Default
     private String settings = "{}";
 
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "json")
     @Builder.Default
     private String metadata = "{}";
 
-    @Column(columnDefinition = "text[]")
+    @Column(columnDefinition = "text array")
     @Builder.Default
     private List<String> tags = new ArrayList<>();
 

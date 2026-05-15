@@ -172,8 +172,8 @@ export const leaveRequestApi = {
     axiosInstance.post<ApiResponse<LeaveRequest>>('/v1/hr/leave-requests', data),
   update: (id: string, data: UpdateLeaveRequest) =>
     axiosInstance.put<ApiResponse<LeaveRequest>>(`/v1/hr/leave-requests/${id}`, data),
-  approve: (id: string, approvedBy: string) =>
-    axiosInstance.patch<ApiResponse<LeaveRequest>>(`/v1/hr/leave-requests/${id}/approve?approvedBy=${approvedBy}`),
+  approve: (id: string) =>
+    axiosInstance.patch<ApiResponse<LeaveRequest>>(`/v1/hr/leave-requests/${id}/approve`),
   cancel: (id: string) =>
     axiosInstance.patch<ApiResponse<LeaveRequest>>(`/v1/hr/leave-requests/${id}/cancel`),
 }
@@ -246,8 +246,8 @@ export const timesheetApi = {
     axiosInstance.put<ApiResponse<Timesheet>>(`/v1/hr/timesheets/${id}`, data),
   submit: (id: string) =>
     axiosInstance.patch<ApiResponse<Timesheet>>(`/v1/hr/timesheets/${id}/submit`),
-  approve: (id: string, approvedBy: string) =>
-    axiosInstance.patch<ApiResponse<Timesheet>>(`/v1/hr/timesheets/${id}/approve?approvedBy=${approvedBy}`),
+  approve: (id: string) =>
+    axiosInstance.patch<ApiResponse<Timesheet>>(`/v1/hr/timesheets/${id}/approve`),
   reject: (id: string, notes?: string) => {
     const params = notes ? `?notes=${encodeURIComponent(notes)}` : ''
     return axiosInstance.patch<ApiResponse<Timesheet>>(`/v1/hr/timesheets/${id}/reject${params}`)
@@ -317,8 +317,8 @@ export const reimbursementApi = {
     ),
   update: (id: string, data: UpdateReimbursementRequest) =>
     axiosInstance.put<ApiResponse<ReimbursementRequest>>(`/v1/hr/reimbursements/${id}`, data),
-  approve: (id: string, approvedBy: string) =>
-    axiosInstance.patch<ApiResponse<ReimbursementRequest>>(`/v1/hr/reimbursements/${id}/approve?approvedBy=${approvedBy}`),
+  approve: (id: string) =>
+    axiosInstance.patch<ApiResponse<ReimbursementRequest>>(`/v1/hr/reimbursements/${id}/approve`),
 }
 
 export const trainingApi = {

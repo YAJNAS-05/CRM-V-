@@ -10,7 +10,6 @@ const TimesheetDetailPage: React.FC = () => {
   const [timesheet, setTimesheet] = useState<Timesheet | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
-  const [approverId, setApproverId] = useState('')
   const [decisionNote, setDecisionNote] = useState('')
 
   useEffect(() => {
@@ -24,13 +23,10 @@ const TimesheetDetailPage: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    if (timesheet?.approvedBy) {
-      setApproverId(timesheet.approvedBy)
-    }
     if (timesheet?.notes) {
       setDecisionNote(timesheet.notes)
     }
-  }, [timesheet?.approvedBy, timesheet?.notes])
+  }, [timesheet?.notes])
 
   const fetchTimesheet = async (timesheetId: string) => {
     try {
@@ -68,13 +64,9 @@ const TimesheetDetailPage: React.FC = () => {
 
   const handleApprove = async () => {
     if (!id) return
-    if (!approverId) {
-      toast.error('Approver ID is required')
-      return
-    }
 
     try {
-      const response = await timesheetApi.approve(id, approverId)
+      const response = await timesheetApi.approve(id)
       setTimesheet(response.data.data || null)
       toast.success('Timesheet approved')
     } catch (error) {
@@ -215,30 +207,15 @@ const TimesheetDetailPage: React.FC = () => {
               Submit Timesheet
             </button>
           </FeatureGate>
-          <div className="grid gap-3 sm:grid-cols-2 items-center">
-            <select
-              value={approverId}
-              onChange={(e) => setApproverId(e.target.value)}
+          <FeatureGate requiredPermission="HR_EDIT">
+            <button
+              onClick={handleApprove}
               disabled={timesheet.status !== 'SUBMITTED'}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60"
             >
-              <option value="">Select approver</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.firstName} {employee.lastName}
-                </option>
-              ))}
-            </select>
-            <FeatureGate requiredPermission="HR_EDIT">
-              <button
-                onClick={handleApprove}
-                disabled={timesheet.status !== 'SUBMITTED'}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60"
-              >
-                Approve Timesheet
-              </button>
-            </FeatureGate>
-          </div>
+              Approve Timesheet
+            </button>
+          </FeatureGate>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-[0.12em]">
               Decision notes
