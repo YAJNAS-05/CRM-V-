@@ -2,7 +2,6 @@ package com.everx.shared.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,7 +11,6 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class ApiResponse<T> {
 
     @JsonProperty("success")
@@ -34,12 +32,12 @@ public class ApiResponse<T> {
      * [Enterprise Standard] Success response with data and optional message.
      */
     public static <T> ApiResponse<T> ok(T data, String message) {
-        return ApiResponse.<T>builder()
-                .success(true)
-                .message(message)
-                .data(data)
-                .timestamp(LocalDateTime.now())
-                .build();
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(true);
+        response.setMessage(message);
+        response.setData(data);
+        response.setTimestamp(LocalDateTime.now());
+        return response;
     }
 
     /**
@@ -74,19 +72,19 @@ public class ApiResponse<T> {
     }
 
     public static <T> ApiResponse<T> error(String message, Map<String, String> errors) {
-        return ApiResponse.<T>builder()
-                .success(false)
-                .message(message)
-                .errors(errors)
-                .timestamp(LocalDateTime.now())
-                .build();
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setErrors(errors);
+        response.setTimestamp(LocalDateTime.now());
+        return response;
     }
 
     public static <T> ApiResponse<T> error(String message) {
-        return ApiResponse.<T>builder()
-                .success(false)
-                .message(message)
-                .timestamp(LocalDateTime.now())
-                .build();
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setTimestamp(LocalDateTime.now());
+        return response;
     }
 }
