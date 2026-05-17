@@ -1,6 +1,55 @@
 -- Organization onboarding bootstrap
 -- Creates organization model and auto-bootstraps org owner as SUPER_ADMIN on signup.
 
+-- Helper function: Get current app user ID
+CREATE OR REPLACE FUNCTION get_current_app_user_id()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT id
+  FROM app_users
+  WHERE auth_id = auth.uid()
+    AND is_deleted = FALSE
+  LIMIT 1;
+$$;
+
+-- Helper function: Check if current user is SUPER_ADMIN
+CREATE OR REPLACE FUNCTION is_super_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS(
+    SELECT 1
+    FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = get_current_app_user_id()
+      AND r.name = 'SUPER_ADMIN'
+  );
+$$;
+
+-- Helper function: Check if current user has a specific permission
+CREATE OR REPLACE FUNCTION has_permission(p_module TEXT, p_action TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS(
+    SELECT 1
+    FROM user_roles ur
+    JOIN role_permissions rp ON ur.role_id = rp.role_id
+    JOIN permissions perm ON rp.permission_id = perm.id
+    WHERE ur.user_id = get_current_app_user_id()
+      AND perm.module = p_module
+      AND perm.action = p_action
+  );
+$$;
+
 CREATE TABLE IF NOT EXISTS organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,

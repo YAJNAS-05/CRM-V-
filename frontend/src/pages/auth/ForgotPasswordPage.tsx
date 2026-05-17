@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { supabase } from '../../lib/supabaseClient'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
 
@@ -23,21 +22,10 @@ const ForgotPasswordPage: React.FC = () => {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setIsLoading(true)
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      })
-
-      if (error) {
-        toast.error(error.message || 'Failed to send reset email')
-        return
-      }
-
-      toast.success('Password reset email sent! Check your inbox.')
+      toast.info('Password reset by email is disabled in local auth mode. Contact admin to reset credentials.')
       setTimeout(() => {
         navigate('/auth/login')
-      }, 2000)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to process password reset')
+      }, 1500)
     } finally {
       setIsLoading(false)
     }

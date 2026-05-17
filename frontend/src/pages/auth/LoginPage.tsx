@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuthStore } from '../../store/authStore'
 import { authApi } from '../../api/authApi'
-import { OAUTH_PROVIDERS, supabase } from '../../lib/supabaseClient'
+import { OAUTH_PROVIDERS } from '../../lib/supabaseClient'
 import { toast } from 'sonner'
 import { Mail, Code, Users } from 'lucide-react'
 
@@ -34,45 +34,15 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
     try {
-      const session = await authApi.signInWithEmail(data.email, data.password)
-      if (!session || !session.user) {
+      const response = await authApi.signInWithEmail(data.email, data.password)
+      if (!response) {
         toast.error('Login failed')
         return
       }
 
-      // Get the current session to extract tokens
-      const { data: sessionData } = await supabase.auth.getSession()
-      if (sessionData?.session?.user && sessionData?.session) {
-        const supabaseUser = sessionData.session.user
-        const supabaseSession = sessionData.session
-        let resolvedUser = null
-
-        try {
-          resolvedUser = await authApi.me()
-        } catch {
-          resolvedUser = null
-        }
-
-        login(
-          resolvedUser || {
-            id: supabaseUser.id,
-            email: supabaseUser.email || '',
-            fullName: supabaseUser.user_metadata?.full_name || '',
-            phone: supabaseUser.user_metadata?.phone || '',
-            role: supabaseUser.user_metadata?.role || 'EMPLOYEE',
-            roles: [supabaseUser.user_metadata?.role || 'EMPLOYEE'],
-            permissions: [],
-            officeLocation: supabaseUser.user_metadata?.officeLocation || 'AUSTRALIA',
-            isActive: true,
-            lastLogin: new Date().toISOString(),
-            avatarUrl: supabaseUser.user_metadata?.avatar_url || null,
-          },
-          supabaseSession.access_token,
-          supabaseSession.refresh_token || ''
-        )
-        toast.success('Login successful')
-        navigate('/dashboard')
-      }
+      login(response.user, response.accessToken, response.refreshToken)
+      toast.success('Login successful')
+      navigate('/dashboard')
     } catch (error: any) {
       toast.error(error.message || 'Login failed')
     } finally {

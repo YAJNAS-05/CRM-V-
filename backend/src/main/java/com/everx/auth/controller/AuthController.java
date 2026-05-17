@@ -2,6 +2,7 @@ package com.everx.auth.controller;
 
 import com.everx.auth.dto.LoginRequest;
 import com.everx.auth.dto.LoginResponse;
+import com.everx.auth.dto.RegisterRequest;
 import com.everx.auth.dto.RefreshTokenRequest;
 import com.everx.auth.dto.UserDto;
 import com.everx.auth.entity.User;
@@ -33,6 +34,13 @@ public class AuthController {
         log.info("Login request for email: {}", request.getEmail());
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Login successful"));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<UserDto>> register(@Valid @RequestBody RegisterRequest request) {
+        log.info("Register request for email: {}", request.getEmail());
+        UserDto user = authService.register(request);
+        return ResponseEntity.status(201).body(ApiResponse.ok(user, "Registration successful"));
     }
 
     @PostMapping("/refresh")

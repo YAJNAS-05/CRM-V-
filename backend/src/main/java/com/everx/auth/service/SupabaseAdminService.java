@@ -22,11 +22,16 @@ public class SupabaseAdminService {
                                 @Value("${SUPABASE_SERVICE_ROLE_KEY:}") String serviceRoleKey) {
         this.supabaseUrl = supabaseUrl;
         this.serviceRoleKey = serviceRoleKey;
-        if (this.supabaseUrl == null || this.supabaseUrl.isBlank()) throw new IllegalArgumentException("SUPABASE_URL must be set");
-        if (this.serviceRoleKey == null || this.serviceRoleKey.isBlank()) throw new IllegalArgumentException("SUPABASE_SERVICE_ROLE_KEY must be set");
+    }
+
+    private void ensureSupabaseConfigured() {
+        if (supabaseUrl == null || supabaseUrl.isBlank() || serviceRoleKey == null || serviceRoleKey.isBlank()) {
+            throw new IllegalStateException("Supabase admin integration is disabled. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to enable it.");
+        }
     }
 
     public Map<String, Object> createUser(String email, String password, Map<String, Object> userMetadata) {
+        ensureSupabaseConfigured();
         String url = supabaseUrl.endsWith("/") ? supabaseUrl + "auth/v1/admin/users" : supabaseUrl + "/auth/v1/admin/users";
 
         HttpHeaders headers = new HttpHeaders();
@@ -45,6 +50,7 @@ public class SupabaseAdminService {
     }
 
     public Map<String, Object> inviteUser(String email, String redirectTo) {
+        ensureSupabaseConfigured();
         String url = supabaseUrl.endsWith("/") ? supabaseUrl + "auth/v1/admin/invite" : supabaseUrl + "/auth/v1/admin/invite";
 
         HttpHeaders headers = new HttpHeaders();

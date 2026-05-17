@@ -3,27 +3,19 @@ import { supabase, OAuthProvider } from '../lib/supabaseClient'
 import { LoginRequest, LoginResponse, ApiResponse, User } from '../types'
 
 export const authApi = {
-  // Supabase email/password login
-  signInWithEmail: async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return data
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to sign in with email')
-    }
+  // Local backend email/password login
+  signInWithEmail: async (email: string, password: string): Promise<LoginResponse | null> => {
+    return authApi.login({ email, password })
   },
 
   // Legacy backend login (kept for compatibility, but not used)
   login: async (credentials: LoginRequest): Promise<LoginResponse | null> => {
     const response = await axiosInstance.post<ApiResponse<LoginResponse>>('/v1/auth/login', credentials)
+    return response.data?.data || null
+  },
+
+  register: async (payload: { email: string; password: string; fullName: string; phone?: string }): Promise<User | null> => {
+    const response = await axiosInstance.post<ApiResponse<User>>('/v1/auth/register', payload)
     return response.data?.data || null
   },
 
@@ -45,26 +37,7 @@ export const authApi = {
 
   // OAuth Methods
   signInWithOAuth: async (provider: OAuthProvider) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider as any,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      })
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return data
-    } catch (error: any) {
-      throw new Error(error.message || `Failed to sign in with ${provider}`)
-    }
+    throw new Error(`OAuth (${provider}) is disabled in local auth mode`)
   },
 
   getConnectedProviders: async (): Promise<string[]> => {

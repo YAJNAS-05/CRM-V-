@@ -3,9 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useAuthStore } from '../../store/authStore'
 import { authApi } from '../../api/authApi'
-import { OAUTH_PROVIDERS, supabase } from '../../lib/supabaseClient'
+import { OAUTH_PROVIDERS } from '../../lib/supabaseClient'
 import { toast } from 'sonner'
 import { Mail, Code, Users } from 'lucide-react'
 
@@ -33,7 +32,6 @@ const SignupPage: React.FC = () => {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
   const [oauthLoading, setOAuthLoading] = useState<string | null>(null)
-  const { login } = useAuthStore()
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
   })
@@ -41,60 +39,20 @@ const SignupPage: React.FC = () => {
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true)
     try {
-      const { error } = await supabase.auth.signUp({
+      const user = await authApi.register({
         email: data.email,
         password: data.password,
-        options: {
-          data: {
-            org_name: data.organizationName,
-            full_name: data.fullName,
-            phone: data.phone || '',
-          },
-        },
+        fullName: data.fullName,
+        phone: data.phone || '',
       })
 
-      if (error) {
-        toast.error(error.message || 'Signup failed')
+      if (!user) {
+        toast.error('Signup failed')
         return
       }
 
-      // Get the current session
-      const { data: sessionData } = await supabase.auth.getSession()
-      if (sessionData?.session?.user && sessionData?.session) {
-        const supabaseUser = sessionData.session.user
-        const supabaseSession = sessionData.session
-        let resolvedUser = null
-
-        try {
-          resolvedUser = await authApi.me()
-        } catch {
-          resolvedUser = null
-        }
-        
-        login(
-          resolvedUser || {
-            id: supabaseUser.id,
-            email: supabaseUser.email || '',
-            fullName: data.fullName,
-            phone: data.phone || '',
-            role: 'EMPLOYEE',
-            roles: ['EMPLOYEE'],
-            permissions: [],
-            officeLocation: 'AUSTRALIA',
-            isActive: true,
-            lastLogin: new Date().toISOString(),
-            avatarUrl: supabaseUser.user_metadata?.avatar_url || null,
-          },
-          supabaseSession.access_token,
-          supabaseSession.refresh_token || ''
-        )
-        
-        toast.success('Account created successfully! Let\'s finish organization setup.')
-        navigate('/org/setup')
-      } else {
-        toast.success('Organization account created! Please check your email to verify and then log in.')
-        navigate('/auth/login')
-      }
+      toast.success('Account created successfully! Please login.')
+      navigate('/auth/login')
     } catch (error: any) {
       toast.error(error.message || 'Signup failed')
     } finally {
@@ -106,9 +64,8 @@ const SignupPage: React.FC = () => {
     setOAuthLoading(provider)
     try {
       await authApi.signInWithOAuth(provider as any)
-      toast.success(`Redirecting to ${provider} signup...`)
     } catch (error: any) {
-      toast.error(error.message || `Failed to sign up with ${provider}`)
+      toast.error(error.message || 'OAuth signup is unavailable in local auth mode')
     } finally {
       setOAuthLoading(null)
     }

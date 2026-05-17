@@ -23,11 +23,15 @@ import java.util.concurrent.TimeUnit;
 public class SupabaseJwtService {
 
     private final ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
+    private final boolean enabled;
 
     public SupabaseJwtService(@Value("${SUPABASE_URL:}") String supabaseUrl) throws MalformedURLException {
         if (supabaseUrl == null || supabaseUrl.isBlank()) {
-            throw new IllegalArgumentException("SUPABASE_URL must be set as environment variable") ;
+            this.enabled = false;
+            this.jwtProcessor = null;
+            return;
         }
+        this.enabled = true;
 
         String jwksUrl = supabaseUrl.endsWith("/") ? supabaseUrl + "auth/v1/.well-known/jwks.json" : supabaseUrl + "/auth/v1/.well-known/jwks.json";
 
@@ -41,7 +45,14 @@ public class SupabaseJwtService {
         jwtProcessor.setJWSKeySelector(keySelector);
     }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     public JWTClaimsSet validate(String token) throws Exception {
+        if (!enabled || jwtProcessor == null) {
+            throw new IllegalStateException("Supabase JWT validation is disabled");
+        }
         SecurityContext ctx = null;
         return jwtProcessor.process(token, ctx);
     }

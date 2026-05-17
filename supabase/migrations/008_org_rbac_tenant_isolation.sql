@@ -2,9 +2,14 @@
 -- Keeps system roles global while scoping custom roles and user management by org.
 
 ALTER TABLE roles
-  ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE CASCADE;
+  ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS is_system_role BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_roles_org_id ON roles(org_id);
+
+-- audit_logs: add actor_id column if missing
+ALTER TABLE audit_logs
+  ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES app_users(id) ON DELETE SET NULL;
 
 -- app_users policies: remove legacy broad access and enforce same-org admin management.
 DROP POLICY IF EXISTS "Users can view own profile" ON app_users;
@@ -175,7 +180,7 @@ DROP POLICY IF EXISTS "Admins can remove roles" ON user_roles;
 CREATE POLICY "Users can see own or org user roles" ON user_roles
   FOR SELECT
   USING (
-    user_id = get_current_user_id()
+    user_id = get_current_app_user_id()
     OR (
       EXISTS (
         SELECT 1
@@ -236,7 +241,7 @@ CREATE POLICY "Admins read org audit logs" ON audit_logs
     OR (
       has_permission('admin', 'view')
       AND (
-        actor_id = get_current_user_id()
+        actor_id = get_current_app_user_id()
         OR EXISTS (
           SELECT 1
           FROM app_users actor_user

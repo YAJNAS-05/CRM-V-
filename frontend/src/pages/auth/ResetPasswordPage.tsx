@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { supabase } from '../../lib/supabaseClient'
 import { toast } from 'sonner'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
@@ -33,19 +32,10 @@ const ResetPasswordPage: React.FC = () => {
   const onSubmit = async (data: ResetPasswordFormData) => {
     setIsLoading(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: data.password,
-      })
-
-      if (error) {
-        toast.error(error.message || 'Failed to reset password')
-        return
-      }
-
-      toast.success('Password reset successful! Redirecting to login...')
+      toast.info('Self-service reset is disabled in local auth mode. Ask admin to reset your password.')
       setTimeout(() => {
         navigate('/auth/login')
-      }, 2000)
+      }, 1500)
     } catch (error: any) {
       toast.error(error.message || 'Failed to reset password')
     } finally {

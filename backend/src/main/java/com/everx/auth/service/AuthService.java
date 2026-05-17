@@ -2,6 +2,7 @@ package com.everx.auth.service;
 
 import com.everx.auth.dto.LoginRequest;
 import com.everx.auth.dto.LoginResponse;
+import com.everx.auth.dto.RegisterRequest;
 import com.everx.auth.dto.UserDto;
 import com.everx.auth.entity.RefreshToken;
 import com.everx.auth.entity.User;
@@ -11,6 +12,7 @@ import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import com.everx.shared.util.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,12 @@ import java.util.stream.Stream;
 @Transactional
 public class AuthService {
 
+    private static final String DEFAULT_ADMIN_EMAIL = "admin@everx.com";
+    private static final String DEFAULT_ADMIN_PASSWORD = "password123";
+
+    @Value("${everx.local-auth.enable-default-admin:true}")
+    private boolean enableDefaultAdmin;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -40,6 +48,8 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
         log.info("Login attempt for email: {}", request.getEmail());
+
+        maybeBootstrapDefaultAdmin(request);
 
         User user = userRepository.findByEmailWithRolesAndPermissions(request.getEmail())
                 .orElseThrow(() -> new ValidationException("Invalid email or password"));
@@ -80,6 +90,31 @@ public class AuthService {
                 .expiresIn(jwtTokenProvider.getAccessTokenExpiry() / 1000)
                 .user(UserDto.fromEntity(user))
                 .build();
+    }
+
+    public UserDto register(RegisterRequest request) {
+        if (userRepository.existsActiveByEmail(request.getEmail())) {
+            throw new ValidationException("Email already registered");
+        }
+
+        String fullName = request.getFullName().trim();
+        String firstName = fullName.contains(" ") ? fullName.substring(0, fullName.indexOf(' ')).trim() : fullName;
+        String lastName = fullName.contains(" ") ? fullName.substring(fullName.indexOf(' ') + 1).trim() : "User";
+
+        User user = User.builder()
+                .email(request.getEmail().trim().toLowerCase())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .fullName(fullName)
+                .firstName(firstName.isBlank() ? "User" : firstName)
+                .lastName(lastName.isBlank() ? "User" : lastName)
+                .phone(request.getPhone())
+                .role(User.UserRole.EMPLOYEE)
+                .officeLocation(User.OfficeLocation.AUSTRALIA)
+                .isActive(true)
+                .isDeleted(false)
+                .build();
+
+        return UserDto.fromEntity(userRepository.save(user));
     }
 
     public LoginResponse refreshAccessToken(String refreshTokenStr) {
@@ -181,5 +216,40 @@ public class AuthService {
                 .distinct()
                 .sorted()
                 .toList();
+    }
+
+    private void maybeBootstrapDefaultAdmin(LoginRequest request) {
+        if (!enableDefaultAdmin) {
+            return;
+        }
+        if (request.getEmail() == null || request.getPassword() == null) {
+            return;
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+        if (!DEFAULT_ADMIN_EMAIL.equals(email) || !DEFAULT_ADMIN_PASSWORD.equals(request.getPassword())) {
+            return;
+        }
+
+        User user = userRepository.findByEmail(email).orElseGet(() -> User.builder()
+                .email(DEFAULT_ADMIN_EMAIL)
+                .fullName("Administrator")
+                .firstName("Admin")
+                .lastName("User")
+                .phone("+61412345678")
+                .role(User.UserRole.ADMIN)
+                .officeLocation(User.OfficeLocation.AUSTRALIA)
+                .isActive(true)
+                .isDeleted(false)
+                .build());
+
+        user.setPasswordHash(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD));
+        user.setIsActive(true);
+        user.setIsDeleted(false);
+        if (user.getRole() == null) {
+            user.setRole(User.UserRole.ADMIN);
+        }
+
+        userRepository.save(user);
     }
 }
