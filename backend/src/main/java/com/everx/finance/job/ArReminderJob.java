@@ -21,7 +21,7 @@ public class ArReminderJob {
     /**
      * Send AR reminders for overdue invoices
      */
-    @Scheduled(cron = "0 3 * * *") // 3 AM daily
+    @Scheduled(cron = "0 0 3 * * *") // 3 AM daily
     public void sendArReminders() {
         log.info("Starting AR reminder job");
         try {
