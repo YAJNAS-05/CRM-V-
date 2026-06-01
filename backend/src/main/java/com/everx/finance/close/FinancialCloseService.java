@@ -8,8 +8,7 @@ import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.finance.journal.GlJournalEntry;
 import com.everx.finance.journal.GlJournalEntryRepository;
-import com.everx.finance.period.PostingPeriodException;
-import com.everx.finance.period.PostingPeriodService;
+
 import com.everx.finance.consolidation.IntercompanyEliminationService;
 import com.everx.finance.tolerance.ThreeWayMatchResult;
 import com.everx.finance.tolerance.ThreeWayMatchService;
@@ -42,7 +41,6 @@ public class FinancialCloseService {
     private final FxRateHistoryService fxRateHistoryService;
     private final GlJournalEntryRepository glJournalEntryRepository;
     private final IntercompanyEliminationService intercompanyEliminationService;
-    private final PostingPeriodService postingPeriodService;
 
     public void initiateMonthEndClose(LocalDate periodEnd) {
         performThreeWayMatch(periodEnd);
@@ -73,9 +71,6 @@ public class FinancialCloseService {
         // Refresh checks right before final close so period is never closed on stale data.
         performThreeWayMatch(periodEnd);
         validateCloseReadiness(companyCode, periodEnd);
-
-        String closedBy = String.valueOf(SecurityUserContext.getCurrentUserIdOrNull());
-        postingPeriodService.closePeriod(companyCode, periodEnd.getYear(), periodEnd.getMonthValue(), closedBy);
     }
 
     private void validateCloseReadiness(String companyCode, LocalDate periodEnd) {
@@ -84,7 +79,7 @@ public class FinancialCloseService {
         long openMatchExceptions = exceptionRepository
                 .countOpenByPeriodAndCompanyCode(periodEnd, "OPEN", companyCode);
         if (openMatchExceptions > 0) {
-            throw new PostingPeriodException("Cannot close period "
+            throw new IllegalStateException("Cannot close period "
                     + periodEnd.getMonthValue() + "/" + periodEnd.getYear()
                     + " for " + companyCode
                     + ": " + openMatchExceptions + " open 3-way match exceptions remain.");
@@ -93,7 +88,7 @@ public class FinancialCloseService {
         long nonPostedEntries = glJournalEntryRepository
                 .countNonPostedByCompanyAndPeriod(companyCode, periodStart, periodEnd);
         if (nonPostedEntries > 0) {
-            throw new PostingPeriodException("Cannot close period "
+            throw new IllegalStateException("Cannot close period "
                     + periodEnd.getMonthValue() + "/" + periodEnd.getYear()
                     + " for " + companyCode
                     + ": " + nonPostedEntries + " non-posted GL entries remain.");

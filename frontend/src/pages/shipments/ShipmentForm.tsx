@@ -151,13 +151,14 @@ export default function ShipmentForm() {
     if (name === 'soId') {
       const selectedSo = salesOrders.find((order) => order.id === value)
       const firstEquipmentId = selectedSo?.items?.[0]?.equipmentId || ''
+      const shouldKeepEquipment = !form.equipmentId || selectedSo?.items?.some((item) => item.equipmentId === form.equipmentId)
 
       setForm((prev) => ({
         ...prev,
         soId: value,
         poId: value ? '' : prev.poId,
         destinationCountry: selectedSo?.destinationCountry || prev.destinationCountry,
-        equipmentId: firstEquipmentId || prev.equipmentId,
+        equipmentId: shouldKeepEquipment ? (prev.equipmentId || firstEquipmentId) : firstEquipmentId,
       }))
       return
     }
@@ -166,13 +167,14 @@ export default function ShipmentForm() {
       const selectedPo = purchaseOrders.find((order) => order.id === value)
       const supplier = suppliers.find((item) => item.id === selectedPo?.supplierId)
       const firstEquipmentId = selectedPo?.items?.[0]?.equipmentId || ''
+      const shouldKeepEquipment = !form.equipmentId || selectedPo?.items?.some((item) => item.equipmentId === form.equipmentId)
 
       setForm((prev) => ({
         ...prev,
         poId: value,
         soId: value ? '' : prev.soId,
         originCountry: supplier?.country || prev.originCountry,
-        equipmentId: firstEquipmentId || prev.equipmentId,
+        equipmentId: shouldKeepEquipment ? (prev.equipmentId || firstEquipmentId) : firstEquipmentId,
       }))
       return
     }
@@ -203,14 +205,36 @@ export default function ShipmentForm() {
     [purchaseOrders, suppliers]
   )
 
+  const linkedEquipmentIds = useMemo(() => {
+    const ids = new Set<string>()
+
+    if (form.soId) {
+      const selectedSalesOrder = salesOrders.find((order) => order.id === form.soId)
+      selectedSalesOrder?.items?.forEach((item) => {
+        if (item.equipmentId) ids.add(item.equipmentId)
+      })
+    }
+
+    if (form.poId) {
+      const selectedPurchaseOrder = purchaseOrders.find((order) => order.id === form.poId)
+      selectedPurchaseOrder?.items?.forEach((item) => {
+        if (item.equipmentId) ids.add(item.equipmentId)
+      })
+    }
+
+    return ids
+  }, [form.poId, form.soId, purchaseOrders, salesOrders])
+
   const equipmentOptions = useMemo(
     () =>
-      equipment.map((item) => ({
-        value: item.id,
-        label: `${item.internalCode} | ${item.make || ''} ${item.model || ''}`.trim(),
-        meta: item.status,
-      })),
-    [equipment]
+      equipment
+        .filter((item) => linkedEquipmentIds.size === 0 || linkedEquipmentIds.has(item.id) || item.id === form.equipmentId)
+        .map((item) => ({
+          value: item.id,
+          label: `${item.internalCode} | ${item.make || ''} ${item.model || ''}`.trim(),
+          meta: item.status,
+        })),
+    [equipment, form.equipmentId, linkedEquipmentIds]
   )
 
   const subcontractorOptions = useMemo(
@@ -404,6 +428,7 @@ export default function ShipmentForm() {
                 onChange={handleLookupChange}
                 disabled={lookupLoading}
                 placeholder="Equipment auto-fills from SO/PO selection"
+                helperText={form.soId || form.poId ? 'Showing equipment from selected order' : 'Select SO or PO to narrow equipment'}
               />
               <SearchableLookupSelect
                 label="Subcontractor / Delivery Agent"

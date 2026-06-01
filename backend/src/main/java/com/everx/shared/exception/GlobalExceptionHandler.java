@@ -1,7 +1,7 @@
 package com.everx.shared.exception;
 
 import com.everx.shared.dto.ErrorResponse;
-import com.everx.finance.period.PostingPeriodException;
+
 import com.everx.finance.account.AccountDeterminationException;
 import com.everx.finance.fx.FxRateException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -108,20 +108,6 @@ public class GlobalExceptionHandler {
                 .build();
 
         log.warn("Accounting immutability violation: {}", ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNPROCESSABLE_ENTITY);
-    }
-
-    @ExceptionHandler(PostingPeriodException.class)
-    public ResponseEntity<ErrorResponse> handlePostingPeriod(PostingPeriodException ex, HttpServletRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
-                .error("Unprocessable Entity")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        log.warn("Posting period violation: {}", ex.getMessage());
         return new ResponseEntity<>(errorResponse, HttpStatus.UNPROCESSABLE_ENTITY);
     }
 

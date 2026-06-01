@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { dealApi, accountApi, contactApi } from '../../api/crmApi'
-import { Deal, Account, Contact } from '../../types/crm'
+import { dealApi, accountApi, contactApi, activityApi, quoteApi } from '../../api/crmApi'
+import { salesOrderApi } from '../../api/erpApi'
+import { Deal, Account, Contact, Activity, Quote } from '../../types/crm'
+import { SalesOrder } from '../../types/erp'
 import { FeatureGate } from '../../components/rbac'
 import CrmDetailHero from '../../components/crm/CrmDetailHero'
 import { toast } from 'sonner'
@@ -44,6 +46,12 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [isEditing, setIsEditing] = useState(isNew)
+  const [activeTab, setActiveTab] = useState<'details' | 'activities' | 'quotes' | 'orders'>('details')
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [quotes, setQuotes] = useState<Quote[]>([])
+  const [linkedOrders, setLinkedOrders] = useState<SalesOrder[]>([])
+  const [relatedLoading, setRelatedLoading] = useState(false)
+  const [convertingSO, setConvertingSO] = useState(false)
   const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<DealFormData>({
     resolver: zodResolver(dealSchema),
     defaultValues: { stage: 'PROSPECTING' },
@@ -65,6 +73,12 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
     }
   }, [selectedAccountId])
 
+  useEffect(() => {
+    if (!isEditing && id && deal) {
+      void fetchRelated()
+    }
+  }, [isEditing, id, deal])
+
   const fetchAccounts = async () => {
     try {
       const response = await accountApi.getAll(0, 100)
@@ -80,6 +94,54 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
       setContacts(response.data.data?.content || [])
     } catch {
       setContacts([])
+    }
+  }
+
+  const fetchRelated = async () => {
+    if (!id) return
+    setRelatedLoading(true)
+    const [actRes, quoteRes, soRes] = await Promise.allSettled([
+      activityApi.getByDeal(id),
+      quoteApi.getByDeal(id, 0, 50),
+      salesOrderApi.getAll(0, 200),
+    ])
+    if (actRes.status === 'fulfilled') {
+      const data = actRes.value.data?.data
+      setActivities(Array.isArray(data) ? data : [])
+    }
+    if (quoteRes.status === 'fulfilled') {
+      const data = quoteRes.value.data?.data
+      const items = data?.content ?? (Array.isArray(data) ? data : [])
+      setQuotes(items)
+    }
+    if (soRes.status === 'fulfilled') {
+      const rows = soRes.value?.data?.data?.content ?? soRes.value?.data?.content ?? []
+      const dealOrders = (Array.isArray(rows) ? rows : []).filter((o: SalesOrder) => o.dealId === id)
+      setLinkedOrders(dealOrders)
+    }
+    setRelatedLoading(false)
+  }
+
+  const handleCreateSO = async () => {
+    if (!deal) return
+    setConvertingSO(true)
+    try {
+      const resp = await salesOrderApi.create({
+        dealId: deal.id,
+        accountId: deal.accountId ?? '',
+        status: 'DRAFT',
+        currency: 'USD',
+        notes: `Created from Deal: ${deal.name}`,
+        items: [],
+      })
+      const newSO = resp?.data?.data ?? resp?.data
+      toast.success('Sales order created from deal')
+      if (newSO?.id) navigate(`/erp/sales-orders/${newSO.id}`)
+      else void fetchRelated()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create sales order')
+    } finally {
+      setConvertingSO(false)
     }
   }
 
@@ -162,8 +224,16 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
     const accountName = accounts.find((account) => account.id === deal.accountId)?.name || 'Unlinked'
     const contactName = contacts.find((contact) => contact.id === deal.primaryContactId)
 
+    const TABS = [
+      { key: 'details', label: 'Details' },
+      { key: 'activities', label: `Activities (${activities.length})` },
+      { key: 'quotes', label: `Quotes (${quotes.length})` },
+      { key: 'orders', label: `Sales Orders (${linkedOrders.length})` },
+    ] as const
+
     return (
       <div className="space-y-6">
+        {/* Stage progress bar */}
         <div className="crm-detail-panel p-4">
           <div className="flex items-center gap-1">
             {STAGES.map((stage, index) => {
@@ -190,6 +260,15 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
           badges={[deal.stage?.replace('_', ' '), accountName, contactName ? `${contactName.firstName} ${contactName.lastName}` : 'No primary contact']}
           actions={
             <>
+              <FeatureGate requiredPermission="ERP_CREATE">
+                <button
+                  onClick={() => void handleCreateSO()}
+                  disabled={convertingSO}
+                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {convertingSO ? 'Creating...' : '+ Create Sales Order'}
+                </button>
+              </FeatureGate>
               <FeatureGate requiredPermission="CRM_EDIT">
                 <button onClick={() => setIsEditing(true)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Edit</button>
               </FeatureGate>
@@ -206,44 +285,196 @@ const DealDetailPage: React.FC<DealDetailPageProps> = ({ isNew = false }) => {
           ]}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { label: 'Amount', value: fmt(deal.amount) },
-            { label: 'Weighted Revenue', value: fmt(deal.expectedRevenueWeighted) },
-            { label: 'Probability', value: `${deal.probability || 0}%` },
-            { label: 'Close Date', value: deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : '—' },
-            { label: 'Days in Stage', value: deal.daysInStage ?? '—' },
-            { label: 'Days in Pipeline', value: deal.daysInPipeline ?? '—' },
-          ].map(({ label, value }) => (
-            <div key={label} className="crm-detail-panel p-4">
-              <p className="text-xs text-gray-400 mb-1">{label}</p>
-              <p className="text-sm font-semibold text-gray-900">{value}</p>
-            </div>
-          ))}
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex gap-6">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`whitespace-nowrap pb-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-sky-600 text-sky-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="crm-detail-panel p-6">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            {[
-              ['Deal Name', deal.name],
-              ['Stage', deal.stage],
-              ['Account', accountName],
-              ['Primary Contact', contactName ? `${contactName.firstName} ${contactName.lastName}` : null],
-              ['Amount', fmt(deal.amount)],
-              ['Weighted Revenue', fmt(deal.expectedRevenueWeighted)],
-              ['Probability', `${deal.probability || 0}%`],
-              ['Days in Stage', deal.daysInStage ?? null],
-              ['Days in Pipeline', deal.daysInPipeline ?? null],
-              ['Expected Close', deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : null],
-              ['Lead Source', deal.leadSource],
-              ['Next Step', deal.nextStep],
-              ['Created', new Date(deal.createdAt).toLocaleDateString()],
-            ].map(([label, value]) => (
-              <div key={label as string}><dt className="text-xs text-gray-400 mb-0.5">{label}</dt><dd className="text-sm text-gray-900">{(value as string) || '—'}</dd></div>
-            ))}
+        {/* Tab: Details */}
+        {activeTab === 'details' && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Amount', value: fmt(deal.amount) },
+                { label: 'Weighted Revenue', value: fmt(deal.expectedRevenueWeighted) },
+                { label: 'Probability', value: `${deal.probability || 0}%` },
+                { label: 'Close Date', value: deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : '—' },
+                { label: 'Days in Stage', value: deal.daysInStage ?? '—' },
+                { label: 'Days in Pipeline', value: deal.daysInPipeline ?? '—' },
+              ].map(({ label, value }) => (
+                <div key={label} className="crm-detail-panel p-4">
+                  <p className="text-xs text-gray-400 mb-1">{label}</p>
+                  <p className="text-sm font-semibold text-gray-900">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="crm-detail-panel p-6">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                {[
+                  ['Deal Name', deal.name],
+                  ['Stage', deal.stage],
+                  ['Account', accountName],
+                  ['Primary Contact', contactName ? `${contactName.firstName} ${contactName.lastName}` : null],
+                  ['Amount', fmt(deal.amount)],
+                  ['Weighted Revenue', fmt(deal.expectedRevenueWeighted)],
+                  ['Probability', `${deal.probability || 0}%`],
+                  ['Days in Stage', deal.daysInStage ?? null],
+                  ['Days in Pipeline', deal.daysInPipeline ?? null],
+                  ['Expected Close', deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : null],
+                  ['Lead Source', deal.leadSource],
+                  ['Next Step', deal.nextStep],
+                  ['Created', new Date(deal.createdAt).toLocaleDateString()],
+                ].map(([label, value]) => (
+                  <div key={label as string}><dt className="text-xs text-gray-400 mb-0.5">{label}</dt><dd className="text-sm text-gray-900">{(value as string) || '—'}</dd></div>
+                ))}
+              </div>
+              {deal.description && <><h3 className="text-sm font-semibold text-gray-900 mt-6 mb-2">Description</h3><p className="text-sm text-gray-600">{deal.description}</p></>}
+            </div>
+          </>
+        )}
+
+        {/* Tab: Activities */}
+        {activeTab === 'activities' && (
+          <div className="crm-detail-panel p-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Activity Timeline</h2>
+            {relatedLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : activities.length === 0 ? (
+              <p className="text-sm text-gray-400">No activities logged for this deal yet.</p>
+            ) : (
+              <ol className="relative border-l border-gray-200 space-y-6 ml-3">
+                {activities.map((act) => (
+                  <li key={act.id} className="ml-6">
+                    <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 ring-4 ring-white text-sky-600 text-xs font-bold">
+                      {act.type?.[0] ?? 'A'}
+                    </span>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{act.subject || act.type}</p>
+                        {act.description && <p className="text-xs text-gray-500 mt-0.5">{act.description}</p>}
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${act.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {act.status || 'OPEN'}
+                        </span>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {act.dueDate ? new Date(act.dueDate).toLocaleDateString() : new Date(act.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
-          {deal.description && <><h3 className="text-sm font-semibold text-gray-900 mt-6 mb-2">Description</h3><p className="text-sm text-gray-600">{deal.description}</p></>}
-        </div>
+        )}
+
+        {/* Tab: Quotes */}
+        {activeTab === 'quotes' && (
+          <div className="crm-detail-panel p-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Quotes</h2>
+            {relatedLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : quotes.length === 0 ? (
+              <p className="text-sm text-gray-400">No quotes linked to this deal.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['Quote #', 'Version', 'Status', 'Issued', 'Expiry', 'Total'].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {quotes.map((q) => (
+                      <tr key={q.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-sky-700">{q.quoteNumber}</td>
+                        <td className="px-4 py-2 text-gray-600">v{q.version}</td>
+                        <td className="px-4 py-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${q.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' : q.status === 'EXPIRED' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {q.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">{q.issuedDate ? new Date(q.issuedDate).toLocaleDateString() : '—'}</td>
+                        <td className="px-4 py-2 text-gray-500">{q.expiryDate ? new Date(q.expiryDate).toLocaleDateString() : '—'}</td>
+                        <td className="px-4 py-2 font-medium">{q.currency} {q.totalAmount?.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Sales Orders */}
+        {activeTab === 'orders' && (
+          <div className="crm-detail-panel p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-gray-700">Linked Sales Orders</h2>
+              <FeatureGate requiredPermission="ERP_CREATE">
+                <button
+                  onClick={() => void handleCreateSO()}
+                  disabled={convertingSO}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {convertingSO ? 'Creating...' : '+ Create SO'}
+                </button>
+              </FeatureGate>
+            </div>
+            {relatedLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : linkedOrders.length === 0 ? (
+              <p className="text-sm text-gray-400">No sales orders linked to this deal.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['SO Number', 'Status', 'Order Date', 'Destination', 'Total', ''].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {linkedOrders.map((so) => (
+                      <tr key={so.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-sky-700">{so.soNumber}</td>
+                        <td className="px-4 py-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${so.status === 'DELIVERED' || so.status === 'INSTALLED' ? 'bg-green-100 text-green-700' : so.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {so.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">{so.orderDate ? new Date(so.orderDate).toLocaleDateString() : '—'}</td>
+                        <td className="px-4 py-2 text-gray-500">{so.destinationCountry || '—'}</td>
+                        <td className="px-4 py-2 font-medium">{so.currency} {so.totalAmount?.toLocaleString()}</td>
+                        <td className="px-4 py-2">
+                          <button onClick={() => navigate(`/erp/sales-orders/${so.id}`)} className="text-xs text-sky-600 hover:underline">View</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }

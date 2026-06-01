@@ -1,5 +1,5 @@
 import axiosInstance from './axiosInstance'
-import { supabase, OAuthProvider } from '../lib/supabaseClient'
+import type { OAuthProvider } from '../lib/localAuth'
 import { LoginRequest, LoginResponse, ApiResponse, User } from '../types'
 
 export const authApi = {
@@ -41,57 +41,18 @@ export const authApi = {
   },
 
   getConnectedProviders: async (): Promise<string[]> => {
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session.session?.user) return []
-
-      const identities = session.session.user.identities || []
-      return identities.map((id: any) => id.provider)
-    } catch (error) {
-      console.error('Error fetching connected providers:', error)
-      return []
-    }
+    return []
   },
 
   linkOAuthProvider: async (provider: OAuthProvider) => {
-    try {
-      const { data, error } = await supabase.auth.linkIdentity({
-        provider: provider as any,
-      })
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return data
-    } catch (error: any) {
-      throw new Error(error.message || `Failed to link ${provider}`)
-    }
+    throw new Error(`OAuth (${provider}) is disabled in local auth mode`)
   },
 
   unlinkOAuthProvider: async (provider: OAuthProvider) => {
-    try {
-      const { data, error } = await supabase.auth.unlinkIdentity({
-        identity_id: provider,
-      } as any)
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return data
-    } catch (error: any) {
-      throw new Error(error.message || `Failed to unlink ${provider}`)
-    }
+    throw new Error(`OAuth (${provider}) is disabled in local auth mode`)
   },
 
   getCurrentSession: async () => {
-    try {
-      const { data } = await supabase.auth.getSession()
-      return data.session
-    } catch (error) {
-      console.error('Error fetching session:', error)
-      return null
-    }
+    return null
   },
 }

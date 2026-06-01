@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { usePermissions } from '../../hooks/usePermissions'
-import { usePermissions as useSupabaseRBAC } from '../../hooks/useRBAC'
+import { usePermissions as useLocalRBAC } from '../../hooks/useRBAC'
+import { hasAdminSettingsAccess } from '../../lib/settingsAccess'
 
 interface SidebarProps {
   collapsed: boolean
@@ -83,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
   const showCollapsed = collapsed && !mobileOpen
   const user = useAuthStore((state) => state.user)
   const { hasAnyRole } = usePermissions()
-  const { can: canModuleView } = useSupabaseRBAC()
+  const { can: canModuleView } = useLocalRBAC()
   const userPermissions = user?.permissions || []
   const [menuQuery, setMenuQuery] = useState('')
   const [activeFlyout, setActiveFlyout] = useState<string | null>(null)
@@ -196,6 +197,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
         { name: 'Acquisitions', path: '/erp/acquisitions', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2m-7-6h2m10 0h2M5 5l2 2m10 10l2 2M19 5l-2 2M7 17l-2 2' },
         { name: 'Equipment Assessments', path: '/erp/equipment-assessments', icon: 'M9 12h6m-6 4h6M7 7h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H9l-4 3v-3H5a2 2 0 01-2-2V5a2 2 0 012-2z' },
         { name: 'Equipment', path: '/erp/equipment', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z' },
+        { name: 'Inventory', path: '/erp/inventory', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
         { name: 'Equipment QC', path: '/erp/equipment-qc', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
         { name: 'Sales Orders', path: '/erp/sales-orders', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
         { name: 'Site Assessments', path: '/erp/site-assessments', icon: 'M8 11a4 4 0 118 0 4 4 0 01-8 0zm-5 9a9 9 0 1118 0H3z' },
@@ -349,17 +351,17 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
           }
 
           if (group.title === 'SETTINGS') {
-            return true
+            return hasAdminSettingsAccess(user)
           }
 
           const requiredModulePermissions = moduleViewPermissions[group.title]
           const moduleKey = moduleKeyMap[group.title]
-          const hasSupabaseModuleAccess = moduleKey ? canModuleView(moduleKey, 'view') : false
+          const hasModuleAccess = moduleKey ? canModuleView(moduleKey, 'view') : false
           if (!requiredModulePermissions || requiredModulePermissions.length === 0) {
             return true
           }
 
-          return hasSupabaseModuleAccess || requiredModulePermissions.some((permission) =>
+          return hasModuleAccess || requiredModulePermissions.some((permission) =>
             userPermissions.includes(permission)
           )
         })
@@ -373,11 +375,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
 
             if (item.requiredPermission) {
               const mappedPermission = itemModuleActionMap[item.path]
-              const hasSupabaseItemAccess = mappedPermission
+              const hasItemAccess = mappedPermission
                 ? canModuleView(mappedPermission.module, mappedPermission.action)
                 : false
 
-              return hasSupabaseItemAccess || userPermissions.includes(item.requiredPermission)
+              return hasItemAccess || userPermissions.includes(item.requiredPermission)
             }
 
             const inferredPermissions = inferRequiredPermissionsForPath(item.path)
@@ -415,7 +417,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, onClose }) => 
           }
         })
         .filter((group) => group.items.length > 0 || (group.subGroups && group.subGroups.length > 0)),
-      [hasAnyRole, menuGroups, userPermissions]
+        [canModuleView, hasAnyRole, menuGroups, user, userPermissions]
   )
 
   const filteredMenuGroups = useMemo(() => {

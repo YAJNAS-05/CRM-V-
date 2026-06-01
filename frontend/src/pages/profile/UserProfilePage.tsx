@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useNotification } from '../../hooks/useNotification'
-import { authApi } from '../../api/authApi'
-import { OAUTH_PROVIDERS } from '../../lib/supabaseClient'
+import { OAUTH_PROVIDERS } from '../../lib/localAuth'
+import { settingsApi } from '../../api/settingsApi'
+import { hasAdminSettingsAccess } from '../../lib/settingsAccess'
+import type { UserSettings } from '../../types'
 import { toast } from 'sonner'
-import { Mail, Code, Users, Trash2, Plus } from 'lucide-react'
+import { Mail, Code, Users } from 'lucide-react'
 
 /**
  * User Profile Page
@@ -13,13 +15,10 @@ import { Mail, Code, Users, Trash2, Plus } from 'lucide-react'
  */
 const UserProfilePage: React.FC = () => {
   const { user, accessToken, logout } = useAuthStore()
-  const { settings, updateSettings } = useSettingsStore()
+  const { settings: cachedSettings, replaceSettings } = useSettingsStore()
   const notification = useNotification()
 
   const [isEditingProfile, setIsEditingProfile] = useState(false)
-  const [connectedProviders, setConnectedProviders] = useState<string[]>([])
-  const [isLoadingProviders, setIsLoadingProviders] = useState(false)
-  const [linkingProvider, setLinkingProvider] = useState<string | null>(null)
   const [editedProfile, setEditedProfile] = useState({
     fullName: user?.fullName || '',
     phone: user?.phone || '',
@@ -28,8 +27,12 @@ const UserProfilePage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(false)
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false)
+  const [isSavingRoleDefaults, setIsSavingRoleDefaults] = useState(false)
+  const [personalSettings, setPersonalSettings] = useState<UserSettings>(cachedSettings)
+  const [roleSettings, setRoleSettings] = useState<UserSettings>(cachedSettings)
 
-  // OAuth provider icons mapping
   const providerIcons: Record<string, any> = {
     [OAUTH_PROVIDERS.GOOGLE]: Mail,
     [OAUTH_PROVIDERS.GITHUB]: Code,
@@ -42,45 +45,12 @@ const UserProfilePage: React.FC = () => {
     [OAUTH_PROVIDERS.DISCORD]: 'Discord',
   }
 
-  useEffect(() => {
-    loadConnectedProviders()
-  }, [])
-
-  const loadConnectedProviders = async () => {
-    setIsLoadingProviders(true)
-    try {
-      const providers = await authApi.getConnectedProviders()
-      setConnectedProviders(providers)
-    } catch (error) {
-      console.error('Error loading connected providers:', error)
-    } finally {
-      setIsLoadingProviders(false)
-    }
-  }
-
   const handleLinkProvider = async (provider: string) => {
-    setLinkingProvider(provider)
-    try {
-      await authApi.linkOAuthProvider(provider as any)
-      toast.success(`${providerLabels[provider]} linked successfully`)
-      await loadConnectedProviders()
-    } catch (error: any) {
-      toast.error(error.message || `Failed to link ${providerLabels[provider]}`)
-    } finally {
-      setLinkingProvider(null)
-    }
+    toast.info(`${providerLabels[provider]} linking is disabled in local mode`)
   }
 
   const handleUnlinkProvider = async (provider: string) => {
-    if (!window.confirm(`Remove ${providerLabels[provider]} from your account?`)) return
-
-    try {
-      await authApi.unlinkOAuthProvider(provider as any)
-      toast.success(`${providerLabels[provider]} removed successfully`)
-      await loadConnectedProviders()
-    } catch (error: any) {
-      toast.error(error.message || `Failed to remove ${providerLabels[provider]}`)
-    }
+    toast.info(`${providerLabels[provider]} unlinking is disabled in local mode`)
   }
 
   const handleProfileChange = (field: string, value: string) => {
@@ -89,6 +59,80 @@ const UserProfilePage: React.FC = () => {
       [field]: value,
     }))
   }
+
+  const effectiveRoleName = useMemo(() => {
+    if (!user) {
+      return null
+    }
+
+    if (user.role) {
+      return user.role
+    }
+
+    return user.roles && user.roles.length > 0 ? user.roles[0] : null
+  }, [user])
+
+  const canManageRoleDefaults = hasAdminSettingsAccess(user)
+
+  useEffect(() => {
+    if (!user) {
+      return
+    }
+
+    let isMounted = true
+
+    const loadSettings = async () => {
+      setIsLoadingPreferences(true)
+      try {
+        const personalResponse = await settingsApi.getMySettings()
+        if (isMounted && personalResponse) {
+          const personal = {
+            theme: personalResponse.theme,
+            language: personalResponse.language,
+            timezone: personalResponse.timezone,
+            notificationsEnabled: personalResponse.notificationsEnabled,
+            emailNotifications: personalResponse.emailNotifications,
+            inAppNotifications: personalResponse.inAppNotifications,
+            autoRefresh: personalResponse.autoRefresh,
+            itemsPerPage: personalResponse.itemsPerPage,
+          }
+          setPersonalSettings(personal)
+          replaceSettings(personal)
+        }
+
+        if (isMounted && canManageRoleDefaults && effectiveRoleName) {
+          const roleResponse = await settingsApi.getRoleSettings(effectiveRoleName)
+          if (roleResponse) {
+            setRoleSettings({
+              theme: roleResponse.theme,
+              language: roleResponse.language,
+              timezone: roleResponse.timezone,
+              notificationsEnabled: roleResponse.notificationsEnabled,
+              emailNotifications: roleResponse.emailNotifications,
+              inAppNotifications: roleResponse.inAppNotifications,
+              autoRefresh: roleResponse.autoRefresh,
+              itemsPerPage: roleResponse.itemsPerPage,
+            })
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setPersonalSettings(cachedSettings)
+          setRoleSettings(cachedSettings)
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingPreferences(false)
+        }
+      }
+    }
+
+    void loadSettings()
+
+    return () => {
+      isMounted = false
+    }
+  }, [cachedSettings, canManageRoleDefaults, effectiveRoleName, replaceSettings, user])
 
   const handleSaveProfile = () => {
     if (!editedProfile.fullName.trim()) {
@@ -116,6 +160,65 @@ const UserProfilePage: React.FC = () => {
     setNewPassword('')
     setConfirmPassword('')
     setShowPasswordForm(false)
+  }
+
+  const handlePersonalSettingChange = <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
+    setPersonalSettings((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const handleRoleSettingChange = <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
+    setRoleSettings((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const handleSavePersonalSettings = async () => {
+    setIsSavingPreferences(true)
+    try {
+      const savedSettings = await settingsApi.updateMySettings(personalSettings)
+      if (savedSettings) {
+        const normalizedSettings = {
+          theme: savedSettings.theme,
+          language: savedSettings.language,
+          timezone: savedSettings.timezone,
+          notificationsEnabled: savedSettings.notificationsEnabled,
+          emailNotifications: savedSettings.emailNotifications,
+          inAppNotifications: savedSettings.inAppNotifications,
+          autoRefresh: savedSettings.autoRefresh,
+          itemsPerPage: savedSettings.itemsPerPage,
+        }
+
+        setPersonalSettings(normalizedSettings)
+        replaceSettings(normalizedSettings)
+      }
+
+      notification.success('Preferences Updated', 'Your personal preferences were saved successfully')
+    } catch {
+      toast.error('Unable to save personal preferences')
+    } finally {
+      setIsSavingPreferences(false)
+    }
+  }
+
+  const handleSaveRoleDefaults = async () => {
+    if (!effectiveRoleName) {
+      toast.error('No primary role found for this account')
+      return
+    }
+
+    setIsSavingRoleDefaults(true)
+    try {
+      await settingsApi.updateRoleSettings(effectiveRoleName, roleSettings)
+      notification.success('Role Defaults Updated', `Defaults for ${effectiveRoleName} were saved successfully`)
+    } catch {
+      toast.error('Unable to save role defaults')
+    } finally {
+      setIsSavingRoleDefaults(false)
+    }
   }
 
   const handleLogout = () => {
@@ -312,7 +415,6 @@ const UserProfilePage: React.FC = () => {
             <div className="space-y-3">
               {Object.entries(OAUTH_PROVIDERS).map(([key, provider]) => {
                 const Icon = providerIcons[provider]
-                const isConnected = connectedProviders.includes(provider)
 
                 return (
                   <div
@@ -323,30 +425,13 @@ const UserProfilePage: React.FC = () => {
                       {Icon && <Icon size={20} className="text-gray-600" />}
                       <div>
                         <p className="font-medium">{providerLabels[provider] || key}</p>
-                        <p className="text-sm text-gray-500">
-                          {isConnected ? 'Connected' : 'Not connected'}
-                        </p>
+                        <p className="text-sm text-gray-500">Disabled in local mode</p>
                       </div>
                     </div>
 
-                    {isConnected ? (
-                      <button
-                        onClick={() => handleUnlinkProvider(provider)}
-                        className="inline-flex items-center gap-2 px-3 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition"
-                      >
-                        <Trash2 size={16} />
-                        Remove
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleLinkProvider(provider)}
-                        disabled={linkingProvider === provider}
-                        className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
-                      >
-                        <Plus size={16} />
-                        {linkingProvider === provider ? 'Linking...' : 'Link'}
-                      </button>
-                    )}
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                      Local mode only
+                    </div>
                   </div>
                 )
               })}
@@ -355,17 +440,22 @@ const UserProfilePage: React.FC = () => {
 
           {/* Settings Card */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-xl font-bold mb-4">Preferences</h3>
-            <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Theme
-                </label>
+                <h3 className="text-xl font-bold">Personal Preferences</h3>
+                <p className="text-sm text-gray-600">These settings affect only your account and local UI behavior.</p>
+              </div>
+              {isLoadingPreferences && (
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Syncing</span>
+              )}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
                 <select
-                  value={settings.theme}
-                  onChange={(e) =>
-                    updateSettings({ theme: e.target.value as 'light' | 'dark' })
-                  }
+                  value={personalSettings.theme}
+                  onChange={(e) => handlePersonalSettingChange('theme', e.target.value as UserSettings['theme'])}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
                   <option value="light">Light</option>
@@ -374,14 +464,10 @@ const UserProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Language
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
                 <select
-                  value={settings.language}
-                  onChange={(e) =>
-                    updateSettings({ language: e.target.value as any })
-                  }
+                  value={personalSettings.language}
+                  onChange={(e) => handlePersonalSettingChange('language', e.target.value as UserSettings['language'])}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
                   <option value="en">English</option>
@@ -392,46 +478,21 @@ const UserProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={settings.inAppNotifications}
-                    onChange={(e) =>
-                      updateSettings({ inAppNotifications: e.target.checked })
-                    }
-                    className="mr-2"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    In-App Notifications
-                  </span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                <input
+                  type="text"
+                  value={personalSettings.timezone}
+                  onChange={(e) => handlePersonalSettingChange('timezone', e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="Africa/Lagos"
+                />
               </div>
 
               <div>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={settings.emailNotifications}
-                    onChange={(e) =>
-                      updateSettings({ emailNotifications: e.target.checked })
-                    }
-                    className="mr-2"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    Email Notifications
-                  </span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Items Per Page
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Items Per Page</label>
                 <select
-                  value={settings.itemsPerPage}
-                  onChange={(e) =>
-                    updateSettings({ itemsPerPage: parseInt(e.target.value) })
-                  }
+                  value={personalSettings.itemsPerPage}
+                  onChange={(e) => handlePersonalSettingChange('itemsPerPage', parseInt(e.target.value, 10))}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
                   <option value="10">10</option>
@@ -440,8 +501,166 @@ const UserProfilePage: React.FC = () => {
                   <option value="100">100</option>
                 </select>
               </div>
+
+              <label className="flex items-center gap-2 rounded-lg border px-3 py-3 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={personalSettings.notificationsEnabled}
+                  onChange={(e) => handlePersonalSettingChange('notificationsEnabled', e.target.checked)}
+                />
+                <span className="text-sm font-medium text-gray-700">Enable notifications</span>
+              </label>
+
+              <label className="flex items-center gap-2 rounded-lg border px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={personalSettings.inAppNotifications}
+                  onChange={(e) => handlePersonalSettingChange('inAppNotifications', e.target.checked)}
+                />
+                <span className="text-sm font-medium text-gray-700">In-app notifications</span>
+              </label>
+
+              <label className="flex items-center gap-2 rounded-lg border px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={personalSettings.emailNotifications}
+                  onChange={(e) => handlePersonalSettingChange('emailNotifications', e.target.checked)}
+                />
+                <span className="text-sm font-medium text-gray-700">Email notifications</span>
+              </label>
+
+              <label className="flex items-center gap-2 rounded-lg border px-3 py-3 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={personalSettings.autoRefresh}
+                  onChange={(e) => handlePersonalSettingChange('autoRefresh', e.target.checked)}
+                />
+                <span className="text-sm font-medium text-gray-700">Auto refresh dashboard data</span>
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleSavePersonalSettings}
+                disabled={isSavingPreferences}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 transition"
+              >
+                {isSavingPreferences ? 'Saving...' : 'Save Preferences'}
+              </button>
             </div>
           </div>
+
+          {canManageRoleDefaults && effectiveRoleName && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-xl font-bold">Role Defaults</h3>
+                  <p className="text-sm text-gray-600">These values seed the defaults for users whose primary role is <span className="font-medium">{effectiveRoleName.replace('_', ' ')}</span>.</p>
+                </div>
+                <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                  Admin only
+                </span>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
+                  <select
+                    value={roleSettings.theme}
+                    onChange={(e) => handleRoleSettingChange('theme', e.target.value as UserSettings['theme'])}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+                  <select
+                    value={roleSettings.language}
+                    onChange={(e) => handleRoleSettingChange('language', e.target.value as UserSettings['language'])}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                  <input
+                    type="text"
+                    value={roleSettings.timezone}
+                    onChange={(e) => handleRoleSettingChange('timezone', e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Items Per Page</label>
+                  <select
+                    value={roleSettings.itemsPerPage}
+                    onChange={(e) => handleRoleSettingChange('itemsPerPage', parseInt(e.target.value, 10))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-2 rounded-lg border px-3 py-3 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={roleSettings.notificationsEnabled}
+                    onChange={(e) => handleRoleSettingChange('notificationsEnabled', e.target.checked)}
+                  />
+                  <span className="text-sm font-medium text-gray-700">Enable notifications</span>
+                </label>
+
+                <label className="flex items-center gap-2 rounded-lg border px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={roleSettings.inAppNotifications}
+                    onChange={(e) => handleRoleSettingChange('inAppNotifications', e.target.checked)}
+                  />
+                  <span className="text-sm font-medium text-gray-700">In-app notifications</span>
+                </label>
+
+                <label className="flex items-center gap-2 rounded-lg border px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={roleSettings.emailNotifications}
+                    onChange={(e) => handleRoleSettingChange('emailNotifications', e.target.checked)}
+                  />
+                  <span className="text-sm font-medium text-gray-700">Email notifications</span>
+                </label>
+
+                <label className="flex items-center gap-2 rounded-lg border px-3 py-3 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={roleSettings.autoRefresh}
+                    onChange={(e) => handleRoleSettingChange('autoRefresh', e.target.checked)}
+                  />
+                  <span className="text-sm font-medium text-gray-700">Auto refresh dashboard data</span>
+                </label>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleSaveRoleDefaults}
+                  disabled={isSavingRoleDefaults}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition"
+                >
+                  {isSavingRoleDefaults ? 'Saving...' : 'Save Role Defaults'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Logout Button */}
           <div className="bg-white rounded-lg shadow p-6">

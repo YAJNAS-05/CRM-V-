@@ -1,6 +1,9 @@
 # EVERX ERP + CRM Platform
 ## Product Requirements Document (PRD)
 
+> Superseded as the primary implementation brief by `docs/product/ENTERPRISE_AI_READY_PRD.md`.
+> Use that document for enterprise-grade, AI-ready delivery requirements and functional completeness rules.
+
 **Version:** 1.0  
 **Last Updated:** April 15, 2026  
 **Status:** In Development  

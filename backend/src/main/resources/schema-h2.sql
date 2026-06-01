@@ -88,6 +88,42 @@ CREATE TABLE IF NOT EXISTS everx_auth.user_roles (
     PRIMARY KEY (user_id, role_id)
 );
 
+CREATE TABLE IF NOT EXISTS everx_auth.user_settings (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL UNIQUE,
+    theme VARCHAR(50) NOT NULL DEFAULT 'light',
+    language VARCHAR(20) NOT NULL DEFAULT 'en',
+    timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
+    notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    in_app_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    auto_refresh BOOLEAN NOT NULL DEFAULT TRUE,
+    items_per_page INTEGER NOT NULL DEFAULT 25,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS everx_auth.role_settings (
+    id UUID PRIMARY KEY,
+    role_id UUID NOT NULL UNIQUE,
+    theme VARCHAR(50) NOT NULL DEFAULT 'light',
+    language VARCHAR(20) NOT NULL DEFAULT 'en',
+    timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
+    notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    in_app_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    auto_refresh BOOLEAN NOT NULL DEFAULT TRUE,
+    items_per_page INTEGER NOT NULL DEFAULT 25,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
 -- CRM schema tables
 CREATE TABLE IF NOT EXISTS everx_crm.accounts (
     id UUID PRIMARY KEY,

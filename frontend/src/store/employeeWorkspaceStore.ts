@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { projectApi } from '../api/projectApi'
 
 export type WorkspaceProjectStatus = 'PLANNING' | 'IN_PROGRESS' | 'ON_HOLD' | 'IN_REVIEW' | 'DONE'
 export type WorkspaceTaskStatus = 'TODO' | 'IN_PROGRESS' | 'ON_HOLD' | 'IN_REVIEW' | 'DONE'
@@ -182,6 +183,7 @@ const buildProjectCode = (name: string) =>
 const roundHours = (value: number) => Math.round(value * 100) / 100
 
 const isApiTimeEntryId = (id: string) => id.startsWith('api-time-')
+const isSeededEntryId = (id: string) => id.startsWith('seed-')
 
 const calculateProjectProgress = (projectId: string, tasks: WorkspaceTask[]) => {
   const projectTasks = tasks.filter((task) => task.projectId === projectId)
@@ -518,21 +520,135 @@ const buildSeedData = (user: WorkspaceUserProfile) => {
   }
 }
 
+const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+
+const mapWorkspaceProjectToApi = (proj: Partial<WorkspaceProject>): any => {
+  const metadataObj = {
+    client: proj.client,
+    product: proj.product,
+    team: proj.team,
+    progress: proj.progress,
+    ownerName: proj.ownerName,
+    source: proj.source,
+    linkedFieldJobId: proj.linkedFieldJobId,
+    code: proj.code
+  }
+  return {
+    name: proj.name,
+    description: proj.description,
+    status: proj.status,
+    startDate: proj.startDate,
+    endDate: proj.dueDate,
+    ownerId: isUuid(proj.ownerId || '') ? proj.ownerId : undefined,
+    projectType: 'STANDARD',
+    visibility: 'PUBLIC',
+    isArchived: proj.status === 'DONE',
+    metadata: JSON.stringify(metadataObj),
+    settings: '{}'
+  }
+}
+
+const mapApiProjectToWorkspace = (apiProj: any): WorkspaceProject => {
+  let extra: any = {}
+  try {
+    if (apiProj.metadata) {
+      extra = JSON.parse(apiProj.metadata)
+    }
+  } catch (e) {
+    console.error("Failed to parse metadata", e)
+  }
+
+  return {
+    id: apiProj.id,
+    code: extra.code || apiProj.icon || 'PROJ',
+    name: apiProj.name,
+    client: extra.client || apiProj.category || 'Internal',
+    product: extra.product || undefined,
+    status: (apiProj.status as any) || 'PLANNING',
+    priority: (apiProj.color as any) || 'MEDIUM',
+    description: apiProj.description || undefined,
+    startDate: apiProj.startDate || undefined,
+    dueDate: apiProj.endDate || undefined,
+    ownerId: apiProj.ownerId || '',
+    ownerName: extra.ownerName || 'Unknown Owner',
+    team: extra.team || [],
+    source: extra.source || 'LOCAL',
+    linkedFieldJobId: extra.linkedFieldJobId || undefined,
+    progress: extra.progress || 0,
+    createdAt: apiProj.createdAt,
+    updatedAt: apiProj.updatedAt
+  }
+}
+
+const mapWorkspaceTaskToApi = (task: Partial<WorkspaceTask>): any => {
+  const metadataObj = {
+    assigneeName: task.assigneeName,
+    creatorId: task.creatorId,
+    creatorName: task.creatorName,
+    estimateHours: task.estimateHours,
+    loggedHours: task.loggedHours
+  }
+  return {
+    projectId: task.projectId,
+    title: task.title,
+    description: task.description,
+    taskType: 'TASK',
+    priority: task.priority || 'MEDIUM',
+    status: task.status || 'TODO',
+    statusOrder: 0,
+    dueDate: task.dueDate,
+    assigneeId: isUuid(task.assigneeId || '') ? task.assigneeId : undefined,
+    tags: task.tags,
+    timeEstimate: task.estimateHours ? Math.round(task.estimateHours * 60) : 0,
+    timeSpent: task.loggedHours ? Math.round(task.loggedHours * 60) : 0,
+    metadata: JSON.stringify(metadataObj)
+  }
+}
+
+const mapApiTaskToWorkspace = (apiTask: any): WorkspaceTask => {
+  let extra: any = {}
+  try {
+    if (apiTask.metadata) {
+      extra = JSON.parse(apiTask.metadata)
+    }
+  } catch (e) {
+    console.error("Failed to parse task metadata", e)
+  }
+
+  return {
+    id: apiTask.id,
+    projectId: apiTask.projectId,
+    title: apiTask.title,
+    description: apiTask.description || undefined,
+    status: (apiTask.status as any) || 'TODO',
+    priority: (apiTask.priority as any) || 'MEDIUM',
+    assigneeId: apiTask.assigneeId || '',
+    assigneeName: extra.assigneeName || apiTask.assigneeName || 'Unassigned',
+    creatorId: extra.creatorId || undefined,
+    creatorName: extra.creatorName || undefined,
+    dueDate: apiTask.dueDate || undefined,
+    estimateHours: extra.estimateHours ?? (apiTask.timeEstimate ? apiTask.timeEstimate / 60 : undefined),
+    loggedHours: extra.loggedHours ?? (apiTask.timeSpent ? apiTask.timeSpent / 60 : 0),
+    tags: apiTask.tags || [],
+    createdAt: apiTask.createdAt,
+    updatedAt: apiTask.updatedAt
+  }
+}
+
 interface EmployeeWorkspaceStore {
-  seededUserIds: string[]
   projects: WorkspaceProject[]
   tasks: WorkspaceTask[]
   timeEntries: WorkspaceTimeEntry[]
   attendanceRecords: WorkspaceAttendanceRecord[]
   taskTimer: WorkspaceTaskTimer | null
-  ensureEmployeeWorkspace: (user: WorkspaceUserProfile) => void
+  ensureEmployeeWorkspace: (user: WorkspaceUserProfile) => Promise<void>
   syncExternalProjects: (projects: WorkspaceExternalProject[]) => void
   syncExternalTimeEntries: (employeeId: string, entries: WorkspaceExternalTimeEntry[]) => void
-  saveProject: (draft: WorkspaceProjectDraft) => string
-  saveTask: (draft: WorkspaceTaskDraft) => string
-  deleteTask: (taskId: string) => void
-  moveTask: (taskId: string, status: WorkspaceTaskStatus) => void
-  logTime: (entry: WorkspaceTimeEntryDraft) => void
+  saveProject: (draft: WorkspaceProjectDraft) => Promise<string>
+  saveTask: (draft: WorkspaceTaskDraft) => Promise<string>
+  deleteTask: (taskId: string) => Promise<void>
+  moveTask: (taskId: string, status: WorkspaceTaskStatus) => Promise<void>
+  logTime: (entry: WorkspaceTimeEntryDraft) => Promise<void>
   punchIn: (employeeId: string, employeeName: string, note?: string) => void
   punchOut: (employeeId: string) => void
   getCurrentPunch: (employeeId: string) => WorkspaceAttendanceRecord | null
@@ -544,27 +660,68 @@ interface EmployeeWorkspaceStore {
 export const useEmployeeWorkspaceStore = create<EmployeeWorkspaceStore>()(
   persist(
     (set, get) => ({
-      seededUserIds: [],
       projects: [],
       tasks: [],
       timeEntries: [],
       attendanceRecords: [],
       taskTimer: null,
 
-      ensureEmployeeWorkspace: (user) => {
-        const { seededUserIds } = get()
-        if (seededUserIds.includes(user.id)) {
-          return
-        }
+      ensureEmployeeWorkspace: async (user) => {
+        try {
+          const res = await projectApi.getAllProjects()
+          const apiProjects = res.data || []
+          const mappedProjects = apiProjects.map(mapApiProjectToWorkspace)
 
-        const seedData = buildSeedData(user)
-        set((state) => ({
-          seededUserIds: [...state.seededUserIds, user.id],
-          projects: [...state.projects, ...seedData.projects],
-          tasks: [...state.tasks, ...seedData.tasks],
-          timeEntries: [...seedData.timeEntries, ...state.timeEntries],
-          attendanceRecords: [...seedData.attendanceRecords, ...state.attendanceRecords],
-        }))
+          let allMappedTasks: WorkspaceTask[] = []
+          for (const project of mappedProjects) {
+            try {
+              const tasksRes = await projectApi.getTasksByProject(project.id)
+              const apiTasks = tasksRes.data || []
+              const mappedTasks = apiTasks.map(mapApiTaskToWorkspace)
+              allMappedTasks.push(...mappedTasks)
+            } catch (e) {
+              console.error(`Failed to fetch tasks for project ${project.id}`, e)
+            }
+          }
+
+          if (mappedProjects.length === 0) {
+            // Seed data to database
+            const seed = buildSeedData(user)
+            const createdProjects: WorkspaceProject[] = []
+            const createdTasks: WorkspaceTask[] = []
+
+            for (const proj of seed.projects) {
+              const apiData = mapWorkspaceProjectToApi(proj)
+              const res = await projectApi.createProject(apiData)
+              const createdProj = mapApiProjectToWorkspace(res.data)
+              createdProjects.push(createdProj)
+
+              const projTasks = seed.tasks.filter((t) => t.projectId === proj.id)
+              for (const task of projTasks) {
+                const apiTaskData = mapWorkspaceTaskToApi({
+                  ...task,
+                  projectId: createdProj.id
+                })
+                const taskRes = await projectApi.createTask(apiTaskData)
+                const createdTask = mapApiTaskToWorkspace(taskRes.data)
+                createdTasks.push(createdTask)
+              }
+            }
+
+            set({
+              projects: syncProjectProgress(createdProjects, createdTasks),
+              tasks: createdTasks,
+            })
+            return
+          }
+
+          set({
+            projects: syncProjectProgress(mappedProjects, allMappedTasks),
+            tasks: allMappedTasks,
+          })
+        } catch (error) {
+          console.error("Failed to load workspace data from API", error)
+        }
       },
 
       syncExternalProjects: (projects) => {
@@ -611,135 +768,163 @@ export const useEmployeeWorkspaceStore = create<EmployeeWorkspaceStore>()(
         })
       },
 
-      saveProject: (draft) => {
-        const projectId = draft.id || buildId('project')
-        const timestamp = nowIso()
-
-        set((state) => {
-          const existing = state.projects.find((project) => project.id === projectId)
-          const nextProject: WorkspaceProject = {
-            id: projectId,
-            code: draft.code?.trim() || buildProjectCode(draft.name),
-            name: draft.name.trim(),
-            client: draft.client.trim(),
-            product: draft.product?.trim(),
-            status: draft.status,
-            priority: draft.priority,
-            description: draft.description?.trim(),
-            startDate: draft.startDate,
-            dueDate: draft.dueDate,
-            ownerId: draft.ownerId,
-            ownerName: draft.ownerName,
-            team: Array.from(new Set(draft.team.filter(Boolean))),
-            source: draft.source || existing?.source || 'LOCAL',
-            linkedFieldJobId: draft.linkedFieldJobId ?? existing?.linkedFieldJobId,
-            progress: existing?.progress || 0,
-            createdAt: existing?.createdAt || timestamp,
-            updatedAt: timestamp,
+      saveProject: async (draft) => {
+        try {
+          if (draft.id && isUuid(draft.id)) {
+            // Update
+            const apiData = mapWorkspaceProjectToApi({
+              ...draft,
+              progress: calculateProjectProgress(draft.id, get().tasks)
+            } as WorkspaceProject)
+            const res = await projectApi.updateProject(draft.id, apiData)
+            const updatedProj = mapApiProjectToWorkspace(res.data)
+            set((state) => ({
+              projects: state.projects.map((p) => p.id === draft.id ? updatedProj : p)
+            }))
+            return updatedProj.id
+          } else {
+            // Create
+            const apiData = mapWorkspaceProjectToApi({
+              ...draft,
+              progress: 0
+            } as WorkspaceProject)
+            const res = await projectApi.createProject(apiData)
+            const createdProj = mapApiProjectToWorkspace(res.data)
+            set((state) => ({
+              projects: [createdProj, ...state.projects]
+            }))
+            return createdProj.id
           }
-
-          const nextProjects = existing
-            ? state.projects.map((project) => (project.id === projectId ? nextProject : project))
-            : [nextProject, ...state.projects]
-
-          return {
-            projects: syncProjectProgress(nextProjects, state.tasks),
-          }
-        })
-
-        return projectId
+        } catch (e) {
+          console.error("Failed to save project", e)
+          return ''
+        }
       },
 
-      saveTask: (draft) => {
-        const taskId = draft.id || buildId('task')
-        const timestamp = nowIso()
-
-        set((state) => {
-          const existing = state.tasks.find((task) => task.id === taskId)
-          const nextTask: WorkspaceTask = {
-            id: taskId,
-            projectId: draft.projectId,
-            title: draft.title.trim(),
-            description: draft.description?.trim(),
-            status: draft.status,
-            priority: draft.priority,
-            assigneeId: draft.assigneeId,
-            assigneeName: draft.assigneeName,
-            creatorId: draft.creatorId || existing?.creatorId || draft.assigneeId,
-            creatorName: draft.creatorName || existing?.creatorName || draft.assigneeName,
-            dueDate: draft.dueDate,
-            estimateHours: draft.estimateHours,
-            loggedHours: existing?.loggedHours || 0,
-            tags: draft.tags || existing?.tags || [],
-            createdAt: existing?.createdAt || timestamp,
-            updatedAt: timestamp,
+      saveTask: async (draft) => {
+        try {
+          if (draft.id && isUuid(draft.id)) {
+            // Update
+            const existing = get().tasks.find((task) => task.id === draft.id)
+            const apiData = mapWorkspaceTaskToApi({
+              ...draft,
+              loggedHours: existing?.loggedHours || 0
+            } as WorkspaceTask)
+            const res = await projectApi.updateTask(draft.id, apiData)
+            const updatedTask = mapApiTaskToWorkspace(res.data)
+            set((state) => {
+              const nextTasks = state.tasks.map((t) => t.id === draft.id ? updatedTask : t)
+              return {
+                tasks: nextTasks,
+                projects: syncProjectProgress(state.projects, nextTasks)
+              }
+            })
+            return updatedTask.id
+          } else {
+            // Create
+            const apiData = mapWorkspaceTaskToApi({
+              ...draft,
+              loggedHours: 0
+            } as WorkspaceTask)
+            const res = await projectApi.createTask(apiData)
+            const createdTask = mapApiTaskToWorkspace(res.data)
+            set((state) => {
+              const nextTasks = [createdTask, ...state.tasks]
+              return {
+                tasks: nextTasks,
+                projects: syncProjectProgress(state.projects, nextTasks)
+              }
+            })
+            return createdTask.id
           }
-
-          const nextTasks = existing
-            ? state.tasks.map((task) => (task.id === taskId ? nextTask : task))
-            : [nextTask, ...state.tasks]
-
-          return {
-            tasks: nextTasks,
-            projects: syncProjectProgress(state.projects, nextTasks),
-          }
-        })
-
-        return taskId
+        } catch (e) {
+          console.error("Failed to save task", e)
+          return ''
+        }
       },
 
-      deleteTask: (taskId) => {
-        set((state) => {
-          const nextTasks = state.tasks.filter((task) => task.id !== taskId)
-          return {
-            tasks: nextTasks,
-            timeEntries: state.timeEntries.filter((entry) => entry.taskId !== taskId),
-            projects: syncProjectProgress(state.projects, nextTasks),
+      deleteTask: async (taskId) => {
+        try {
+          if (isUuid(taskId)) {
+            await projectApi.deleteTask(taskId)
           }
-        })
-      },
-
-      moveTask: (taskId, status) => {
-        set((state) => {
-          const nextTasks = state.tasks.map((task) =>
-            task.id === taskId ? { ...task, status, updatedAt: nowIso() } : task,
-          )
-
-          return {
-            tasks: nextTasks,
-            projects: syncProjectProgress(state.projects, nextTasks),
-          }
-        })
-      },
-
-      logTime: (entry) => {
-        set((state) => {
-          const nextEntry: WorkspaceTimeEntry = {
-            ...entry,
-            id: buildId('time'),
-            hours: roundHours(entry.hours),
-            createdAt: nowIso(),
-          }
-
-          const nextTasks = state.tasks.map((task) => {
-            if (task.id !== entry.taskId) {
-              return task
-            }
-
+          set((state) => {
+            const nextTasks = state.tasks.filter((task) => task.id !== taskId)
             return {
-              ...task,
-              loggedHours: roundHours(task.loggedHours + entry.hours),
-              status: task.status === 'TODO' ? 'IN_PROGRESS' : task.status,
-              updatedAt: nowIso(),
+              tasks: nextTasks,
+              timeEntries: state.timeEntries.filter((entry) => entry.taskId !== taskId),
+              projects: syncProjectProgress(state.projects, nextTasks),
+              taskTimer: state.taskTimer?.taskId === taskId ? null : state.taskTimer,
             }
           })
+        } catch (e) {
+          console.error("Failed to delete task", e)
+        }
+      },
 
-          return {
-            timeEntries: [nextEntry, ...state.timeEntries],
-            tasks: nextTasks,
-            projects: syncProjectProgress(state.projects, nextTasks),
+      moveTask: async (taskId, status) => {
+        try {
+          if (isUuid(taskId)) {
+            await projectApi.moveTask(taskId, status)
           }
-        })
+          set((state) => {
+            const nextTasks = state.tasks.map((task) =>
+              task.id === taskId ? { ...task, status, updatedAt: nowIso() } : task,
+            )
+            return {
+              tasks: nextTasks,
+              projects: syncProjectProgress(state.projects, nextTasks),
+            }
+          })
+        } catch (e) {
+          console.error("Failed to move task", e)
+        }
+      },
+
+      logTime: async (entry) => {
+        try {
+          const task = get().tasks.find((t) => t.id === entry.taskId)
+          if (task && isUuid(task.id)) {
+            const newLoggedHours = roundHours(task.loggedHours + entry.hours)
+            const newStatus = task.status === 'TODO' ? 'IN_PROGRESS' : task.status
+            const apiData = mapWorkspaceTaskToApi({
+              ...task,
+              loggedHours: newLoggedHours,
+              status: newStatus
+            })
+            await projectApi.updateTask(task.id, apiData)
+          }
+
+          set((state) => {
+            const nextEntry: WorkspaceTimeEntry = {
+              ...entry,
+              id: buildId('time'),
+              hours: roundHours(entry.hours),
+              createdAt: nowIso(),
+            }
+
+            const nextTasks = state.tasks.map((task) => {
+              if (task.id !== entry.taskId) {
+                return task
+              }
+
+              return {
+                ...task,
+                loggedHours: roundHours(task.loggedHours + entry.hours),
+                status: task.status === 'TODO' ? 'IN_PROGRESS' : task.status,
+                updatedAt: nowIso(),
+              }
+            })
+
+            return {
+              timeEntries: [nextEntry, ...state.timeEntries],
+              tasks: nextTasks,
+              projects: syncProjectProgress(state.projects, nextTasks),
+            }
+          })
+        } catch (e) {
+          console.error("Failed to log time", e)
+        }
       },
 
       punchIn: (employeeId, employeeName, note) => {
@@ -815,7 +1000,6 @@ export const useEmployeeWorkspaceStore = create<EmployeeWorkspaceStore>()(
     {
       name: 'everx_employee_workspace_store',
       partialize: (state) => ({
-        seededUserIds: state.seededUserIds,
         projects: state.projects,
         tasks: state.tasks,
         timeEntries: state.timeEntries,

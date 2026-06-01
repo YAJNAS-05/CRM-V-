@@ -25,7 +25,7 @@ public class EverxApplication {
     @Bean
     @Profile("prod")
     public CommandLineRunner initData(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        // Default admin creation removed: authentication will be managed by Supabase Auth.
+        // Intentionally no bootstrap users in production.
         return args -> {
             // no-op
         };

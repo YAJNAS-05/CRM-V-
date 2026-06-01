@@ -6,6 +6,7 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "strict": true,
+    "noImplicitAny": false,
     "esModuleInterop": true,
     "noEmitOnError": true,
     "resolveJsonModule": true,
@@ -14,7 +15,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]

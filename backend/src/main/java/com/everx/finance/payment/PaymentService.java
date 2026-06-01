@@ -4,7 +4,7 @@ import com.everx.finance.fx.FxRateLock;
 import com.everx.finance.fx.FxRateLockingService;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
-import com.everx.finance.period.PostingPeriodEnforcer;
+
 import com.everx.finance.posting.GlPostingService;
 import com.everx.finance.tolerance.ThreeWayMatchResult;
 import com.everx.finance.tolerance.ThreeWayMatchService;
@@ -33,7 +33,6 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
-    private final PostingPeriodEnforcer postingPeriodEnforcer;
     private final FxRateLockingService fxRateLockingService;
     private final GlPostingService glPostingService;
     private final PaymentDeduplicationService paymentDeduplicationService;
@@ -74,9 +73,6 @@ public class PaymentService {
 
         Invoice invoice = invoiceRepository.findByIdAndIsDeletedFalse(request.getInvoiceId())
                 .orElseThrow(() -> new EntityNotFoundException("Invoice not found with id: " + request.getInvoiceId()));
-
-        postingPeriodEnforcer.enforcePostingAllowed(invoice.getEntity().name(), request.getPaymentDate());
-        postingPeriodEnforcer.enforceNoBackdating(request.getPaymentDate());
 
         // Three-way match guard: if this invoice is linked to a PO, validate PO → Receipt → Invoice
         if (invoice.getPoId() != null) {

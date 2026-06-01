@@ -13,19 +13,6 @@ const axiosInstance: AxiosInstance = axios.create({
   },
 })
 
-const isSupabaseAccessToken = (token: string | null) => {
-  if (!token) return false
-  const parts = token.split('.')
-  if (parts.length !== 3) return false
-
-  try {
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return typeof payload?.iss === 'string' && payload.iss.includes('supabase.co/auth/v1')
-  } catch {
-    return false
-  }
-}
-
 // Request interceptor to add JWT token to all requests
 axiosInstance.interceptors.request.use(
   (config) => {
@@ -49,14 +36,9 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
     const state = useAuthStore.getState()
-    const currentAccessToken = state.accessToken
 
     // Only attempt refresh if 401 and not already retried
     if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
-      if (isSupabaseAccessToken(currentAccessToken)) {
-        return Promise.reject(error)
-      }
-
       originalRequest._retry = true
       const { refreshToken, logout } = state
 

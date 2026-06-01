@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { timeEntryApi } from '../../api/hrApi'
 import useEmployeeTimeLogger from '../../hooks/useEmployeeTimeLogger'
 import useEmployeeWorkspace from '../../hooks/useEmployeeWorkspace'
+import { useUsers } from '../../hooks/useRBAC'
 import {
   useEmployeeWorkspaceStore,
   type WorkspacePriority,
@@ -95,9 +96,28 @@ const EMPTY_PROJECT_FORM: ProjectFormState = {
 const slugName = (value: string) => `member-${value.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 
+const PlayIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+    <path d="M8 5v14l11-7z" />
+  </svg>
+)
+
+const PauseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+    <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
+  </svg>
+)
+
+const StopIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+    <path d="M6 6h12v12H6z" />
+  </svg>
+)
+
 const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
-  const { workspaceUser, isEmployee } = useEmployeeWorkspace()
+  const { user, workspaceUser, isEmployee } = useEmployeeWorkspace()
+  const { users } = useUsers()
   const projects = useEmployeeWorkspaceStore((state) => state.projects)
   const tasks = useEmployeeWorkspaceStore((state) => state.tasks)
   const timeEntries = useEmployeeWorkspaceStore((state) => state.timeEntries)
@@ -122,7 +142,7 @@ const ProjectDetailPage: React.FC = () => {
   const [timeForm, setTimeForm] = useState<TimeLogState>(EMPTY_TIME_LOG)
   const [projectForm, setProjectForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM)
   const [timerNow, setTimerNow] = useState(Date.now())
-  const [memberName, setMemberName] = useState('')
+  const [memberUserId, setMemberUserId] = useState('')
 
   const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
   const projectTasks = useMemo(() => tasks.filter((task) => task.projectId === id), [id, tasks])
@@ -135,6 +155,27 @@ const ProjectDetailPage: React.FC = () => {
     if (!project) return []
     return Array.from(new Set([...(project.team || []), project.ownerName]))
   }, [project])
+
+  const memberDirectory = useMemo(() => {
+    const pairs = (Array.isArray(users) ? users : [])
+      .map((user: any) => ({
+        id: String(user.id || ''),
+        fullName: String(user.fullName || user.full_name || '').trim(),
+        email: String(user.email || '').trim(),
+      }))
+      .filter((user) => user.id && user.fullName)
+
+    const byName = new Map<string, string>()
+    pairs.forEach((user) => byName.set(user.fullName, user.id))
+    return { list: pairs, byName }
+  }, [users])
+
+  const availableMembersToAdd = useMemo(() => {
+    if (!project) return []
+    return memberDirectory.list.filter(
+      (user) => user.fullName !== project.ownerName && !project.team.includes(user.fullName),
+    )
+  }, [memberDirectory.list, project])
 
   const taskLookup = useMemo(() => new Map(projectTasks.map((task) => [task.id, task])), [projectTasks])
   const hoursLogged = useMemo(() => projectEntries.reduce((total, entry) => total + entry.hours, 0), [projectEntries])
@@ -152,9 +193,12 @@ const ProjectDetailPage: React.FC = () => {
     return <div className="shell-card p-8 text-sm text-slate-500">Project not found.</div>
   }
 
-  const canEditProject = workspaceUser.id === project.ownerId
-  const canEditTask = (task: WorkspaceTask) => workspaceUser.id === (task.creatorId || task.assigneeId)
-  const isProjectMember = project.ownerId === workspaceUser.id || project.team.includes(workspaceUser.fullName)
+  const roleNames = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
+  const isWorkspaceAdmin = roleNames.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')
+  const canEditProject = workspaceUser.id === project.ownerId || isWorkspaceAdmin
+  const canEditTask = (task: WorkspaceTask) => canEditProject || workspaceUser.id === (task.creatorId || task.assigneeId)
+  const isProjectMember = isWorkspaceAdmin || project.ownerId === workspaceUser.id || project.team.includes(workspaceUser.fullName)
+  const assigneeOptions = teamMembers.length > 0 ? teamMembers : [project.ownerName]
   useEffect(() => {
     if (!taskTimer) {
       return
@@ -231,7 +275,8 @@ const ProjectDetailPage: React.FC = () => {
       return
     }
 
-    const assigneeId = taskForm.assigneeName === workspaceUser.fullName ? workspaceUser.id : slugName(taskForm.assigneeName)
+    const assigneeId = memberDirectory.byName.get(taskForm.assigneeName)
+      || (taskForm.assigneeName === workspaceUser.fullName ? workspaceUser.id : slugName(taskForm.assigneeName))
     const currentTask = editingTaskId ? taskLookup.get(editingTaskId) : null
     const draft: WorkspaceTaskDraft = {
       id: editingTaskId || undefined,
@@ -292,13 +337,9 @@ const ProjectDetailPage: React.FC = () => {
       toast.error('Only the project manager can manage members')
       return
     }
-    const nextName = memberName.trim()
-    if (!nextName) {
-      toast.error('Enter a member name to add')
-      return
-    }
-    if (project.team.includes(nextName) || project.ownerName === nextName) {
-      toast.error('Member already added')
+    const selectedUser = availableMembersToAdd.find((user) => user.id === memberUserId)
+    if (!selectedUser) {
+      toast.error('Select a user to add')
       return
     }
 
@@ -315,13 +356,13 @@ const ProjectDetailPage: React.FC = () => {
       startDate: project.startDate,
       ownerId: project.ownerId,
       ownerName: project.ownerName,
-      team: [...project.team, nextName],
+      team: [...project.team, selectedUser.fullName],
       source: project.source,
       linkedFieldJobId: project.linkedFieldJobId,
     })
 
     toast.success('Member added')
-    setMemberName('')
+    setMemberUserId('')
   }
 
   const handleRemoveMember = (member: string) => {
@@ -447,20 +488,8 @@ const ProjectDetailPage: React.FC = () => {
 
   const handleStartTimer = async (task: WorkspaceTask) => {
     if (taskTimer && taskTimer.taskId !== task.id) {
-      const confirmStop = window.confirm('A timer is already running on another task. Stop it first?')
-      if (!confirmStop) return
-
-      const activeTask = tasks.find((item) => item.id === taskTimer.taskId)
-      const activeProject = projects.find((item) => item.id === taskTimer.projectId)
-      if (!activeTask || !activeProject) {
-        toast.error('Active timer task no longer exists')
-        return
-      }
-
-      const stopped = await stopTimerAndLog(activeTask, activeProject.id)
-      if (!stopped) {
-        return
-      }
+      toast.error('Stop or pause the current running task before starting another one')
+      return
     }
 
     if (!isUuid(project.id)) {
@@ -677,7 +706,7 @@ const ProjectDetailPage: React.FC = () => {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{task.assigneeName}</p>
+                          <p className="mt-1 text-xs text-slate-500">Assigned: {task.assigneeName}</p>
                           <p className="mt-1 text-[11px] text-slate-400">Task Creator: {task.creatorName || task.assigneeName}</p>
                         </div>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
@@ -716,33 +745,52 @@ const ProjectDetailPage: React.FC = () => {
                           Log time
                         </button>
                         {taskTimer?.taskId === task.id ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleStopTimer(task)
-                            }}
-                            className="text-emerald-600 hover:text-emerald-700"
-                          >
-                            Stop Timer
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              title="Pause timer"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void handleStopTimer(task)
+                              }}
+                              className="inline-flex items-center justify-center rounded-md border border-emerald-200 p-1.5 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            >
+                              <PauseIcon />
+                            </button>
+                            <button
+                              type="button"
+                              title="Stop timer"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void handleStopTimer(task)
+                              }}
+                              className="inline-flex items-center justify-center rounded-md border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            >
+                              <StopIcon />
+                            </button>
+                          </>
                         ) : (
                           <button
                             type="button"
+                            title="Start timer"
                             onClick={(event) => {
                               event.stopPropagation()
-                              handleStartTimer(task)
+                              void handleStartTimer(task)
                             }}
-                            className="text-emerald-600 hover:text-emerald-700"
+                            className="inline-flex items-center justify-center rounded-md border border-emerald-200 p-1.5 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
                           >
-                            Start Timer
+                            <PlayIcon />
                           </button>
                         )}
                         {canEditTask(task) && (
                           <button
                             type="button"
-                            onClick={(event) => {
+                            onClick={async (event) => {
                               event.stopPropagation()
+                              if (taskTimer?.taskId === task.id) {
+                                const stopped = await stopTimerAndLog(task, project.id)
+                                if (!stopped) return
+                              }
                               deleteTask(task.id)
                               toast.success('Task deleted')
                             }}
@@ -820,15 +868,22 @@ const ProjectDetailPage: React.FC = () => {
           </div>
           {canEditProject ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              <input
-                value={memberName}
-                onChange={(event) => setMemberName(event.target.value)}
-                placeholder="Add member name"
-                className="pm-input min-w-[220px] flex-1 text-sm"
-              />
+              <select
+                value={memberUserId}
+                onChange={(event) => setMemberUserId(event.target.value)}
+                className="pm-select min-w-[220px] flex-1 text-sm"
+              >
+                <option value="">Select user to add</option>
+                {availableMembersToAdd.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.fullName}{member.email ? ` (${member.email})` : ''}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={handleAddMember}
+                disabled={!memberUserId}
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 Add Member
@@ -896,15 +951,9 @@ const ProjectDetailPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Assignee</label>
-                {isEmployee ? (
-                  <select value={taskForm.assigneeName} onChange={(event) => setTaskForm((state) => ({ ...state, assigneeName: event.target.value }))} className="pm-select mt-1 text-sm">
-                    {teamMembers.map((member) => <option key={member} value={member}>{member}</option>)}
-                  </select>
-                ) : (
-                  <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    {taskForm.assigneeName || project.ownerName}
-                  </div>
-                )}
+                <select value={taskForm.assigneeName} onChange={(event) => setTaskForm((state) => ({ ...state, assigneeName: event.target.value }))} className="pm-select mt-1 text-sm">
+                  {assigneeOptions.map((member) => <option key={member} value={member}>{member}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Due date</label>

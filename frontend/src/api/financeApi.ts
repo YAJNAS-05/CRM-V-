@@ -110,6 +110,22 @@ export const reportApi = {
     api.get<ApiResponse<any>>('/v1/finance/reports/cash-flow', { params: { startDate, endDate } }),
 };
 
+// Chart of Accounts (COA) API
+export const coaApi = {
+  fetchTree: async () => {
+    const { data } = await api.get('/api/finance/coa/tree');
+    return data;
+  },
+  fetchList: async () => {
+    const { data } = await api.get('/api/finance/coa');
+    return data;
+  },
+  create: async (account: any) => {
+    const { data } = await api.post('/api/finance/coa', account);
+    return data;
+  },
+};
+
 export const financialCloseApi = {
   initiate: (periodEnd: string) =>
     api.post<ApiResponse<void>>(`/v1/finance/close/initiate?periodEnd=${periodEnd}`),

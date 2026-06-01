@@ -1,8 +1,8 @@
 package com.everx.erp.workflow;
 
 import com.everx.erp.equipment.Equipment;
-import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.EquipmentStatus;
+import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.PhysicalStatus;
 import com.everx.erp.logistics.Shipment;
 import com.everx.erp.logistics.ShipmentRepository;
@@ -73,6 +73,7 @@ public class SalesOrderWorkflowOrchestrator {
         // Set equipment to RESERVED state
         equipment.setPhysicalStatus(PhysicalStatus.RESERVED);
         equipment.setCommercialStatus(com.everx.erp.equipment.CommercialStatus.SOLD);
+        equipment.setStatus(EquipmentStatus.RESERVED);
         equipmentRepository.save(equipment);
     }
 
@@ -141,6 +142,7 @@ public class SalesOrderWorkflowOrchestrator {
         }
 
         equipment.setPhysicalStatus(PhysicalStatus.IN_TRANSIT);
+        equipment.setStatus(EquipmentStatus.IN_TRANSIT);
         equipmentRepository.save(equipment);
     }
 
@@ -160,6 +162,7 @@ public class SalesOrderWorkflowOrchestrator {
         }
 
         equipment.setPhysicalStatus(PhysicalStatus.INSTALLED);
+        equipment.setStatus(EquipmentStatus.INSTALLED);
         equipmentRepository.save(equipment);
 
         // Auto-create warranty

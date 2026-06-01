@@ -91,8 +91,9 @@ import { ReportListPage } from './pages/reports/ReportListPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
 import AdminUsersPage from './pages/admin/users'
 import AdminRolesPage from './pages/admin/roles'
+import RoleCreatePage from './pages/admin/roles/create'
 import RoleDetailPage from './pages/admin/roles/[id]'
-import { usePermissions as useSupabaseRBAC } from './hooks/useRBAC'
+import { usePermissions as useLocalRBAC } from './hooks/useRBAC'
 
 // Inventory Pages
 import InventoryList from './pages/erp/inventory/InventoryList'
@@ -214,7 +215,9 @@ const inferRoutePermissions = (pathname: string): string[] => {
   if (pathname === '/dashboard/technician') return ['DASHBOARD_TECH_VIEW']
   if (pathname === '/dashboard/fieldwork') return ['FIELDWORK_VIEW']
   if (pathname === '/dashboard/employee') return ['HR_VIEW']
-  if (pathname === '/employee' || pathname.startsWith('/employee/')) return ['HR_VIEW']
+  if (pathname === '/employee/projects' || pathname.startsWith('/employee/projects/') || pathname === '/employee/tasks') return ['PM_VIEW']
+  if (pathname === '/employee/timesheets' || pathname === '/employee/attendance') return ['HR_VIEW']
+  if (pathname === '/employee' || pathname.startsWith('/employee/')) return ['PM_VIEW', 'HR_VIEW']
   if (pathname === '/crm/dashboard/team') return ['DASHBOARD_TEAM_VIEW']
   if (pathname === '/crm/dashboard/user') return ['DASHBOARD_SELF_VIEW']
   if (pathname === '/crm/dashboard') return ['DASHBOARD_SELF_VIEW', 'DASHBOARD_TEAM_VIEW']
@@ -321,19 +324,6 @@ const EmployeeModuleBoundary: React.FC<{ children: React.ReactNode }> = ({ child
   return <Suspense fallback={<EmployeeModuleFallback />}>{children}</Suspense>
 }
 
-const isSupabaseAccessToken = (token: string | null) => {
-  if (!token) return false
-  const parts = token.split('.')
-  if (parts.length !== 3) return false
-
-  try {
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return typeof payload?.iss === 'string' && payload.iss.includes('supabase.co/auth/v1')
-  } catch {
-    return false
-  }
-}
-
 const AuthSessionSync: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -343,10 +333,6 @@ const AuthSessionSync: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) {
-      return
-    }
-
-    if (isSupabaseAccessToken(accessToken)) {
       return
     }
 
@@ -459,7 +445,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
 const AdminAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = useAuthStore((state) => state.user)
-  const { can, loading } = useSupabaseRBAC()
+  const { can, loading } = useLocalRBAC()
   const legacyPermissions = user?.permissions || []
   const hasLegacyAdminAccess = ['ADMIN_VIEW', 'USER_VIEW', 'ROLE_VIEW'].some((permission) =>
     legacyPermissions.includes(permission)
@@ -693,7 +679,7 @@ function App() {
         <Route
           path="/employee"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['PM_VIEW', 'HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
               <EmployeeModuleBoundary>
                 <EmployeeWorkspaceDashboardPage />
               </EmployeeModuleBoundary>
@@ -703,7 +689,7 @@ function App() {
         <Route
           path="/employee/projects"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['PM_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
               <EmployeeModuleBoundary>
                 <ProjectsPage />
               </EmployeeModuleBoundary>
@@ -713,7 +699,7 @@ function App() {
         <Route
           path="/employee/projects/:id"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['PM_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
               <EmployeeModuleBoundary>
                 <ProjectDetailPage />
               </EmployeeModuleBoundary>
@@ -723,7 +709,7 @@ function App() {
         <Route
           path="/employee/tasks"
           element={
-            <ProtectedRoute requiredPermissions={['HR_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
+            <ProtectedRoute requiredPermissions={['PM_VIEW']} requiredRoles={WORKSPACE_MODULE_ROLES}>
               <EmployeeModuleBoundary>
                 <MyTasksPage />
               </EmployeeModuleBoundary>
@@ -2073,6 +2059,16 @@ function App() {
             <ProtectedRoute>
               <AdminAccessGate>
                 <AdminRolesPage />
+              </AdminAccessGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles/create"
+          element={
+            <ProtectedRoute>
+              <AdminAccessGate>
+                <RoleCreatePage />
               </AdminAccessGate>
             </ProtectedRoute>
           }

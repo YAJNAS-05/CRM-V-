@@ -155,7 +155,12 @@ public class RbacDataInitializer implements ApplicationRunner {
 
                 new PermissionSeed("HR_APPRAISAL_VIEW", "HR", "APPRAISAL_VIEW", "View performance appraisals"),
                 new PermissionSeed("HR_APPRAISAL_CREATE", "HR", "APPRAISAL_CREATE", "Create performance appraisals"),
-                new PermissionSeed("HR_APPRAISAL_EDIT", "HR", "APPRAISAL_EDIT", "Edit performance appraisals")
+                new PermissionSeed("HR_APPRAISAL_EDIT", "HR", "APPRAISAL_EDIT", "Edit performance appraisals"),
+
+                new PermissionSeed("PM_VIEW", "PM", "VIEW", "View PM projects and tasks"),
+                new PermissionSeed("PM_CREATE", "PM", "CREATE", "Create PM projects and tasks"),
+                new PermissionSeed("PM_EDIT", "PM", "EDIT", "Edit PM projects and tasks"),
+                new PermissionSeed("PM_DELETE", "PM", "DELETE", "Delete PM projects and tasks")
         );
 
         for (PermissionSeed seed : seeds) {
@@ -287,6 +292,7 @@ public class RbacDataInitializer implements ApplicationRunner {
             "ERP_VIEW",
             "FINANCE_VIEW",
             "FIELDWORK_VIEW",
+            "PM_VIEW",
             "REPORT_VIEW",
             "REPORT_PERSONAL_VIEW",
             "DASHBOARD_SELF_VIEW",
@@ -303,6 +309,10 @@ public class RbacDataInitializer implements ApplicationRunner {
             "ERP_VIEW",
             "FIELDWORK_VIEW",
             "FINANCE_VIEW",
+            "PM_VIEW",
+            "PM_CREATE",
+            "PM_EDIT",
+            "PM_DELETE",
             "HR_VIEW",
             "HR_CREATE",
             "HR_EDIT",
@@ -333,6 +343,9 @@ public class RbacDataInitializer implements ApplicationRunner {
             "CRM_VIEW",
             "CRM_CREATE",
             "CRM_EDIT",
+            "PM_VIEW",
+            "PM_CREATE",
+            "PM_EDIT",
             "REPORT_VIEW",
             "REPORT_EXPORT",
             "REPORT_TEAM_VIEW",
@@ -345,6 +358,7 @@ public class RbacDataInitializer implements ApplicationRunner {
             "CRM_VIEW",
             "CRM_CREATE",
             "CRM_EDIT",
+            "PM_VIEW",
             "DASHBOARD_SELF_VIEW",
             "INSIGHTS_VIEW",
             "REPORT_PERSONAL_VIEW",
@@ -354,6 +368,7 @@ public class RbacDataInitializer implements ApplicationRunner {
             "FINANCE_VIEW",
             "FINANCE_CREATE",
             "FINANCE_EDIT",
+            "PM_VIEW",
             "REPORT_VIEW",
             "REPORT_EXPORT",
             "REPORT_TEAM_VIEW",
@@ -368,6 +383,9 @@ public class RbacDataInitializer implements ApplicationRunner {
             "FIELDWORK_VIEW",
             "FIELDWORK_CREATE",
             "FIELDWORK_EDIT",
+            "PM_VIEW",
+            "PM_CREATE",
+            "PM_EDIT",
             "DASHBOARD_TECH_VIEW",
             "INSIGHTS_VIEW",
             "DATA_SCOPE_OWN"
@@ -376,6 +394,7 @@ public class RbacDataInitializer implements ApplicationRunner {
             "HR_VIEW",
             "HR_CREATE",
             "HR_EDIT",
+            "PM_VIEW",
             "HR_DELETE",
             "HR_EMPLOYEE_VIEW",
             "HR_EMPLOYEE_CREATE",
@@ -464,6 +483,7 @@ public class RbacDataInitializer implements ApplicationRunner {
         matrix.put(User.UserRole.EXECUTIVE.name(), Set.of(
             "HR_VIEW",
             "HR_EMPLOYEE_VIEW",
+            "PM_VIEW",
             "HR_DEPARTMENT_VIEW",
             "HR_POSITION_VIEW",
             "HR_TRAINING_VIEW",
@@ -494,6 +514,9 @@ public class RbacDataInitializer implements ApplicationRunner {
             "HR_DOCUMENT_CREATE",
             "HR_PAYSLIP_VIEW",
             "HR_APPRAISAL_VIEW",
+            "PM_VIEW",
+            "PM_CREATE",
+            "PM_EDIT",
             "INSIGHTS_VIEW",
             "REPORT_PERSONAL_VIEW",
             "DATA_SCOPE_OWN"

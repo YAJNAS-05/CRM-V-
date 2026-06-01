@@ -140,9 +140,11 @@ export default function SalesOrderForm() {
   const handleLookupChange = (name: string, value: string) => {
     if (name === 'accountId') {
       const selectedAccount = accounts.find((account) => account.id === value)
+      const shouldClearDeal = Boolean(form.dealId) && !deals.some((deal) => deal.id === form.dealId && deal.accountId === value)
       setForm((prev) => ({
         ...prev,
         accountId: value,
+        dealId: shouldClearDeal ? '' : prev.dealId,
         destinationCountry: selectedAccount?.billingCountry || prev.destinationCountry,
       }))
       return
@@ -186,7 +188,9 @@ export default function SalesOrderForm() {
 
   const dealOptions = useMemo(
     () =>
-      deals.map((deal) => {
+      deals
+        .filter((deal) => !form.accountId || deal.accountId === form.accountId || deal.id === form.dealId)
+        .map((deal) => {
         const linkedAccount = accounts.find((account) => account.id === deal.accountId)
         return {
           value: deal.id,
@@ -194,7 +198,7 @@ export default function SalesOrderForm() {
           meta: linkedAccount ? `${linkedAccount.name} | ${deal.stage || 'Stage not set'}` : deal.stage || undefined,
         }
       }),
-    [accounts, deals]
+    [accounts, deals, form.accountId, form.dealId]
   )
 
   const equipmentOptions = useMemo(
@@ -349,6 +353,7 @@ export default function SalesOrderForm() {
                 onChange={handleLookupChange}
                 disabled={lookupLoading}
                 placeholder="Search deal by name"
+                helperText={form.accountId ? 'Showing deals for selected account' : 'Select account first to narrow deals'}
               />
               <SearchableLookupSelect
                 label="Equipment"

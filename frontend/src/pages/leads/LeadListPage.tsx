@@ -48,10 +48,16 @@ const LeadListPage: React.FC = () => {
     try {
       setIsLoading(true)
       const query = searchQuery.trim()
-      const shouldSearch = query.length > 0 || statusFilter.length > 0 || sourceFilter.length > 0
-      const resp = shouldSearch
-        ? await leadApi.search(query, page, pageSize, sortField, sortDir, statusFilter || undefined, sourceFilter || undefined)
-        : await leadApi.getAll(page, pageSize, sortField, sortDir)
+      let resp
+      if (query.length > 0) {
+        // Text search — pass filters alongside
+        resp = await leadApi.search(query, page, pageSize, sortField, sortDir, statusFilter || undefined, sourceFilter || undefined)
+      } else if (statusFilter.length > 0) {
+        // Status-only filter — use dedicated endpoint
+        resp = await leadApi.getByStatus(statusFilter, page, pageSize, sortField, sortDir)
+      } else {
+        resp = await leadApi.getAll(page, pageSize, sortField, sortDir)
+      }
       const data = resp.data.data
       if (data?.content) {
         setLeads(data.content)

@@ -118,27 +118,51 @@ export default function EquipmentAssessmentForm() {
       return
     }
 
+    if (name === 'equipmentId') {
+      const shouldClearAcquisition = Boolean(form.acquisitionId) && !acquisitions.some(
+        (item) => item.id === form.acquisitionId && item.equipmentId === value
+      )
+      setForm((prev) => ({
+        ...prev,
+        equipmentId: value,
+        acquisitionId: shouldClearAcquisition ? '' : prev.acquisitionId,
+      }))
+      return
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
+  const filteredAcquisitions = useMemo(
+    () => acquisitions.filter((item) => !form.equipmentId || item.equipmentId === form.equipmentId || item.id === form.acquisitionId),
+    [acquisitions, form.acquisitionId, form.equipmentId]
+  )
+
+  const filteredEquipment = useMemo(
+    () => equipment.filter((item) => !form.acquisitionId || acquisitions.some(
+      (acquisition) => acquisition.id === form.acquisitionId && acquisition.equipmentId === item.id
+    ) || item.id === form.equipmentId),
+    [acquisitions, equipment, form.acquisitionId, form.equipmentId]
+  )
+
   const acquisitionOptions = useMemo(
     () =>
-      acquisitions.map((item) => ({
+      filteredAcquisitions.map((item) => ({
         value: item.id,
         label: item.acquisitionNumber,
         meta: item.stage,
       })),
-    [acquisitions]
+    [filteredAcquisitions]
   )
 
   const equipmentOptions = useMemo(
     () =>
-      equipment.map((item) => ({
+      filteredEquipment.map((item) => ({
         value: item.id,
         label: `${item.internalCode} | ${item.make || ''} ${item.model || ''}`.trim(),
         meta: item.status,
       })),
-    [equipment]
+    [filteredEquipment]
   )
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -225,6 +249,7 @@ export default function EquipmentAssessmentForm() {
               onChange={handleLookupChange}
               disabled={lookupLoading}
               placeholder="Search acquisition"
+              helperText={form.equipmentId ? 'Showing acquisitions for selected equipment' : undefined}
             />
 
             <SearchableLookupSelect
@@ -235,6 +260,7 @@ export default function EquipmentAssessmentForm() {
               onChange={handleLookupChange}
               disabled={lookupLoading}
               placeholder="Search equipment"
+              helperText={form.acquisitionId ? 'Filtered from selected acquisition' : undefined}
             />
 
             <div>

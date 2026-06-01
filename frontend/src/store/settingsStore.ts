@@ -1,20 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-interface UserSettings {
-  theme: 'light' | 'dark'
-  language: 'en' | 'es' | 'fr' | 'de'
-  timezone: string
-  notificationsEnabled: boolean
-  emailNotifications: boolean
-  inAppNotifications: boolean
-  autoRefresh: boolean
-  itemsPerPage: number
-}
+import { type UserSettings } from '../types'
 
 interface SettingsStore {
   settings: UserSettings
   updateSettings: (updates: Partial<UserSettings>) => void
+  replaceSettings: (settings: UserSettings) => void
   resetSettings: () => void
 }
 
@@ -41,6 +32,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set((state) => ({
           settings: { ...state.settings, ...updates },
         }))
+      },
+
+      replaceSettings: (settings) => {
+        set({ settings })
       },
 
       resetSettings: () => {

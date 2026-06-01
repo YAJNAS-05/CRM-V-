@@ -1,81 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useMemo, useState, useEffect } from "react";
+import { useAuthStore } from "@/store/authStore";
+import { adminApi } from "@/api/adminApi";
 
 type Permission = { module: string; action: string };
 
-async function getCurrentAppUser() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
 
-  if (!user) {
-    return null;
-  }
-
-  const { data } = await supabase
-    .from("app_users")
-    .select("id, org_id")
-    .eq("auth_id", user.id)
-    .maybeSingle();
-
-  return data ?? null;
+/** Map flat permission strings like "CRM_VIEW" to {module, action} pairs */
+function parsePermissions(rawPerms: string[]): Permission[] {
+  return rawPerms.flatMap((p) => {
+    const idx = p.lastIndexOf("_");
+    if (idx <= 0) return [];
+    return [{ module: p.slice(0, idx).toLowerCase(), action: p.slice(idx + 1).toLowerCase() }];
+  });
 }
 
 export function usePermissions() {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const user = useAuthStore((state) => state.user);
+  const rawPermissions = user?.permissions || [];
 
-  useEffect(() => {
-    let mounted = true;
-
-    const load = async () => {
-      setLoading(true);
-
-      const appUser = await getCurrentAppUser();
-
-      if (!appUser?.id) {
-        if (mounted) {
-          setPermissions([]);
-          setLoading(false);
-        }
-        return;
-      }
-
-      const { data } = await supabase
-        .from("user_roles")
-        .select(
-          `
-          role:roles (
-            role_permissions (
-              permission:permissions (module, action)
-            )
-          )
-        `,
-        )
-        .eq("user_id", appUser.id);
-
-      const perms =
-        data?.flatMap((ur: any) =>
-          (ur?.role?.role_permissions || []).map((rp: any) => rp?.permission),
-        )?.filter((p: any) => p?.module && p?.action) || [];
-
-      const unique = Array.from(
-        new Map(
-          perms.map((p: Permission) => [`${p.module}:${p.action}`, p] as const),
-        ).values(),
-      );
-
-      if (mounted) {
-        setPermissions(unique);
-        setLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const permissions = useMemo(() => parsePermissions(rawPermissions), [rawPermissions]);
 
   const can = useMemo(
     () => (module: string, action: string) =>
@@ -87,7 +33,7 @@ export function usePermissions() {
     [permissions],
   );
 
-  return { permissions, can, loading };
+  return { permissions, can, loading: false };
 }
 
 export function useUsers() {
@@ -96,34 +42,23 @@ export function useUsers() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const currentAppUser = await getCurrentAppUser();
+    try {
+      const res = await adminApi.getUsers(0, 200);
+      const pageContent = res.data?.data?.content;
+      const directContent = res.data?.content;
+      const directData = res.data?.data;
+      const data = ensureArray<any>(pageContent ?? directContent ?? directData ?? res.data);
 
-    if (!currentAppUser?.org_id) {
+      const normalized = data.map((u: any) => ({
+        ...u,
+        department: u.officeLocation || u.office_location || null,
+      }));
+      setUsers(normalized);
+    } catch {
       setUsers([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data } = await supabase
-      .from("app_users")
-      .select(
-        `
-        id, full_name, email, office_location, is_active, created_at,
-        user_roles (
-          role:roles (id, name)
-        )
-      `,
-      )
-      .eq("org_id", currentAppUser.org_id)
-      .order("created_at", { ascending: false });
-
-    const normalized = (data ?? []).map((u: any) => ({
-      ...u,
-      department: u.office_location || null,
-    }));
-
-    setUsers(normalized);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -139,29 +74,17 @@ export function useRoles() {
 
   const fetchRoles = async () => {
     setLoading(true);
-    const currentAppUser = await getCurrentAppUser();
-
-    if (!currentAppUser?.org_id) {
+    try {
+      const res = await adminApi.getRoles();
+      const raw = res.data?.data ?? res.data;
+      // handle both plain array and Spring-paged { content: [] } shapes
+      const data = ensureArray<any>(Array.isArray(raw) ? raw : raw?.content ?? raw);
+      setRoles(data);
+    } catch {
       setRoles([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data } = await supabase
-      .from("roles")
-      .select(
-        `
-        id, name, description, is_system_role, org_id, created_at,
-        role_permissions (
-          permission:permissions (id, module, action)
-        )
-      `,
-      )
-      .or(`org_id.is.null,org_id.eq.${currentAppUser.org_id}`)
-      .order("name");
-
-    setRoles(data ?? []);
-    setLoading(false);
   };
 
   useEffect(() => {

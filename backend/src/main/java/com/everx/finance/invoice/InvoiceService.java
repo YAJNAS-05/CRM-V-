@@ -5,8 +5,6 @@ import com.everx.finance.invoice.dto.CreateInvoiceRequest;
 import com.everx.finance.invoice.dto.InvoiceResponse;
 import com.everx.finance.invoice.dto.UpdateInvoiceRequest;
 import com.everx.finance.fx.FxRateLockingService;
-import com.everx.finance.period.PostingPeriodEnforcer;
-import com.everx.finance.period.PostingPeriodService;
 import com.everx.finance.posting.GlPostingService;
 import com.everx.shared.exception.AccountingImmutabilityException;
 import com.everx.shared.exception.EntityNotFoundException;
@@ -33,8 +31,6 @@ import java.util.stream.Collectors;
 public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
-    private final PostingPeriodService postingPeriodService;
-    private final PostingPeriodEnforcer postingPeriodEnforcer;
     private final FxRateLockingService fxRateLockingService;
     private final GlPostingService glPostingService;
     private final DocumentNumberGenerator documentNumberGenerator;
@@ -115,10 +111,6 @@ public class InvoiceService {
         if (invoiceNumber == null || invoiceNumber.isEmpty()) {
             invoiceNumber = generateInvoiceNumber(request.getEntity());
         }
-
-        // Enforce posting period is open before creating invoice
-        postingPeriodService.assertPeriodOpen(request.getEntity().name(), request.getIssueDate());
-        postingPeriodEnforcer.enforceNoBackdating(request.getIssueDate());
 
         Invoice invoice = Invoice.builder()
                 .invoiceNumber(invoiceNumber)

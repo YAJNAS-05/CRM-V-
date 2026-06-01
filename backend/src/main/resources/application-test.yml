@@ -1,18 +1,24 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
   datasource:
-    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/everx_db}
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD:}
-    driverClassName: org.postgresql.Driver
+    url: jdbc:h2:mem:everx_db;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE SCHEMA IF NOT EXISTS everx_auth\;CREATE SCHEMA IF NOT EXISTS everx_crm\;CREATE SCHEMA IF NOT EXISTS everx_erp\;CREATE SCHEMA IF NOT EXISTS everx_hr\;CREATE SCHEMA IF NOT EXISTS everx_reporting\;CREATE SCHEMA IF NOT EXISTS everx_shared
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: never
 
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: false
+    defer-datasource-initialization: false
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
 
   flyway:
     enabled: false

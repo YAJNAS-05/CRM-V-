@@ -1,7 +1,5 @@
 param(
     [string]$Profile = "h2",
-    [string]$SupabaseUrl = "https://epkxbbcmztgrefxfrdvh.supabase.co",
-    [string]$SupabaseServiceRoleKey = "local-dev-placeholder",
     [int]$ServerPort = 8080
 )
 
@@ -22,8 +20,6 @@ if (-not (Get-Command mvn -ErrorAction SilentlyContinue)) {
 }
 
 $env:SPRING_PROFILES_ACTIVE = $Profile
-$env:SUPABASE_URL = $SupabaseUrl
-$env:SUPABASE_SERVICE_ROLE_KEY = $SupabaseServiceRoleKey
 
 Write-Host "Starting backend diagnostics..."
 Write-Host "Profile: $Profile"
@@ -40,7 +36,7 @@ Write-Host "Exit code: $exitCode"
 if (Test-Path $logFile) {
     Write-Host ""
     Write-Host "Potential root-cause lines:"
-    Select-String -Path $logFile -Pattern "APPLICATION FAILED TO START|Error creating bean|UnsatisfiedDependencyException|UnknownEntityException|SUPABASE_URL must be set|Port [0-9]+ was already in use|Description:|Action:" -CaseSensitive:$false |
+    Select-String -Path $logFile -Pattern "APPLICATION FAILED TO START|Error creating bean|UnsatisfiedDependencyException|UnknownEntityException|Port [0-9]+ was already in use|Description:|Action:" -CaseSensitive:$false |
         Select-Object -First 25 |
         ForEach-Object { Write-Host $_.Line }
 

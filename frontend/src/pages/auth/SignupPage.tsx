@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { authApi } from '../../api/authApi'
-import { OAUTH_PROVIDERS } from '../../lib/supabaseClient'
+import { OAUTH_PROVIDERS } from '../../lib/localAuth'
 import { toast } from 'sonner'
 import { Mail, Code, Users } from 'lucide-react'
 
@@ -30,6 +30,7 @@ const oauthProviders = [
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate()
+  const oauthEnabled = false
   const [isLoading, setIsLoading] = useState(false)
   const [oauthLoading, setOAuthLoading] = useState<string | null>(null)
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
@@ -103,36 +104,38 @@ const SignupPage: React.FC = () => {
         <section className="flex w-full flex-col justify-center bg-white px-6 py-8 sm:px-10 lg:w-1/2 lg:px-12">
           <div className="mb-8">
             <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Create Account</h2>
-            <p className="mt-2 text-sm text-slate-500">Sign up with OAuth or email to get started.</p>
+            <p className="mt-2 text-sm text-slate-500">Sign up with email to get started.</p>
           </div>
 
-          {/* OAuth Providers */}
-          <div className="mb-6 space-y-2">
-            {oauthProviders.map((provider) => {
-              const Icon = provider.icon
-              return (
-                <button
-                  key={provider.id}
-                  onClick={() => handleOAuthSignUp(provider.id)}
-                  disabled={oauthLoading !== null}
-                  className="inline-flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Icon size={18} />
-                  Sign up with {provider.label}
-                </button>
-              )
-            })}
-          </div>
+          {oauthEnabled && (
+            <>
+              <div className="mb-6 space-y-2">
+                {oauthProviders.map((provider) => {
+                  const Icon = provider.icon
+                  return (
+                    <button
+                      key={provider.id}
+                      onClick={() => handleOAuthSignUp(provider.id)}
+                      disabled={oauthLoading !== null}
+                      className="inline-flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Icon size={18} />
+                      Sign up with {provider.label}
+                    </button>
+                  )
+                })}
+              </div>
 
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-slate-500">Or sign up with email</span>
-            </div>
-          </div>
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-2 text-slate-500">Or sign up with email</span>
+                </div>
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>

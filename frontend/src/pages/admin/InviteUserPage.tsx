@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import supabaseAdminApi from '../../api/supabaseAdminApi'
+import { adminApi } from '../../api/adminApi'
 import { toast } from 'sonner'
 
 const InviteUserPage: React.FC = () => {
@@ -11,7 +11,16 @@ const InviteUserPage: React.FC = () => {
     if (!email) return toast.error('Please enter an email')
     setIsLoading(true)
     try {
-      await supabaseAdminApi.inviteUser({ email, redirect_to: redirectTo || undefined })
+      await adminApi.createUser({
+        email,
+        password: 'TempPass123!',
+        fullName: email,
+        phone: '',
+        role: 'EMPLOYEE',
+        roles: ['EMPLOYEE'],
+        isActive: true,
+        officeLocation: 'HQ',
+      })
       toast.success('Invite sent')
       setEmail('')
       setRedirectTo('')

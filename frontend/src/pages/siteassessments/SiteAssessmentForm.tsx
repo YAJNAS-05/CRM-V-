@@ -129,8 +129,25 @@ export default function SiteAssessmentForm() {
       return
     }
 
+    if (name === 'accountId') {
+      const shouldClearSalesOrder = Boolean(form.salesOrderId) && !salesOrders.some(
+        (item) => item.id === form.salesOrderId && item.accountId === value
+      )
+      setForm((prev) => ({
+        ...prev,
+        accountId: value,
+        salesOrderId: shouldClearSalesOrder ? '' : prev.salesOrderId,
+      }))
+      return
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }))
   }
+
+  const filteredSalesOrders = useMemo(
+    () => salesOrders.filter((order) => !form.accountId || order.accountId === form.accountId || order.id === form.salesOrderId),
+    [salesOrders, form.accountId, form.salesOrderId]
+  )
 
   const accountOptions = useMemo(
     () =>
@@ -144,12 +161,12 @@ export default function SiteAssessmentForm() {
 
   const salesOrderOptions = useMemo(
     () =>
-      salesOrders.map((order) => ({
+      filteredSalesOrders.map((order) => ({
         value: order.id,
         label: order.soNumber,
         meta: order.status,
       })),
-    [salesOrders]
+    [filteredSalesOrders]
   )
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,6 +243,7 @@ export default function SiteAssessmentForm() {
               onChange={handleLookupChange}
               disabled={lookupLoading}
               placeholder="Search sales order"
+              helperText={form.accountId ? 'Showing sales orders for selected account' : undefined}
             />
 
             <SearchableLookupSelect
@@ -237,6 +255,7 @@ export default function SiteAssessmentForm() {
               disabled={lookupLoading}
               required={!form.salesOrderId}
               placeholder="Search account"
+              helperText={form.salesOrderId ? 'Auto-filled from selected sales order' : undefined}
             />
 
             <div>

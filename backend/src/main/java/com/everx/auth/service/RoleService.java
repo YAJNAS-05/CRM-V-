@@ -197,6 +197,33 @@ public class RoleService {
         upsertPermission("DATA_SCOPE_OWN", "DATA", "SCOPE_OWN", "Access own data only");
         upsertPermission("DATA_SCOPE_TEAM", "DATA", "SCOPE_TEAM", "Access team data");
         upsertPermission("DATA_SCOPE_ORG", "DATA", "SCOPE_ORG", "Access org data");
+        upsertPermission("SETTINGS_VIEW", "SETTINGS", "VIEW", "View personal and admin settings");
+        upsertPermission("SETTINGS_EDIT", "SETTINGS", "EDIT", "Edit personal settings");
+        upsertPermission("SETTINGS_ADMIN_VIEW", "SETTINGS", "ADMIN_VIEW", "View role-based settings defaults");
+        upsertPermission("SETTINGS_ADMIN_EDIT", "SETTINGS", "ADMIN_EDIT", "Edit role-based settings defaults");
+
+        ensurePermissionAssignedToRoles("SETTINGS_VIEW", "SUPER_ADMIN", "ADMIN");
+        ensurePermissionAssignedToRoles("SETTINGS_EDIT", "SUPER_ADMIN", "ADMIN");
+        ensurePermissionAssignedToRoles("SETTINGS_ADMIN_VIEW", "SUPER_ADMIN", "ADMIN");
+        ensurePermissionAssignedToRoles("SETTINGS_ADMIN_EDIT", "SUPER_ADMIN", "ADMIN");
+    }
+
+    private void ensurePermissionAssignedToRoles(String permissionKey, String... roleNames) {
+        Permission permission = permissionRepository.findByPermissionKey(permissionKey).orElse(null);
+        if (permission == null) {
+            return;
+        }
+
+        List<Role> roles = roleRepository.findActiveByNamesWithPermissions(java.util.Arrays.asList(roleNames));
+        for (Role role : roles) {
+            if (role.getPermissions() == null) {
+                role.setPermissions(new LinkedHashSet<>());
+            }
+            if (role.getPermissions().stream().noneMatch(existing -> permissionKey.equals(existing.getPermissionKey()))) {
+                role.getPermissions().add(permission);
+                roleRepository.save(role);
+            }
+        }
     }
 
     private void upsertPermission(String key, String module, String action, String description) {

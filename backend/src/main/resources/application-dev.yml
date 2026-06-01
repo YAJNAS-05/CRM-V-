@@ -39,3 +39,10 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+
+# Disable mail health checks in development to avoid failing actuator when SMTP is
+# not configured for local runs.
+management:
+  health:
+    mail:
+      enabled: false

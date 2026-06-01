@@ -5,6 +5,7 @@ import com.everx.auth.dto.UpdateUserRequest;
 import com.everx.auth.dto.UserDto;
 import com.everx.auth.entity.User;
 import com.everx.auth.repository.UserRepository;
+import com.everx.auth.repository.RoleRepository;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,9 @@ public class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private RoleRepository roleRepository;
 
     @InjectMocks
     private UserService userService;
@@ -98,7 +102,7 @@ public class UserServiceTest {
     void testGetUserById_Success() {
         // Arrange
         UUID id = Objects.requireNonNull(testUserId);
-        when(userRepository.findById(id)).thenReturn(Optional.of(Objects.requireNonNull(testUser)));
+        when(userRepository.findByIdWithRolesAndPermissions(id)).thenReturn(Optional.of(Objects.requireNonNull(testUser)));
 
         // Act
         UserDto result = userService.getUserById(id);
@@ -107,25 +111,25 @@ public class UserServiceTest {
         assertNotNull(result);
         assertEquals(id, result.getId());
         assertEquals("admin@everx.com", result.getEmail());
-        verify(userRepository, times(1)).findById(id);
+        verify(userRepository, times(1)).findByIdWithRolesAndPermissions(id);
     }
 
     @Test
     void testGetUserById_NotFound() {
         // Arrange
         UUID id = Objects.requireNonNull(testUserId);
-        when(userRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+        when(userRepository.findByIdWithRolesAndPermissions(any(UUID.class))).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(EntityNotFoundException.class, () -> userService.getUserById(id));
-        verify(userRepository, times(1)).findById(id);
+        verify(userRepository, times(1)).findByIdWithRolesAndPermissions(id);
     }
 
     @Test
     void testGetUserByEmail_Success() {
         // Arrange
         String email = "admin@everx.com";
-        when(userRepository.findByEmail(email)).thenReturn(Optional.of(Objects.requireNonNull(testUser)));
+        when(userRepository.findByEmailWithRolesAndPermissions(email)).thenReturn(Optional.of(Objects.requireNonNull(testUser)));
 
         // Act
         UserDto result = userService.getUserByEmail(email);
@@ -133,7 +137,7 @@ public class UserServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(email, result.getEmail());
-        verify(userRepository, times(1)).findByEmail(email);
+        verify(userRepository, times(1)).findByEmailWithRolesAndPermissions(email);
     }
 
     @Test
@@ -145,6 +149,13 @@ public class UserServiceTest {
         
         when(userRepository.existsActiveByEmail(email)).thenReturn(false);
         when(passwordEncoder.encode(password)).thenReturn("hashedPassword");
+        
+        com.everx.auth.entity.Role salesRole = com.everx.auth.entity.Role.builder()
+                .id(UUID.randomUUID())
+                .name("SALES_REP")
+                .isActive(true)
+                .build();
+        when(roleRepository.findActiveByNamesWithPermissions(any())).thenReturn(List.of(salesRole));
         
         User newUser = User.builder()
                 .id(UUID.randomUUID())
@@ -167,6 +178,7 @@ public class UserServiceTest {
         assertEquals("SALES_REP", result.getRole());
         verify(userRepository, times(1)).existsActiveByEmail(email);
         verify(passwordEncoder, times(1)).encode(password);
+        verify(roleRepository, times(1)).findActiveByNamesWithPermissions(any());
         verify(userRepository, times(1)).save(any(User.class));
     }
 
@@ -190,6 +202,12 @@ public class UserServiceTest {
         User user = Objects.requireNonNull(testUser);
         UpdateUserRequest req = Objects.requireNonNull(updateUserRequest);
         
+        com.everx.auth.entity.Role adminRole = com.everx.auth.entity.Role.builder()
+                .id(UUID.randomUUID())
+                .name("ADMIN")
+                .isActive(true)
+                .build();
+        when(roleRepository.findActiveByNamesWithPermissions(any())).thenReturn(List.of(adminRole));
         when(userRepository.findById(id)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenReturn(user);
 
@@ -200,6 +218,7 @@ public class UserServiceTest {
         assertNotNull(result);
         assertEquals(req.getFullName(), result.getFullName());
         verify(userRepository, times(1)).findById(id);
+        verify(roleRepository, times(1)).findActiveByNamesWithPermissions(any());
         verify(userRepository, times(1)).save(any(User.class));
     }
 
@@ -274,7 +293,7 @@ public class UserServiceTest {
 
         // Assert
         verify(userRepository, times(1)).findById(id);
-        verify(passwordEncoder, times(1)).matches("currentPassword", user.getPasswordHash());
+        verify(passwordEncoder, times(1)).matches("currentPassword", "hashedPassword");
         verify(passwordEncoder, times(1)).encode("newPassword");
         verify(userRepository, times(1)).save(any(User.class));
     }

@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.*;
@@ -65,8 +66,13 @@ public class UserControllerIntegrationTest {
                 .build();
         userRepository.save(adminUser);
 
-        // Generate JWT token for admin
-        adminToken = jwtTokenProvider.generateAccessToken(adminUserId, "admin@everx.com", User.UserRole.ADMIN.name());
+        // Generate JWT token for admin with full admin permissions
+        adminToken = jwtTokenProvider.generateAccessToken(
+                adminUserId, 
+                "admin@everx.com", 
+                List.of(User.UserRole.ADMIN.name()), 
+                List.of("USER_VIEW", "USER_CREATE", "USER_EDIT", "USER_DELETE")
+        );
     }
 
     @Test

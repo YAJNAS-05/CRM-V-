@@ -1,4 +1,6 @@
-import { supabase } from '../lib/supabase';
+import api from '../api/axiosInstance';
+import { employeeApi } from '../api/hrApi';
+import type { Employee } from '../types/hr';
 import type {
   Project,
   Task,
@@ -23,7 +25,423 @@ import type {
   CommentInput,
   TaskFilter,
   TaskBoardColumn,
+  ProjectSettings,
 } from '../types/projectManagement';
+
+type ProjectDTO = {
+  id: string;
+  workspaceId?: string | null;
+  portfolioId?: string | null;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  category?: string | null;
+  projectType?: string | null;
+  visibility?: string | null;
+  status?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  ownerId?: string | null;
+  settings?: string | null;
+  metadata?: string | null;
+  tags?: string[] | null;
+  isArchived?: boolean | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  createdBy?: string | null;
+};
+
+type TaskDTO = {
+  id: string;
+  projectId: string;
+  taskNumber: string;
+  parentTaskId?: string | null;
+  epicId?: string | null;
+  sprintId?: string | null;
+  milestoneId?: string | null;
+  title: string;
+  description?: string | null;
+  taskType?: string | null;
+  priority?: string | null;
+  status?: string | null;
+  statusOrder?: number | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  completedAt?: string | null;
+  timeEstimate?: number | null;
+  timeSpent?: number | null;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  storyPoints?: number | null;
+  isRecurring?: boolean | null;
+  recurringPattern?: string | null;
+  coverImage?: string | null;
+  isPrivate?: boolean | null;
+  metadata?: string | null;
+  tags?: string[] | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  createdBy?: string | null;
+};
+
+type SprintDTO = {
+  id: string;
+  projectId: string;
+  name: string;
+  goal?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status?: string | null;
+  velocity?: number | string | null;
+  capacity?: number | string | null;
+  retrospectiveNotes?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type EpicDTO = {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status?: string | null;
+  progress?: number | null;
+  ownerId?: string | null;
+  milestoneId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type MilestoneDTO = {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string | null;
+  dueDate?: string | null;
+  status?: string | null;
+  progress?: number | null;
+  ownerId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+const parseJson = <T>(value: string | null | undefined, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const parseRecord = <T extends Record<string, any>>(value: string | null | undefined, fallback: T): T => {
+  const parsed = parseJson<unknown>(value, fallback);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return parsed as T;
+  }
+  return fallback;
+};
+
+const ensureArray = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+
+const mapProjectDto = (dto: ProjectDTO): Project => ({
+  id: dto.id,
+  workspace_id: dto.workspaceId ?? null,
+  portfolio_id: dto.portfolioId ?? null,
+  name: dto.name,
+  description: dto.description ?? null,
+  icon: dto.icon ?? null,
+  color: dto.color ?? null,
+  category: dto.category ?? null,
+  project_type: (dto.projectType as Project['project_type']) || 'KANBAN',
+  visibility: (dto.visibility as Project['visibility']) || 'PRIVATE',
+  status: (dto.status as Project['status']) || 'ACTIVE',
+  start_date: dto.startDate ?? null,
+  end_date: dto.endDate ?? null,
+  owner_id: dto.ownerId ?? null,
+  settings: parseRecord<ProjectSettings>(dto.settings, {}),
+  metadata: parseRecord<Record<string, any>>(dto.metadata, {}),
+  tags: ensureArray(dto.tags),
+  is_archived: dto.isArchived ?? false,
+  created_at: dto.createdAt ?? new Date().toISOString(),
+  updated_at: dto.updatedAt ?? new Date().toISOString(),
+  created_by: dto.createdBy ?? null,
+  is_deleted: false,
+  version: 0,
+});
+
+const mapTaskDto = (dto: TaskDTO): Task => ({
+  id: dto.id,
+  project_id: dto.projectId,
+  task_number: dto.taskNumber,
+  parent_task_id: dto.parentTaskId ?? null,
+  epic_id: dto.epicId ?? null,
+  sprint_id: dto.sprintId ?? null,
+  milestone_id: dto.milestoneId ?? null,
+  title: dto.title,
+  description: dto.description ?? null,
+  task_type: (dto.taskType as Task['task_type']) || 'TASK',
+  priority: (dto.priority as Task['priority']) || 'MEDIUM',
+  status: dto.status || 'TODO',
+  status_order: dto.statusOrder ?? 0,
+  start_date: dto.startDate ?? null,
+  due_date: dto.dueDate ?? null,
+  completed_at: dto.completedAt ?? null,
+  time_estimate: dto.timeEstimate ?? null,
+  time_spent: dto.timeSpent ?? 0,
+  assignee_id: dto.assigneeId ?? null,
+  story_points: dto.storyPoints ?? null,
+  is_recurring: dto.isRecurring ?? false,
+  recurring_pattern: dto.recurringPattern ?? null,
+  cover_image: dto.coverImage ?? null,
+  is_private: dto.isPrivate ?? false,
+  metadata: parseRecord<Record<string, any>>(dto.metadata, {}),
+  tags: ensureArray(dto.tags),
+  created_at: dto.createdAt ?? new Date().toISOString(),
+  updated_at: dto.updatedAt ?? new Date().toISOString(),
+  created_by: dto.createdBy ?? null,
+  is_deleted: false,
+  version: 0,
+  assignee: dto.assigneeId
+    ? {
+        id: dto.assigneeId,
+        full_name: dto.assigneeName || '',
+        avatar_url: null,
+      }
+    : undefined,
+});
+
+const mapSprintDto = (dto: SprintDTO): Sprint => ({
+  id: dto.id,
+  project_id: dto.projectId,
+  name: dto.name,
+  goal: dto.goal ?? null,
+  start_date: dto.startDate ?? '',
+  end_date: dto.endDate ?? '',
+  status: (dto.status as Sprint['status']) || 'PLANNING',
+  velocity: dto.velocity != null ? Number(dto.velocity) : null,
+  capacity: dto.capacity != null ? Number(dto.capacity) : null,
+  retrospective_notes: dto.retrospectiveNotes ?? null,
+  created_at: dto.createdAt ?? new Date().toISOString(),
+  updated_at: dto.updatedAt ?? new Date().toISOString(),
+  is_deleted: false,
+});
+
+const mapEpicDto = (dto: EpicDTO): Epic => ({
+  id: dto.id,
+  project_id: dto.projectId,
+  name: dto.name,
+  description: dto.description ?? null,
+  color: dto.color ?? null,
+  start_date: dto.startDate ?? null,
+  end_date: dto.endDate ?? null,
+  status: (dto.status as Epic['status']) || 'OPEN',
+  progress: dto.progress ?? 0,
+  owner_id: dto.ownerId ?? null,
+  milestone_id: dto.milestoneId ?? null,
+  created_at: dto.createdAt ?? new Date().toISOString(),
+  updated_at: dto.updatedAt ?? new Date().toISOString(),
+  is_deleted: false,
+});
+
+const mapMilestoneDto = (dto: MilestoneDTO): Milestone => ({
+  id: dto.id,
+  project_id: dto.projectId,
+  name: dto.name,
+  description: dto.description ?? null,
+  due_date: dto.dueDate ?? '',
+  status: (dto.status as Milestone['status']) || 'PENDING',
+  progress: dto.progress ?? 0,
+  owner_id: dto.ownerId ?? null,
+  created_at: dto.createdAt ?? new Date().toISOString(),
+  updated_at: dto.updatedAt ?? new Date().toISOString(),
+  is_deleted: false,
+});
+
+const mapCreateProjectInput = (project: CreateProjectInput) => ({
+  name: project.name,
+  description: project.description ?? null,
+  icon: project.icon ?? null,
+  color: project.color ?? null,
+  category: project.category ?? null,
+  projectType: project.project_type,
+  visibility: project.visibility,
+  workspaceId: project.workspace_id ?? undefined,
+  portfolioId: project.portfolio_id ?? undefined,
+  startDate: project.start_date ?? undefined,
+  endDate: project.end_date ?? undefined,
+  tags: project.tags ?? [],
+});
+
+const mapUpdateProjectInput = (project: Partial<Project>) => ({
+  name: project.name,
+  description: project.description,
+  icon: project.icon,
+  color: project.color,
+  category: project.category,
+  projectType: project.project_type,
+  visibility: project.visibility,
+  status: project.status,
+  startDate: project.start_date ?? undefined,
+  endDate: project.end_date ?? undefined,
+  tags: project.tags,
+  isArchived: project.is_archived,
+});
+
+const mapCreateTaskInput = (task: CreateTaskInput) => ({
+  projectId: task.project_id,
+  title: task.title,
+  description: task.description ?? null,
+  taskType: task.task_type,
+  priority: task.priority,
+  status: task.status,
+  assigneeId: task.assignee_id ?? undefined,
+  epicId: task.epic_id ?? undefined,
+  sprintId: task.sprint_id ?? undefined,
+  milestoneId: task.milestone_id ?? undefined,
+  parentTaskId: task.parent_task_id ?? undefined,
+  startDate: task.start_date ?? undefined,
+  dueDate: task.due_date ?? undefined,
+  timeEstimate: task.time_estimate ?? undefined,
+  storyPoints: task.story_points ?? undefined,
+  tags: task.tags ?? [],
+  isPrivate: task.is_private ?? undefined,
+});
+
+const mapUpdateTaskInput = (task: UpdateTaskInput) => ({
+  title: task.title,
+  description: task.description,
+  taskType: task.task_type,
+  priority: task.priority,
+  status: task.status,
+  statusOrder: task.status_order,
+  assigneeId: task.assignee_id ?? undefined,
+  epicId: task.epic_id ?? undefined,
+  sprintId: task.sprint_id ?? undefined,
+  milestoneId: task.milestone_id ?? undefined,
+  startDate: task.start_date ?? undefined,
+  dueDate: task.due_date ?? undefined,
+  timeEstimate: task.time_estimate ?? undefined,
+  timeSpent: task.time_spent ?? undefined,
+  storyPoints: task.story_points ?? undefined,
+  isRecurring: task.is_recurring ?? undefined,
+  recurringPattern: task.recurring_pattern ?? undefined,
+  coverImage: task.cover_image ?? undefined,
+  isPrivate: task.is_private ?? undefined,
+  tags: task.tags,
+});
+
+const mapCreateSprintInput = (sprint: CreateSprintInput) => ({
+  projectId: sprint.project_id,
+  name: sprint.name,
+  goal: sprint.goal ?? null,
+  startDate: sprint.start_date,
+  endDate: sprint.end_date,
+});
+
+const mapUpdateSprintInput = (sprint: Partial<Sprint>) => ({
+  name: sprint.name,
+  goal: sprint.goal ?? null,
+  startDate: sprint.start_date,
+  endDate: sprint.end_date,
+  status: sprint.status,
+  velocity: sprint.velocity ?? undefined,
+  capacity: sprint.capacity ?? undefined,
+  retrospectiveNotes: sprint.retrospective_notes ?? undefined,
+});
+
+const mapCreateEpicInput = (epic: CreateEpicInput) => ({
+  projectId: epic.project_id,
+  name: epic.name,
+  description: epic.description ?? null,
+  color: epic.color ?? null,
+  startDate: epic.start_date ?? undefined,
+  endDate: epic.end_date ?? undefined,
+  milestoneId: epic.milestone_id ?? undefined,
+});
+
+const mapUpdateEpicInput = (epic: Partial<Epic>) => ({
+  name: epic.name,
+  description: epic.description ?? null,
+  color: epic.color ?? null,
+  startDate: epic.start_date ?? undefined,
+  endDate: epic.end_date ?? undefined,
+  status: epic.status,
+  progress: epic.progress ?? undefined,
+  milestoneId: epic.milestone_id ?? undefined,
+});
+
+const mapCreateMilestoneInput = (milestone: CreateMilestoneInput) => ({
+  projectId: milestone.project_id,
+  name: milestone.name,
+  description: milestone.description ?? null,
+  dueDate: milestone.due_date,
+});
+
+const mapUpdateMilestoneInput = (milestone: Partial<Milestone>) => ({
+  name: milestone.name,
+  description: milestone.description ?? null,
+  dueDate: milestone.due_date ?? undefined,
+  status: milestone.status,
+  progress: milestone.progress ?? undefined,
+});
+
+const toProjectMember = (projectId: string, employee: Employee): ProjectMember => {
+  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
+  const userId = employee.userId ?? employee.id;
+
+  return {
+    id: employee.id,
+    project_id: projectId,
+    user_id: userId,
+    role: 'MEMBER',
+    joined_at: employee.createdAt || new Date().toISOString(),
+    user: {
+      id: userId,
+      full_name: fullName || employee.email,
+      email: employee.email,
+      avatar_url: employee.avatarUrl ?? null,
+    },
+  };
+};
+
+const applyTaskFilters = (tasks: Task[], filters?: TaskFilter) => {
+  if (!filters) return tasks;
+
+  return tasks.filter(task => {
+    if (filters.status?.length && !filters.status.includes(task.status)) return false;
+    if (filters.priority?.length && !filters.priority.includes(task.priority)) return false;
+    if (filters.assignee_id?.length && (!task.assignee_id || !filters.assignee_id.includes(task.assignee_id))) {
+      return false;
+    }
+    if (filters.epic_id && task.epic_id !== filters.epic_id) return false;
+    if (filters.sprint_id && task.sprint_id !== filters.sprint_id) return false;
+    if (filters.milestone_id && task.milestone_id !== filters.milestone_id) return false;
+    if (filters.task_type?.length && !filters.task_type.includes(task.task_type)) return false;
+    if (filters.tags?.length && !filters.tags.every(tag => task.tags.includes(tag))) return false;
+    if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+
+    if (filters.due_date_from) {
+      if (!task.due_date) return false;
+      if (new Date(task.due_date).getTime() < new Date(filters.due_date_from).getTime()) return false;
+    }
+
+    if (filters.due_date_to) {
+      if (!task.due_date) return false;
+      if (new Date(task.due_date).getTime() > new Date(filters.due_date_to).getTime()) return false;
+    }
+
+    return true;
+  });
+};
+
+const notImplemented = (feature: string): never => {
+  throw new Error(`${feature} is not available in the backend API yet.`);
+};
 
 // ============================================
 // WORKSPACES
@@ -31,51 +449,23 @@ import type {
 
 export const workspaceService = {
   async getAll() {
-    const { data, error } = await supabase
-      .from('workspaces')
-      .select('*')
-      .order('name');
-    if (error) throw error;
-    return data;
+    return notImplemented('Workspaces');
   },
 
-  async getById(id: string) {
-    const { data, error } = await supabase
-      .from('workspaces')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+  async getById(_id: string) {
+    return notImplemented('Workspaces');
   },
 
-  async create(workspace: Partial<Workspace>) {
-    const { data, error } = await supabase
-      .from('workspaces')
-      .insert(workspace)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async create(_workspace: Partial<Workspace>) {
+    return notImplemented('Workspaces');
   },
 
-  async update(id: string, workspace: Partial<Workspace>) {
-    const { data, error } = await supabase
-      .from('workspaces')
-      .update(workspace)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async update(_id: string, _workspace: Partial<Workspace>) {
+    return notImplemented('Workspaces');
   },
 
-  async delete(id: string) {
-    const { error } = await supabase
-      .from('workspaces')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+  async delete(_id: string) {
+    return notImplemented('Workspaces');
   },
 };
 
@@ -84,51 +474,24 @@ export const workspaceService = {
 // ============================================
 
 export const portfolioService = {
-  async getAll(workspaceId?: string) {
-    let query = supabase.from('portfolios').select('*').order('name');
-    if (workspaceId) query = query.eq('workspace_id', workspaceId);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+  async getAll(_workspaceId?: string) {
+    return notImplemented('Portfolios');
   },
 
-  async getById(id: string) {
-    const { data, error } = await supabase
-      .from('portfolios')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+  async getById(_id: string) {
+    return notImplemented('Portfolios');
   },
 
-  async create(portfolio: Partial<Portfolio>) {
-    const { data, error } = await supabase
-      .from('portfolios')
-      .insert(portfolio)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async create(_portfolio: Partial<Portfolio>) {
+    return notImplemented('Portfolios');
   },
 
-  async update(id: string, portfolio: Partial<Portfolio>) {
-    const { data, error } = await supabase
-      .from('portfolios')
-      .update(portfolio)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async update(_id: string, _portfolio: Partial<Portfolio>) {
+    return notImplemented('Portfolios');
   },
 
-  async delete(id: string) {
-    const { error } = await supabase
-      .from('portfolios')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+  async delete(_id: string) {
+    return notImplemented('Portfolios');
   },
 };
 
@@ -138,103 +501,65 @@ export const portfolioService = {
 
 export const projectService = {
   async getAll(filters?: { workspaceId?: string; portfolioId?: string; status?: string }) {
-    let query = supabase.from('projects').select('*').order('name');
-    if (filters?.workspaceId) query = query.eq('workspace_id', filters.workspaceId);
-    if (filters?.portfolioId) query = query.eq('portfolio_id', filters.portfolioId);
-    if (filters?.status) query = query.eq('status', filters.status);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    let response;
+
+    if (filters?.workspaceId) {
+      response = await api.get<ProjectDTO[]>(`/pm/projects/workspace/${filters.workspaceId}`);
+    } else if (filters?.portfolioId) {
+      response = await api.get<ProjectDTO[]>(`/pm/projects/portfolio/${filters.portfolioId}`);
+    } else {
+      response = await api.get<ProjectDTO[]>('/pm/projects');
+    }
+
+    let projects = response.data.map(mapProjectDto);
+
+    if (filters?.status) {
+      projects = projects.filter(project => project.status === filters.status);
+    }
+
+    return projects;
   },
 
   async getById(id: string) {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.get<ProjectDTO>(`/pm/projects/${id}`);
+    return mapProjectDto(response.data);
   },
 
   async create(project: CreateProjectInput) {
-    const { data, error } = await supabase
-      .from('projects')
-      .insert(project)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.post<ProjectDTO>('/pm/projects', mapCreateProjectInput(project));
+    return mapProjectDto(response.data);
   },
 
   async update(id: string, project: Partial<Project>) {
-    const { data, error } = await supabase
-      .from('projects')
-      .update(project)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<ProjectDTO>(`/pm/projects/${id}`, mapUpdateProjectInput(project));
+    return mapProjectDto(response.data);
   },
 
   async delete(id: string) {
-    const { error } = await supabase
-      .from('projects')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+    await api.delete(`/pm/projects/${id}`);
   },
 
   async archive(id: string) {
-    const { data, error } = await supabase
-      .from('projects')
-      .update({ is_archived: true })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.post<ProjectDTO>(`/pm/projects/${id}/archive`);
+    return mapProjectDto(response.data);
   },
 
   async getMembers(projectId: string) {
-    const { data, error } = await supabase
-      .from('project_members')
-      .select('*, user:app_users(id, full_name, email, avatar_url)')
-      .eq('project_id', projectId);
-    if (error) throw error;
-    return data;
+    const response = await employeeApi.getAll(0, 200);
+    const employees = response.data?.data?.content ?? [];
+    return employees.map(employee => toProjectMember(projectId, employee));
   },
 
-  async addMember(projectId: string, userId: string, role: string = 'MEMBER') {
-    const { data, error } = await supabase
-      .from('project_members')
-      .insert({ project_id: projectId, user_id: userId, role })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async addMember(_projectId: string, _userId: string, _role: string = 'MEMBER') {
+    return notImplemented('Project members');
   },
 
-  async removeMember(projectId: string, userId: string) {
-    const { error } = await supabase
-      .from('project_members')
-      .delete()
-      .eq('project_id', projectId)
-      .eq('user_id', userId);
-    if (error) throw error;
+  async removeMember(_projectId: string, _userId: string) {
+    return notImplemented('Project members');
   },
 
-  async updateMemberRole(projectId: string, userId: string, role: string) {
-    const { data, error } = await supabase
-      .from('project_members')
-      .update({ role })
-      .eq('project_id', projectId)
-      .eq('user_id', userId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async updateMemberRole(_projectId: string, _userId: string, _role: string) {
+    return notImplemented('Project members');
   },
 };
 
@@ -244,89 +569,49 @@ export const projectService = {
 
 export const taskService = {
   async getAll(projectId: string, filters?: TaskFilter) {
-    let query = supabase
-      .from('tasks')
-      .select('*, assignee:app_users(id, full_name, avatar_url), epic:epics(id, name, color), sprint:sprints(id, name)')
-      .eq('project_id', projectId)
-      .eq('is_deleted', false);
+    const response = await api.get<TaskDTO[]>(`/pm/tasks/project/${projectId}`);
+    const tasks = response.data.map(mapTaskDto);
+    const filtered = applyTaskFilters(tasks, filters);
 
-    if (filters?.status?.length) query = query.in('status', filters.status);
-    if (filters?.priority?.length) query = query.in('priority', filters.priority);
-    if (filters?.assignee_id?.length) query = query.in('assignee_id', filters.assignee_id);
-    if (filters?.epic_id) query = query.eq('epic_id', filters.epic_id);
-    if (filters?.sprint_id) query = query.eq('sprint_id', filters.sprint_id);
-    if (filters?.milestone_id) query = query.eq('milestone_id', filters.milestone_id);
-    if (filters?.task_type?.length) query = query.in('task_type', filters.task_type);
-    if (filters?.search) query = query.ilike('title', `%${filters.search}%`);
-    if (filters?.due_date_from) query = query.gte('due_date', filters.due_date_from);
-    if (filters?.due_date_to) query = query.lte('due_date', filters.due_date_to);
-
-    query = query.order('status_order', { ascending: true }).order('created_at', { ascending: false });
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    return filtered.sort((a, b) => {
+      if (a.status_order !== b.status_order) return a.status_order - b.status_order;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
   },
 
   async getById(id: string) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*, assignee:app_users(id, full_name, avatar_url), epic:epics(id, name, color), sprint:sprints(id, name), parent_task:tasks(id, task_number, title)')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.get<TaskDTO>(`/pm/tasks/${id}`);
+    return mapTaskDto(response.data);
   },
 
   async create(task: CreateTaskInput) {
-    // Generate task number first
-    const { data: taskNum } = await supabase.rpc('generate_task_number', { project_id_param: task.project_id });
-    
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert({ ...task, task_number: taskNum || `TASK-${Date.now()}` })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.post<TaskDTO>('/pm/tasks', mapCreateTaskInput(task));
+    return mapTaskDto(response.data);
   },
 
   async update(id: string, task: UpdateTaskInput) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(task)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<TaskDTO>(`/pm/tasks/${id}`, mapUpdateTaskInput(task));
+    return mapTaskDto(response.data);
   },
 
   async delete(id: string) {
-    const { error } = await supabase
-      .from('tasks')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+    await api.delete(`/pm/tasks/${id}`);
   },
 
   async getSubtasks(parentTaskId: string) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*, assignee:app_users(id, full_name, avatar_url)')
-      .eq('parent_task_id', parentTaskId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data;
+    const response = await api.get<TaskDTO[]>(`/pm/tasks/subtasks/${parentTaskId}`);
+    return response.data.map(mapTaskDto);
+  },
+
+  async getBySprint(sprintId: string) {
+    const response = await api.get<TaskDTO[]>(`/pm/tasks/sprint/${sprintId}`);
+    return response.data.map(mapTaskDto);
   },
 
   async getBoardColumns(projectId: string): Promise<TaskBoardColumn[]> {
     const tasks = await this.getAll(projectId);
-    
-    // Group by status
     const columnsMap = new Map<string, TaskBoardColumn>();
-    
+
     tasks.forEach(task => {
       if (!columnsMap.has(task.status)) {
         columnsMap.set(task.status, {
@@ -339,41 +624,28 @@ export const taskService = {
       }
       columnsMap.get(task.status)!.tasks.push(task);
     });
-    
+
     return Array.from(columnsMap.values()).sort((a, b) => a.order - b.order);
   },
 
   async moveTask(taskId: string, newStatus: string, newOrder: number) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ status: newStatus, status_order: newOrder })
-      .eq('id', taskId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<TaskDTO>(`/pm/tasks/${taskId}/move`, {
+      status: newStatus,
+      statusOrder: newOrder,
+    });
+    return mapTaskDto(response.data);
   },
 
   async assignTask(taskId: string, assigneeId: string | null) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ assignee_id: assigneeId })
-      .eq('id', taskId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<TaskDTO>(`/pm/tasks/${taskId}`, {
+      assigneeId,
+    });
+    return mapTaskDto(response.data);
   },
 
   async getMyTasks(userId: string) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*, project:projects(id, name, color), assignee:app_users(id, full_name, avatar_url)')
-      .eq('assignee_id', userId)
-      .eq('is_deleted', false)
-      .order('due_date', { ascending: true });
-    if (error) throw error;
-    return data;
+    const response = await api.get<TaskDTO[]>(`/pm/tasks/assignee/${userId}`);
+    return response.data.map(mapTaskDto);
   },
 };
 
@@ -382,62 +654,16 @@ export const taskService = {
 // ============================================
 
 export const taskDependencyService = {
-  async getByTask(taskId: string) {
-    const { data, error } = await supabase
-      .from('task_dependencies')
-      .select('*, blocking_task:tasks(id, task_number, title), blocked_task:tasks(id, task_number, title)')
-      .or(`blocking_task_id.eq.${taskId},blocked_task_id.eq.${taskId}`);
-    if (error) throw error;
-    return data;
+  async getByTask(_taskId: string): Promise<TaskDependency[]> {
+    return notImplemented('Task dependencies');
   },
 
-  async create(dependency: { blocking_task_id: string; blocked_task_id: string; dependency_type?: string }) {
-    const { data, error } = await supabase
-      .from('task_dependencies')
-      .insert(dependency)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async create(_dependency: { blocking_task_id: string; blocked_task_id: string; dependency_type?: string }) {
+    return notImplemented('Task dependencies');
   },
 
-  async delete(id: string) {
-    const { error } = await supabase.from('task_dependencies').delete().eq('id', id);
-    if (error) throw error;
-  },
-};
-
-// ============================================
-// TASK WATCHERS
-// ============================================
-
-export const taskWatcherService = {
-  async getWatchers(taskId: string) {
-    const { data, error } = await supabase
-      .from('task_watchers')
-      .select('*, user:app_users(id, full_name, avatar_url)')
-      .eq('task_id', taskId);
-    if (error) throw error;
-    return data;
-  },
-
-  async watch(taskId: string, userId: string) {
-    const { data, error } = await supabase
-      .from('task_watchers')
-      .insert({ task_id: taskId, user_id: userId })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async unwatch(taskId: string, userId: string) {
-    const { error } = await supabase
-      .from('task_watchers')
-      .delete()
-      .eq('task_id', taskId)
-      .eq('user_id', userId);
-    if (error) throw error;
+  async delete(_id: string) {
+    return notImplemented('Task dependencies');
   },
 };
 
@@ -447,89 +673,42 @@ export const taskWatcherService = {
 
 export const sprintService = {
   async getByProject(projectId: string) {
-    const { data, error } = await supabase
-      .from('sprints')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('is_deleted', false)
-      .order('start_date', { ascending: false });
-    if (error) throw error;
-    return data;
+    const response = await api.get<SprintDTO[]>(`/pm/sprints/project/${projectId}`);
+    return response.data.map(mapSprintDto);
   },
 
   async getById(id: string) {
-    const { data, error } = await supabase
-      .from('sprints')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.get<SprintDTO>(`/pm/sprints/${id}`);
+    return mapSprintDto(response.data);
   },
 
   async getActive(projectId: string) {
-    const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('sprints')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('status', 'ACTIVE')
-      .lte('start_date', today)
-      .gte('end_date', today)
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.get<SprintDTO>(`/pm/sprints/project/${projectId}/active`);
+    return mapSprintDto(response.data);
   },
 
   async create(sprint: CreateSprintInput) {
-    const { data, error } = await supabase
-      .from('sprints')
-      .insert(sprint)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.post<SprintDTO>('/pm/sprints', mapCreateSprintInput(sprint));
+    return mapSprintDto(response.data);
   },
 
   async update(id: string, sprint: Partial<Sprint>) {
-    const { data, error } = await supabase
-      .from('sprints')
-      .update(sprint)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async startSprint(id: string) {
-    const { data, error } = await supabase
-      .from('sprints')
-      .update({ status: 'ACTIVE' })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async completeSprint(id: string) {
-    const { data, error } = await supabase
-      .from('sprints')
-      .update({ status: 'COMPLETED' })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<SprintDTO>(`/pm/sprints/${id}`, mapUpdateSprintInput(sprint));
+    return mapSprintDto(response.data);
   },
 
   async delete(id: string) {
-    const { error } = await supabase
-      .from('sprints')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+    await api.delete(`/pm/sprints/${id}`);
+  },
+
+  async startSprint(id: string) {
+    const response = await api.post<SprintDTO>(`/pm/sprints/${id}/start`);
+    return mapSprintDto(response.data);
+  },
+
+  async completeSprint(id: string) {
+    const response = await api.post<SprintDTO>(`/pm/sprints/${id}/complete`);
+    return mapSprintDto(response.data);
   },
 };
 
@@ -539,53 +718,27 @@ export const sprintService = {
 
 export const epicService = {
   async getByProject(projectId: string) {
-    const { data, error } = await supabase
-      .from('epics')
-      .select('*, owner:app_users(id, full_name)')
-      .eq('project_id', projectId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data;
+    const response = await api.get<EpicDTO[]>(`/pm/epics/project/${projectId}`);
+    return response.data.map(mapEpicDto);
   },
 
   async getById(id: string) {
-    const { data, error } = await supabase
-      .from('epics')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.get<EpicDTO>(`/pm/epics/${id}`);
+    return mapEpicDto(response.data);
   },
 
   async create(epic: CreateEpicInput) {
-    const { data, error } = await supabase
-      .from('epics')
-      .insert(epic)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.post<EpicDTO>('/pm/epics', mapCreateEpicInput(epic));
+    return mapEpicDto(response.data);
   },
 
   async update(id: string, epic: Partial<Epic>) {
-    const { data, error } = await supabase
-      .from('epics')
-      .update(epic)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<EpicDTO>(`/pm/epics/${id}`, mapUpdateEpicInput(epic));
+    return mapEpicDto(response.data);
   },
 
   async delete(id: string) {
-    const { error } = await supabase
-      .from('epics')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+    await api.delete(`/pm/epics/${id}`);
   },
 };
 
@@ -595,53 +748,27 @@ export const epicService = {
 
 export const milestoneService = {
   async getByProject(projectId: string) {
-    const { data, error } = await supabase
-      .from('milestones')
-      .select('*, owner:app_users(id, full_name)')
-      .eq('project_id', projectId)
-      .eq('is_deleted', false)
-      .order('due_date', { ascending: true });
-    if (error) throw error;
-    return data;
+    const response = await api.get<MilestoneDTO[]>(`/pm/milestones/project/${projectId}`);
+    return response.data.map(mapMilestoneDto);
   },
 
   async getById(id: string) {
-    const { data, error } = await supabase
-      .from('milestones')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.get<MilestoneDTO>(`/pm/milestones/${id}`);
+    return mapMilestoneDto(response.data);
   },
 
   async create(milestone: CreateMilestoneInput) {
-    const { data, error } = await supabase
-      .from('milestones')
-      .insert(milestone)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.post<MilestoneDTO>('/pm/milestones', mapCreateMilestoneInput(milestone));
+    return mapMilestoneDto(response.data);
   },
 
   async update(id: string, milestone: Partial<Milestone>) {
-    const { data, error } = await supabase
-      .from('milestones')
-      .update(milestone)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const response = await api.put<MilestoneDTO>(`/pm/milestones/${id}`, mapUpdateMilestoneInput(milestone));
+    return mapMilestoneDto(response.data);
   },
 
   async delete(id: string) {
-    const { error } = await supabase
-      .from('milestones')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+    await api.delete(`/pm/milestones/${id}`);
   },
 };
 
@@ -650,65 +777,20 @@ export const milestoneService = {
 // ============================================
 
 export const timeLogService = {
-  async getByTask(taskId: string) {
-    const { data, error } = await supabase
-      .from('task_time_logs')
-      .select('*, user:app_users(id, full_name)')
-      .eq('task_id', taskId)
-      .order('log_date', { ascending: false });
-    if (error) throw error;
-    return data;
+  async getByTask(_taskId: string): Promise<TimeLog[]> {
+    return notImplemented('Time logs');
   },
 
-  async getByUser(userId: string, startDate?: string, endDate?: string) {
-    let query = supabase
-      .from('task_time_logs')
-      .select('*, task:tasks(id, task_number, title), user:app_users(id, full_name)')
-      .eq('user_id', userId);
-    
-    if (startDate) query = query.gte('log_date', startDate);
-    if (endDate) query = query.lte('log_date', endDate);
-    
-    const { data, error } = await query.order('log_date', { ascending: false });
-    if (error) throw error;
-    return data;
+  async create(_log: TimeLogInput) {
+    return notImplemented('Time logs');
   },
 
-  async create(timeLog: TimeLogInput) {
-    const { data, error } = await supabase
-      .from('task_time_logs')
-      .insert(timeLog)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async update(_id: string, _log: Partial<TimeLog>) {
+    return notImplemented('Time logs');
   },
 
-  async update(id: string, timeLog: Partial<TimeLog>) {
-    const { data, error } = await supabase
-      .from('task_time_logs')
-      .update(timeLog)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async delete(id: string) {
-    const { error } = await supabase.from('task_time_logs').delete().eq('id', id);
-    if (error) throw error;
-  },
-
-  async approve(id: string, approvedBy: string) {
-    const { data, error } = await supabase
-      .from('task_time_logs')
-      .update({ is_approved: true, approved_by: approvedBy, approved_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async delete(_id: string) {
+    return notImplemented('Time logs');
   },
 };
 
@@ -717,44 +799,20 @@ export const timeLogService = {
 // ============================================
 
 export const commentService = {
-  async getByTask(taskId: string) {
-    const { data, error } = await supabase
-      .from('project_comments')
-      .select('*, user:app_users(id, full_name, avatar_url)')
-      .eq('task_id', taskId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return data;
+  async getByTask(_taskId: string): Promise<Comment[]> {
+    return notImplemented('Task comments');
   },
 
-  async create(comment: CommentInput) {
-    const { data, error } = await supabase
-      .from('project_comments')
-      .insert(comment)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async create(_comment: CommentInput) {
+    return notImplemented('Task comments');
   },
 
-  async update(id: string, content: string) {
-    const { data, error } = await supabase
-      .from('project_comments')
-      .update({ content, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async update(_id: string, _content: string) {
+    return notImplemented('Task comments');
   },
 
-  async delete(id: string) {
-    const { error } = await supabase
-      .from('project_comments')
-      .update({ is_deleted: true })
-      .eq('id', id);
-    if (error) throw error;
+  async delete(_id: string) {
+    return notImplemented('Task comments');
   },
 };
 
@@ -763,60 +821,16 @@ export const commentService = {
 // ============================================
 
 export const attachmentService = {
-  async getByTask(taskId: string) {
-    const { data, error } = await supabase
-      .from('project_attachments')
-      .select('*, uploaded_by_user:app_users(id, full_name)')
-      .eq('task_id', taskId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data;
+  async getByTask(_taskId: string): Promise<Attachment[]> {
+    return notImplemented('Task attachments');
   },
 
-  async upload(taskId: string, file: File, userId: string) {
-    const filePath = `tasks/${taskId}/${Date.now()}_${file.name}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('attachments')
-      .upload(filePath, file);
-    
-    if (uploadError) throw uploadError;
-
-    const { data, error } = await supabase
-      .from('project_attachments')
-      .insert({
-        task_id: taskId,
-        file_name: file.name,
-        file_path: filePath,
-        file_type: file.type,
-        file_size: file.size,
-        uploaded_by: userId,
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
+  async create(_attachment: Partial<Attachment>) {
+    return notImplemented('Task attachments');
   },
 
-  async delete(id: string) {
-    const { data, error: fetchError } = await supabase
-      .from('project_attachments')
-      .select('file_path')
-      .eq('id', id)
-      .single();
-    
-    if (fetchError) throw fetchError;
-    
-    await supabase.storage.from('attachments').remove([data.file_path]);
-    
-    const { error } = await supabase.from('project_attachments').delete().eq('id', id);
-    if (error) throw error;
-  },
-
-  getPublicUrl(filePath: string) {
-    const { data } = supabase.storage.from('attachments').getPublicUrl(filePath);
-    return data.publicUrl;
+  async delete(_id: string) {
+    return notImplemented('Task attachments');
   },
 };
 
@@ -825,59 +839,28 @@ export const attachmentService = {
 // ============================================
 
 export const customFieldService = {
-  async getByProject(projectId: string) {
-    const { data, error } = await supabase
-      .from('custom_fields')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('display_order');
-    if (error) throw error;
-    return data;
+  async getByProject(_projectId: string): Promise<CustomField[]> {
+    return notImplemented('Custom fields');
   },
 
-  async create(field: Partial<CustomField>) {
-    const { data, error } = await supabase
-      .from('custom_fields')
-      .insert(field)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async create(_field: Partial<CustomField>) {
+    return notImplemented('Custom fields');
   },
 
-  async update(id: string, field: Partial<CustomField>) {
-    const { data, error } = await supabase
-      .from('custom_fields')
-      .update(field)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async update(_id: string, _field: Partial<CustomField>) {
+    return notImplemented('Custom fields');
   },
 
-  async delete(id: string) {
-    const { error } = await supabase.from('custom_fields').delete().eq('id', id);
-    if (error) throw error;
+  async delete(_id: string) {
+    return notImplemented('Custom fields');
   },
 
-  async getTaskValues(taskId: string) {
-    const { data, error } = await supabase
-      .from('task_custom_fields')
-      .select('*, custom_field:custom_fields(*)')
-      .eq('task_id', taskId);
-    if (error) throw error;
-    return data;
+  async getTaskValues(_taskId: string) {
+    return notImplemented('Custom fields');
   },
 
-  async setTaskValue(taskId: string, fieldId: string, value: string) {
-    const { data, error } = await supabase
-      .from('task_custom_fields')
-      .upsert({ task_id: taskId, field_id: fieldId, field_value: value })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async setTaskValue(_taskId: string, _fieldId: string, _value: string) {
+    return notImplemented('Custom fields');
   },
 };
 
@@ -887,29 +870,29 @@ export const customFieldService = {
 
 export const dashboardService = {
   async getProjectStats(projectId: string) {
-    const { data: tasks, error } = await supabase
-      .from('tasks')
-      .select('status, priority, due_date, completed_at')
-      .eq('project_id', projectId)
-      .eq('is_deleted', false);
-    
-    if (error) throw error;
+    const tasks = await taskService.getAll(projectId);
+    const completedStatuses = new Set(['DONE', 'COMPLETED']);
+    const inProgressStatuses = new Set(['IN_PROGRESS']);
 
     const total = tasks.length;
-    const completed = tasks.filter(t => t.status === 'DONE').length;
-    const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-    const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'DONE').length;
+    const completed = tasks.filter(task => completedStatuses.has(task.status)).length;
+    const inProgress = tasks.filter(task => inProgressStatuses.has(task.status)).length;
+    const overdue = tasks.filter(task => {
+      if (!task.due_date) return false;
+      if (completedStatuses.has(task.status)) return false;
+      return new Date(task.due_date) < new Date();
+    }).length;
 
     const byStatus = Object.entries(
-      tasks.reduce((acc, t) => {
-        acc[t.status] = (acc[t.status] || 0) + 1;
+      tasks.reduce((acc, task) => {
+        acc[task.status] = (acc[task.status] || 0) + 1;
         return acc;
       }, {} as Record<string, number>)
     ).map(([status, count]) => ({ status, count }));
 
     const byPriority = Object.entries(
-      tasks.reduce((acc, t) => {
-        acc[t.priority] = (acc[t.priority] || 0) + 1;
+      tasks.reduce((acc, task) => {
+        acc[task.priority] = (acc[task.priority] || 0) + 1;
         return acc;
       }, {} as Record<string, number>)
     ).map(([priority, count]) => ({ priority, count }));
@@ -925,22 +908,15 @@ export const dashboardService = {
   },
 
   async getSprintStats(sprintId: string) {
-    const { data: tasks, error } = await supabase
-      .from('tasks')
-      .select('status, story_points')
-      .eq('sprint_id', sprintId)
-      .eq('is_deleted', false);
-    
-    if (error) throw error;
-
-    const totalPoints = tasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
+    const tasks = await taskService.getBySprint(sprintId);
+    const totalPoints = tasks.reduce((sum, task) => sum + (task.story_points || 0), 0);
     const completedPoints = tasks
-      .filter(t => t.status === 'DONE')
-      .reduce((sum, t) => sum + (t.story_points || 0), 0);
+      .filter(task => task.status === 'DONE')
+      .reduce((sum, task) => sum + (task.story_points || 0), 0);
 
     return {
       totalTasks: tasks.length,
-      completedTasks: tasks.filter(t => t.status === 'DONE').length,
+      completedTasks: tasks.filter(task => task.status === 'DONE').length,
       totalPoints,
       completedPoints,
       remainingPoints: totalPoints - completedPoints,

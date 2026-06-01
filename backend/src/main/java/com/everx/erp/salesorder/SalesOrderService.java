@@ -1,11 +1,14 @@
 package com.everx.erp.salesorder;
 
 import com.everx.erp.equipment.Equipment;
+import com.everx.erp.equipment.CommercialStatus;
+import com.everx.erp.equipment.PhysicalStatus;
 import com.everx.erp.equipment.EquipmentRepository;
 import com.everx.erp.equipment.EquipmentStatus;
 import com.everx.erp.logistics.Shipment;
 import com.everx.erp.logistics.ShipmentRepository;
 import com.everx.erp.numbering.DocumentNumberGenerator;
+import com.everx.erp.workflow.SalesOrderWorkflowOrchestrator;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
 import com.everx.erp.salesorder.dto.*;
@@ -35,6 +38,7 @@ public class SalesOrderService {
     private final InvoiceRepository invoiceRepository;
     private final SagaOrchestrator sagaOrchestrator;
     private final DocumentNumberGenerator documentNumberGenerator;
+    private final SalesOrderWorkflowOrchestrator salesOrderWorkflowOrchestrator;
 
     @Transactional
     public SalesOrderDto createSalesOrder(CreateSalesOrderRequest request) {
@@ -156,21 +160,8 @@ public class SalesOrderService {
         );
 
         try {
-            for (SalesOrderItem item : so.getItems()) {
-                if (item.getEquipmentId() == null) {
-                    throw new ValidationException("Sales order item missing equipment reference");
-                }
-
-                Equipment equipment = equipmentRepository.findByIdAndNotDeleted(item.getEquipmentId())
-                        .orElseThrow(() -> new ValidationException("Equipment not found: " + item.getEquipmentId()));
-
-                if (equipment.getStatus() == EquipmentStatus.SOLD) {
-                    throw new ValidationException("Equipment already sold: " + equipment.getInternalCode());
-                }
-
-                equipment.setStatus(EquipmentStatus.RESERVED);
-                equipmentRepository.save(equipment);
-            }
+            // Use orchestrator to enforce inventory reservation/state-machine rules.
+            salesOrderWorkflowOrchestrator.confirmSalesOrderWorkflow(so);
 
             sagaOrchestrator.transitionStep(sagaId, "RESERVE_INVENTORY", java.util.Map.of("soId", so.getId().toString()));
 
@@ -208,6 +199,8 @@ public class SalesOrderService {
                 if (equipment == null) continue;
                 if (equipment.getStatus() == EquipmentStatus.RESERVED || equipment.getStatus() == EquipmentStatus.IN_TRANSIT) {
                     equipment.setStatus(EquipmentStatus.IN_WAREHOUSE);
+                    equipment.setPhysicalStatus(PhysicalStatus.AVAILABLE);
+                    equipment.setCommercialStatus(CommercialStatus.LEAD);
                     equipmentRepository.save(equipment);
                 }
             }
@@ -255,6 +248,8 @@ public class SalesOrderService {
                 if (equipment.getStatus() == EquipmentStatus.RESERVED
                         || equipment.getStatus() == EquipmentStatus.IN_TRANSIT) {
                     equipment.setStatus(EquipmentStatus.IN_WAREHOUSE);
+                    equipment.setPhysicalStatus(PhysicalStatus.AVAILABLE);
+                    equipment.setCommercialStatus(CommercialStatus.LEAD);
                     equipmentRepository.save(equipment);
                 }
             }

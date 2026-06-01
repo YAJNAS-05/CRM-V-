@@ -242,7 +242,26 @@ export default function ServiceTicketForm() {
 
   const handleLookupChange = (name: string, value: string) => {
     if (name === 'equipmentId') {
-      setForm((prev) => ({ ...prev, equipmentId: value }))
+      const selectedEquipment = equipment.find((item) => item.id === value)
+      const selectedModel = `${selectedEquipment?.make || ''} ${selectedEquipment?.model || ''}`.trim().toLowerCase()
+
+      setForm((prev) => {
+        const compatiblePartIds = new Set(
+          spareParts
+            .filter((part) => {
+              if (!selectedModel) return true
+              if (!part.compatibleModels || part.compatibleModels.length === 0) return true
+              return part.compatibleModels.some((model) => model.toLowerCase().includes(selectedModel) || selectedModel.includes(model.toLowerCase()))
+            })
+            .map((part) => part.id)
+        )
+
+        return {
+          ...prev,
+          equipmentId: value,
+          partsUsed: prev.partsUsed.filter((partId) => compatiblePartIds.has(partId)),
+        }
+      })
       loadWarrantyContext(value)
       return
     }
@@ -301,6 +320,27 @@ export default function ServiceTicketForm() {
     const partsMap = new Map(spareParts.map((part) => [part.id, `${part.partNumber} | ${part.name}`]))
     return form.partsUsed.map((partId) => partsMap.get(partId)).filter(Boolean).join(', ')
   }, [form.partsUsed, spareParts])
+
+  const filteredSpareParts = useMemo(() => {
+    if (!form.equipmentId) {
+      return spareParts
+    }
+
+    const selectedEquipment = equipment.find((item) => item.id === form.equipmentId)
+    const selectedModel = `${selectedEquipment?.make || ''} ${selectedEquipment?.model || ''}`.trim().toLowerCase()
+
+    if (!selectedModel) {
+      return spareParts
+    }
+
+    return spareParts.filter((part) => {
+      if (!part.compatibleModels || part.compatibleModels.length === 0) {
+        return true
+      }
+
+      return part.compatibleModels.some((model) => model.toLowerCase().includes(selectedModel) || selectedModel.includes(model.toLowerCase()))
+    })
+  }, [equipment, form.equipmentId, spareParts])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -550,11 +590,14 @@ export default function ServiceTicketForm() {
                   onChange={handlePartsUsedChange}
                   className="w-full h-32 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {spareParts.map((part) => (
+                  {filteredSpareParts.map((part) => (
                     <option key={part.id} value={part.id}>{`${part.partNumber} | ${part.name}`}</option>
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">Selected: {partsUsedLabels || 'None'}</p>
+                {form.equipmentId && (
+                  <p className="text-xs text-blue-600 mt-1">Parts list is filtered by selected equipment model.</p>
+                )}
               </div>
             </div>
           </div>

@@ -9,10 +9,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"
+    ,
+    "check-route-mapping": "node ../scripts/check-route-mapping.js --frontend ./src --backend ../backend/src/main/java"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
-    "@supabase/supabase-js": "^2.105.4",
+    
     "@tanstack/react-query": "^5.28.0",
     "axios": "^1.6.0",
     "date-fns": "^4.1.0",

@@ -1,7 +1,7 @@
 package com.everx.finance.fx;
 
 import com.everx.finance.invoice.Invoice;
-import com.everx.finance.period.PostingPeriodEnforcer;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,7 +36,6 @@ public class FxRateLockingService {
 
     private final FxRateHistoryRepository fxRateHistoryRepository;
     private final FxRateLockRepository fxRateLockRepository;
-    private final PostingPeriodEnforcer postingPeriodEnforcer;
 
     /**
      * Locks FX rates at Sales Order creation time
@@ -62,8 +61,6 @@ public class FxRateLockingService {
         if (invoiceCurrency.equalsIgnoreCase(baseCurrency)) {
             return Optional.empty();
         }
-
-        postingPeriodEnforcer.enforceNoBackdating(issueDate);
 
         FxRateHistory historicalRate = fxRateHistoryRepository
             .findTopByFromCurrencyAndToCurrencyAndRateDateLessThanEqualOrderByRateDateDesc(
@@ -134,9 +131,6 @@ public class FxRateLockingService {
             BigDecimal fxGainLoss,
             String currency,
             LocalDate postingDate) {
-
-        // Enforce posting period
-        postingPeriodEnforcer.enforceNoBackdating(postingDate);
 
         log.info("Posting FX Gain/Loss to GL for transaction {}: {} {}", 
             transactionId, fxGainLoss, currency);

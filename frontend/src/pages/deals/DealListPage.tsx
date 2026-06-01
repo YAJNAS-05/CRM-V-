@@ -40,10 +40,16 @@ const DealListPage: React.FC = () => {
     try {
       setIsLoading(true)
       const query = searchQuery.trim()
-      const shouldSearch = query.length > 0 || stageFilter.length > 0
-      const resp = shouldSearch
-        ? await dealApi.search(query, page, pageSize, stageFilter || undefined)
-        : await dealApi.getAll(page, pageSize)
+      let resp
+      if (query.length > 0) {
+        // Text search — pass stage as extra filter if set
+        resp = await dealApi.search(query, page, pageSize, stageFilter || undefined)
+      } else if (stageFilter.length > 0) {
+        // Stage-only filter — use dedicated endpoint
+        resp = await dealApi.getByStage(stageFilter, page, pageSize)
+      } else {
+        resp = await dealApi.getAll(page, pageSize)
+      }
       const data = resp.data.data
       if (data?.content) { setDeals(data.content); setTotalPages(data.totalPages || 1); setTotalItems(data.totalElements || data.content.length) }
       else if (Array.isArray(data)) { setDeals(data); setTotalPages(1); setTotalItems(data.length) }

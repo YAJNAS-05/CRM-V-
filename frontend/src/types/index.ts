@@ -53,6 +53,16 @@ export interface UserSettings {
   itemsPerPage: number
 }
 
+export type SettingsScope = 'USER' | 'ROLE'
+
+export interface SettingsResponse extends UserSettings {
+  scope: SettingsScope
+  key: string
+  userId?: string
+  roleName?: string
+  updatedAt?: string
+}
+
 // Generic pagination interface
 export interface Page<T> {
   content: T[]
