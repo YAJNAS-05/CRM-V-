@@ -16,7 +16,6 @@ interface FormData {
   soNumber: string
   accountId: string
   dealId: string
-  equipmentId: string
   status: string
   orderDate: string
   expectedDelivery: string
@@ -29,11 +28,17 @@ interface FormData {
   notes: string
 }
 
+interface LineItemInput {
+  equipmentId: string
+  quantity: number
+  unitPrice: string
+  lineTotal: string
+}
+
 const defaultForm: FormData = {
   soNumber: '',
   accountId: '',
   dealId: '',
-  equipmentId: '',
   status: 'DRAFT',
   orderDate: new Date().toISOString().split('T')[0],
   expectedDelivery: '',
@@ -51,6 +56,7 @@ export default function SalesOrderForm() {
   const navigate = useNavigate()
   const isEdit = Boolean(id)
   const [form, setForm] = useState<FormData>(defaultForm)
+  const [lineItems, setLineItems] = useState<LineItemInput[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [lookupLoading, setLookupLoading] = useState(false)
@@ -65,18 +71,6 @@ export default function SalesOrderForm() {
   useEffect(() => {
     if (isEdit && id) loadItem()
   }, [id, isEdit])
-
-  useEffect(() => {
-    const total = parseFloat(form.totalAmount)
-    const percent = parseFloat(form.depositPercent)
-
-    if (!Number.isNaN(total) && !Number.isNaN(percent)) {
-      setForm((prev) => ({ ...prev, depositAmount: ((total * percent) / 100).toFixed(2) }))
-      return
-    }
-
-    setForm((prev) => ({ ...prev, depositAmount: '' }))
-  }, [form.totalAmount, form.depositPercent])
 
   const loadLookups = async () => {
     try {
@@ -111,23 +105,29 @@ export default function SalesOrderForm() {
       const d = response.data
       if (d.success && d.data) {
         const e = d.data
-        const firstItem = e.items?.[0]
         setForm({
           soNumber: e.soNumber || '',
           accountId: e.accountId || '',
           dealId: e.dealId || '',
-          equipmentId: firstItem?.equipmentId || '',
           status: e.status || 'DRAFT',
           orderDate: e.orderDate || '',
           expectedDelivery: e.expectedDelivery || '',
           currency: e.currency || 'USD',
-          totalAmount: e.totalAmount?.toString() || firstItem?.lineTotal?.toString() || '',
+          totalAmount: e.totalAmount?.toString() || '',
           depositPercent: '30',
           depositAmount: '',
           incoterms: e.incoterms || '',
           destinationCountry: e.destinationCountry || '',
           notes: e.notes || '',
         })
+        setLineItems(
+          (e.items || []).map((item: any) => ({
+            equipmentId: item.equipmentId || '',
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice?.toString() || '',
+            lineTotal: item.lineTotal?.toString() || '',
+          }))
+        )
       }
     } catch { toast.error('Failed to load sales order') }
     finally { setLoading(false) }
@@ -135,6 +135,30 @@ export default function SalesOrderForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleLineItemChange = (index: number, field: keyof LineItemInput, value: string | number) => {
+    setLineItems(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      
+      if (field === 'quantity' || field === 'unitPrice') {
+        const qty = field === 'quantity' ? Number(value) : Number(updated[index].quantity)
+        const price = field === 'unitPrice' ? Number(value) : Number(updated[index].unitPrice)
+        if (!Number.isNaN(qty) && !Number.isNaN(price)) {
+          updated[index].lineTotal = (qty * price).toFixed(2)
+        }
+      }
+      return updated
+    })
+  }
+
+  const addLineItem = () => {
+    setLineItems(prev => [...prev, { equipmentId: '', quantity: 1, unitPrice: '', lineTotal: '' }])
+  }
+
+  const removeLineItem = (index: number) => {
+    setLineItems(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleLookupChange = (name: string, value: string) => {
@@ -162,18 +186,16 @@ export default function SalesOrderForm() {
       return
     }
 
-    if (name === 'equipmentId') {
-      const selectedEquipment = equipment.find((item) => item.id === value)
-      setForm((prev) => ({
-        ...prev,
-        equipmentId: value,
-        totalAmount: selectedEquipment?.askingPrice?.toString() || prev.totalAmount,
-        currency: selectedEquipment?.askingCurrency || prev.currency,
-      }))
-      return
-    }
-
     setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleEquipmentForItem = (index: number, equipmentId: string) => {
+    const selectedEquipment = equipment.find((item) => item.id === equipmentId)
+    handleLineItemChange(index, 'equipmentId', equipmentId)
+    if (selectedEquipment) {
+      const price = selectedEquipment.askingPrice?.toString() || ''
+      handleLineItemChange(index, 'unitPrice', price)
+    }
   }
 
   const accountOptions = useMemo(
@@ -204,10 +226,7 @@ export default function SalesOrderForm() {
   const equipmentOptions = useMemo(
     () =>
       equipment
-        .filter(
-          (item) =>
-            SELLABLE_EQUIPMENT_STATUSES.has(item.status) || item.id === form.equipmentId
-        )
+        .filter((item) => SELLABLE_EQUIPMENT_STATUSES.has(item.status) || lineItems.some(li => li.equipmentId === item.id))
         .map((item) => ({
           value: item.id,
           label: `${item.internalCode} | ${item.make || ''} ${item.model || ''}`.trim(),
@@ -215,14 +234,16 @@ export default function SalesOrderForm() {
             .filter(Boolean)
             .join(' | '),
         })),
-    [equipment, form.equipmentId]
+    [equipment, lineItems]
   )
+
+  const lineItemsSubtotal = lineItems.reduce((sum, item) => sum + (Number(item.lineTotal) || 0), 0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const missing: string[] = []
-    if (!form.accountId) missing.push('Account (create one in CRM → Accounts first)')
-    if (!form.equipmentId) missing.push('Equipment')
+    if (!form.accountId) missing.push('Account')
+    if (lineItems.length === 0) missing.push('At least one line item')
     if (!form.status) missing.push('Status')
     if (missing.length > 0) {
       toast.error(`Required: ${missing.join(', ')}`)
@@ -234,22 +255,8 @@ export default function SalesOrderForm() {
       return
     }
 
-    const depositPercent = parseFloat(form.depositPercent)
-    if (!Number.isNaN(depositPercent) && (depositPercent < 0 || depositPercent > 100)) {
-      toast.error('Deposit percentage must be between 0 and 100')
-      return
-    }
-
     try {
       setSaving(true)
-      const parsedTotal = form.totalAmount ? parseFloat(form.totalAmount) : null
-      const notesWithDeposit = [
-        form.notes?.trim() || null,
-        !Number.isNaN(depositPercent) ? `Deposit ${depositPercent}% (${form.depositAmount || '0.00'})` : null,
-      ]
-        .filter(Boolean)
-        .join('\n')
-
       const payload = {
         ...(isEdit && form.soNumber ? { soNumber: form.soNumber } : {}),
         accountId: form.accountId,
@@ -258,18 +265,16 @@ export default function SalesOrderForm() {
         orderDate: form.orderDate || null,
         expectedDelivery: form.expectedDelivery || null,
         currency: form.currency,
-        totalAmount: parsedTotal,
+        totalAmount: lineItemsSubtotal || null,
         incoterms: form.incoterms || null,
         destinationCountry: form.destinationCountry || null,
-        notes: notesWithDeposit || null,
-        items: [
-          {
-            equipmentId: form.equipmentId,
-            quantity: 1,
-            unitPrice: parsedTotal,
-            lineTotal: parsedTotal,
-          },
-        ],
+        notes: form.notes || null,
+        items: lineItems.map(item => ({
+          equipmentId: item.equipmentId,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          lineTotal: Number(item.lineTotal),
+        })),
       }
 
       if (isEdit) {
@@ -296,7 +301,7 @@ export default function SalesOrderForm() {
   if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <button onClick={() => navigate('/erp/sales-orders')} className="text-blue-600 hover:text-blue-800 flex items-center">
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -324,9 +329,6 @@ export default function SalesOrderForm() {
                       : 'border border-gray-200 bg-gray-50 text-gray-600'
                   }`}
                 />
-                {!isEdit && (
-                  <p className="text-xs text-gray-500 mt-1">SO number is generated by backend after create.</p>
-                )}
               </div>
               <SearchableLookupSelect
                 label="Customer / Account"
@@ -355,22 +357,12 @@ export default function SalesOrderForm() {
                 placeholder="Search deal by name"
                 helperText={form.accountId ? 'Showing deals for selected account' : 'Select account first to narrow deals'}
               />
-              <SearchableLookupSelect
-                label="Equipment"
-                name="equipmentId"
-                value={form.equipmentId}
-                options={equipmentOptions}
-                onChange={handleLookupChange}
-                disabled={lookupLoading}
-                required
-                placeholder="Search available equipment by SKU, make, or model"
-                helperText="On selection, total amount and currency auto-fill from asking price"
-              />
             </div>
           </div>
+
           <div>
             <h2 className="text-lg font-semibold mb-3 text-gray-700">Dates & Shipping</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Order Date</label>
                 <input type="date" name="orderDate" value={form.orderDate} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
@@ -392,35 +384,162 @@ export default function SalesOrderForm() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Destination Country</label>
                 <input type="text" name="destinationCountry" value={form.destinationCountry} onChange={handleChange} maxLength={100} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
-                <input type="number" step="0.01" name="totalAmount" value={form.totalAmount} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-700">Line Items *</h2>
+              <button
+                type="button"
+                onClick={addLineItem}
+                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                + Add Item
+              </button>
+            </div>
+            {lineItems.length === 0 ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-700 text-sm">
+                Add at least one equipment item to the sales order
               </div>
+            ) : (
+              <div className="bg-white border border-gray-300 rounded-lg overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-300">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-700">Equipment</th>
+                      <th className="px-4 py-2 text-center font-semibold text-gray-700">Qty</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-700">Unit Price</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-700">Line Total</th>
+                      <th className="px-4 py-2 text-center font-semibold text-gray-700">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((item, index) => (
+                      <tr key={index} className="border-b border-gray-200">
+                        <td className="px-4 py-2">
+                          <select
+                            value={item.equipmentId}
+                            onChange={(e) => handleEquipmentForItem(index, e.target.value)}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Select Equipment</option>
+                            {equipmentOptions.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          {item.equipmentId && (
+                            <p className="text-xs text-gray-500 mt-1">{equipmentOptions.find(e => e.value === item.equipmentId)?.meta}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleLineItemChange(index, 'quantity', parseInt(e.target.value) || 1)}
+                            className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={(e) => handleLineItemChange(index, 'unitPrice', e.target.value)}
+                            className="w-28 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:ring-2 focus:ring-blue-500"
+                            placeholder="0.00"
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-right font-semibold">
+                          {form.currency} {Number(item.lineTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeLineItem(index)}
+                            className="text-red-600 hover:text-red-800 font-medium text-sm"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="bg-gray-50 border-t border-gray-300 px-4 py-3 flex justify-end">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600 mb-1">Subtotal (from line items):</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {form.currency} {lineItemsSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-3 text-gray-700">Additional Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
                 <select name="currency" value={form.currency} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                  {CURRENCIES.map((item) => (
-                    <option key={item} value={item}>{item}</option>
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Deposit %</label>
-                <input type="number" min="0" max="100" step="0.01" name="depositPercent" value={form.depositPercent} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Deposit Amount</label>
-                <input type="text" value={form.depositAmount} readOnly className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-gray-700" />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    name="depositPercent"
+                    value={form.depositPercent}
+                    onChange={handleChange}
+                    min="0"
+                    max="100"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    value={form.depositAmount}
+                    readOnly
+                    className="flex-1 border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-gray-600"
+                    placeholder="Auto-calculated"
+                  />
+                </div>
               </div>
             </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                name="notes"
+                value={form.notes}
+                onChange={handleChange}
+                rows={3}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Additional notes about this sales order..."
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <button type="button" onClick={() => navigate('/erp/sales-orders')} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button type="submit" disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{saving ? 'Saving...' : isEdit ? 'Update SO' : 'Create SO'}</button>
+
+          <div className="flex gap-3 justify-end pt-4">
+            <button
+              type="button"
+              onClick={() => navigate('/erp/sales-orders')}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || lookupLoading || lineItems.length === 0}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving...' : isEdit ? 'Update Sales Order' : 'Create Sales Order'}
+            </button>
           </div>
         </form>
       </div>

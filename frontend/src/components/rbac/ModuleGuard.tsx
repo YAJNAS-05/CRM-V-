@@ -15,7 +15,13 @@ export function ModuleGuard({ module, children }: Props) {
   }
 
   if (!can(module, "view")) {
-    return <Navigate to="/unauthorized" replace />;
+    return (
+      <Navigate
+        to="/unauthorized"
+        replace
+        state={{ from: window.location.pathname, required: [`${module.toUpperCase()}_VIEW`] }}
+      />
+    );
   }
 
   return <>{children}</>;

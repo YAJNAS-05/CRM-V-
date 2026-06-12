@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { salesOrderApi } from '../../api/erpApi'
+import axiosInstance from '../../api/axiosInstance'
 import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
 
@@ -64,19 +65,15 @@ export default function SalesOrderDetailPage() {
     setRelatedLoading(true)
     try {
       const [shipRes, invRes] = await Promise.allSettled([
-        fetch(`${import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8080/api`}/v1/erp/shipments?salesOrderId=${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken') ?? ''}` },
-        }).then((r) => r.json()),
-        fetch(`${import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8080/api`}/v1/finance/invoices?salesOrderId=${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken') ?? ''}` },
-        }).then((r) => r.json()),
+        axiosInstance.get(`/v1/erp/shipments?salesOrderId=${id}`),
+        axiosInstance.get(`/v1/finance/invoices?salesOrderId=${id}`),
       ])
       if (shipRes.status === 'fulfilled') {
-        const d = shipRes.value?.data
+        const d = shipRes.value?.data?.data
         setShipments(d?.content ?? (Array.isArray(d) ? d : []))
       }
       if (invRes.status === 'fulfilled') {
-        const d = invRes.value?.data
+        const d = invRes.value?.data?.data
         setInvoices(d?.content ?? (Array.isArray(d) ? d : []))
       }
     } finally {
@@ -251,6 +248,55 @@ export default function SalesOrderDetailPage() {
         </div>
       )}
 
+      {/* Customer Details Card */}
+      {displayData?.customerDetails && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow p-6 border border-blue-100">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Company Name</label>
+              <p className="text-sm font-semibold text-gray-800">{displayData.customerDetails.name}</p>
+              {displayData.customerDetails.industry && (
+                <p className="text-xs text-gray-600">{displayData.customerDetails.industry}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Contact</label>
+              <p className="text-sm text-gray-700">
+                {displayData.customerDetails.email && (
+                  <>
+                    <a href={`mailto:${displayData.customerDetails.email}`} className="text-blue-600 hover:underline">{displayData.customerDetails.email}</a>
+                    <br />
+                  </>
+                )}
+                {displayData.customerDetails.phone && <span>{displayData.customerDetails.phone}</span>}
+              </p>
+              {displayData.customerDetails.website && (
+                <p className="text-xs">
+                  <a href={displayData.customerDetails.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {displayData.customerDetails.website}
+                  </a>
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Billing Address</label>
+              <p className="text-xs text-gray-700">
+                {[
+                  displayData.customerDetails.billingStreet,
+                  displayData.customerDetails.billingCity,
+                  displayData.customerDetails.billingState,
+                  displayData.customerDetails.billingZip,
+                  displayData.customerDetails.billingCountry,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
@@ -323,74 +369,93 @@ export default function SalesOrderDetailPage() {
 
       {/* Tab: Line Items */}
       {activeTab === 'items' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold">Line Items</h2>
-            {editMode && (
-              <button
-                onClick={() => setEditItems((prev) => [...prev, { equipmentId: '', quantity: 1, unitPrice: '', lineTotal: '' }])}
-                className="px-3 py-1.5 bg-sky-600 text-white text-xs rounded hover:bg-sky-700"
-              >
-                + Add Item
-              </button>
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold">Line Items</h2>
+              {editMode && (
+                <button
+                  onClick={() => setEditItems((prev) => [...prev, { equipmentId: '', quantity: 1, unitPrice: '', lineTotal: '' }])}
+                  className="px-3 py-1.5 bg-sky-600 text-white text-xs rounded hover:bg-sky-700"
+                >
+                  + Add Item
+                </button>
+              )}
+            </div>
+            {items.length === 0 ? (
+              <p className="text-sm text-gray-400">No line items on this sales order.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['Equipment ID', 'Qty', 'Unit Price', 'Line Total', editMode ? 'Action' : ''].filter(Boolean).map((h) => (
+                        <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {items.map((item: any, index: number) => (
+                      <tr key={index}>
+                        <td className="px-4 py-2">
+                          {editMode ? (
+                            <input value={item.equipmentId || ''} onChange={(e) => handleItemChange(index, 'equipmentId', e.target.value)} className="border rounded px-2 py-1 text-xs w-52" placeholder="Equipment UUID" />
+                          ) : (
+                            <span className="text-xs font-mono text-gray-600">{item.equipmentId || '—'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {editMode ? (
+                            <input type="number" min="1" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} className="border rounded px-2 py-1 text-xs w-20" />
+                          ) : (
+                            item.quantity
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {editMode ? (
+                            <input type="number" step="0.01" value={item.unitPrice || ''} onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)} className="border rounded px-2 py-1 text-xs w-28" />
+                          ) : (
+                            item.unitPrice != null ? `${so.currency || ''} ${Number(item.unitPrice).toLocaleString()}` : '—'
+                          )}
+                        </td>
+                        <td className="px-4 py-2 font-medium">
+                          {item.lineTotal != null ? `${so.currency || ''} ${Number(item.lineTotal).toLocaleString()}` : '—'}
+                        </td>
+                        {editMode && (
+                          <td className="px-4 py-2">
+                            <button onClick={() => setEditItems((prev) => prev.filter((_, i) => i !== index))} className="text-xs text-red-600 hover:underline">Remove</button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
-          {items.length === 0 ? (
-            <p className="text-sm text-gray-400">No line items on this sales order.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {['Equipment ID', 'Qty', 'Unit Price', 'Line Total', editMode ? 'Action' : ''].filter(Boolean).map((h) => (
-                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map((item: any, index: number) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2">
-                        {editMode ? (
-                          <input value={item.equipmentId || ''} onChange={(e) => handleItemChange(index, 'equipmentId', e.target.value)} className="border rounded px-2 py-1 text-xs w-52" placeholder="Equipment UUID" />
-                        ) : (
-                          <span className="text-xs font-mono text-gray-600">{item.equipmentId || '—'}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        {editMode ? (
-                          <input type="number" min="1" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} className="border rounded px-2 py-1 text-xs w-20" />
-                        ) : (
-                          item.quantity
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        {editMode ? (
-                          <input type="number" step="0.01" value={item.unitPrice || ''} onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)} className="border rounded px-2 py-1 text-xs w-28" />
-                        ) : (
-                          item.unitPrice != null ? `${so.currency || ''} ${Number(item.unitPrice).toLocaleString()}` : '—'
-                        )}
-                      </td>
-                      <td className="px-4 py-2 font-medium">
-                        {item.lineTotal != null ? `${so.currency || ''} ${Number(item.lineTotal).toLocaleString()}` : '—'}
-                      </td>
-                      {editMode && (
-                        <td className="px-4 py-2">
-                          <button onClick={() => setEditItems((prev) => prev.filter((_, i) => i !== index))} className="text-xs text-red-600 hover:underline">Remove</button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-                {!editMode && items.length > 0 && (
-                  <tfoot>
-                    <tr className="bg-gray-50 font-semibold">
-                      <td colSpan={3} className="px-4 py-2 text-right text-sm text-gray-600">Total:</td>
-                      <td className="px-4 py-2 text-sm">{so.currency} {items.reduce((sum: number, i: any) => sum + (Number(i.lineTotal) || 0), 0).toLocaleString()}</td>
-                    </tr>
-                  </tfoot>
+
+          {/* Line Items Summary/Totals */}
+          {items.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Item Count</h3>
+                <p className="text-3xl font-bold text-gray-900">{items.length}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Quantity</h3>
+                <p className="text-3xl font-bold text-gray-900">{items.reduce((sum: number, i: any) => sum + (Number(i.quantity) || 0), 0)}</p>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg shadow p-6 border border-green-200">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Line Items Subtotal</h3>
+                <p className="text-3xl font-bold text-green-700">
+                  {so.currency} {items.reduce((sum: number, i: any) => sum + (Number(i.lineTotal) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                {so.totalAmount && (
+                  <div className="mt-3 pt-3 border-t border-green-200 text-xs text-gray-600">
+                    <p>SO Total Amount: <strong className="text-green-700">{so.currency} {Number(so.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
+                  </div>
                 )}
-              </table>
+              </div>
             </div>
           )}
         </div>

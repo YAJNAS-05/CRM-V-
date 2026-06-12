@@ -18,5 +18,5 @@ public interface BudgetLineRepository extends JpaRepository<BudgetLine, Long> {
     @Query("SELECT COALESCE(SUM(bl.budgetedAmount), 0) FROM BudgetLine bl WHERE bl.budget.id = ?1")
     BigDecimal getTotalBudgeted(Long budgetId);
 
-    List<BudgetLine> findByAccountId(UUID accountId);
+    List<BudgetLine> findByAccount_Id(UUID accountId);
 }

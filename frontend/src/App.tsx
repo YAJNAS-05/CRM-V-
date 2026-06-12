@@ -12,6 +12,9 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import OrganizationSetupPage from './pages/onboarding/OrganizationSetupPage'
 import UserProfilePage from './pages/profile/UserProfilePage'
+import MyAccessPage from './pages/rbac/MyAccessPage'
+import AccessDeniedPage from './pages/rbac/AccessDeniedPage'
+import { getFirstAuthorizedPath, getFirstDashboardPath } from './lib/rbacNavigation'
 import NotificationPanel from './components/NotificationPanel'
 
 // CRM Pages
@@ -50,6 +53,7 @@ import SparePartForm from './pages/spareparts/SparePartForm'
 import SupplierForm from './pages/suppliers/SupplierForm'
 import PurchaseOrderForm from './pages/purchaseorders/PurchaseOrderForm'
 import SalesOrderForm from './pages/salesorders/SalesOrderForm'
+import SalesOrderSettingsPage from './pages/salesorders/SalesOrderSettingsPage'
 import ShipmentForm from './pages/shipments/ShipmentForm'
 import WarrantyForm from './pages/warranties/WarrantyForm'
 import SubcontractorForm from './pages/subcontractors/SubcontractorForm'
@@ -88,6 +92,7 @@ import OperationsDashboardPage from './pages/dashboard/OperationsDashboardPage'
 import TechnicianDashboardPage from './pages/fieldwork/TechnicianDashboardPage'
 import { CustomReportBuilderPage } from './pages/reports/CustomReportBuilderPage'
 import { ReportListPage } from './pages/reports/ReportListPage'
+import { ReportDetailPage } from './pages/reports/ReportDetailPage'
 import { TemplateReportPage } from './pages/reports/TemplateReportPage'
 import AdminUsersPage from './pages/admin/users'
 import AdminRolesPage from './pages/admin/roles'
@@ -230,46 +235,6 @@ const inferRoutePermissions = (pathname: string): string[] => {
   return []
 }
 
-const getFirstDashboardPath = (permissions: string[], roles: string[] = []): string => {
-  const hasAdminAccess = roles.some((role) => HR_ADMIN_ROLES.includes(role))
-  if (!hasAdminAccess && roles.includes('MANAGER')) return '/dashboard/manager'
-  if (!hasAdminAccess && roles.includes('EMPLOYEE')) return '/employee'
-  if (permissions.includes('DASHBOARD_OPERATIONS_VIEW')) return '/dashboard/operations'
-  if (permissions.includes('DASHBOARD_FINANCE_VIEW')) return '/dashboard/finance'
-  if (permissions.includes('DASHBOARD_HR_VIEW')) return '/dashboard/hr'
-  if (permissions.includes('DASHBOARD_TECH_VIEW')) return '/dashboard/technician'
-  if (permissions.includes('DASHBOARD_TEAM_VIEW') || permissions.includes('DASHBOARD_SELF_VIEW')) return '/dashboard/crm'
-  if (permissions.includes('FIELDWORK_VIEW')) return '/dashboard/fieldwork'
-  if (permissions.includes('HR_VIEW')) return '/dashboard/employee'
-  return '/profile'
-}
-
-const getFirstAuthorizedPath = (permissions: string[], roles: string[] = []): string => {
-  if (
-    permissions.some((permission) =>
-      [
-        'DASHBOARD_TEAM_VIEW',
-        'DASHBOARD_SELF_VIEW',
-        'DASHBOARD_FINANCE_VIEW',
-        'DASHBOARD_HR_VIEW',
-        'DASHBOARD_TECH_VIEW',
-        'DASHBOARD_OPERATIONS_VIEW',
-        'FIELDWORK_VIEW',
-        'HR_VIEW'
-      ].includes(permission)
-    )
-  ) {
-    return getFirstDashboardPath(permissions, roles)
-  }
-  if (permissions.includes('CRM_VIEW')) return '/crm/accounts'
-  if (permissions.includes('ERP_VIEW')) return '/erp/equipment'
-  if (permissions.includes('HR_VIEW')) return '/hr'
-  if (permissions.includes('FINANCE_VIEW')) return '/finance/invoices'
-  if (permissions.includes('FIELDWORK_VIEW')) return '/fieldwork'
-  if (permissions.includes('REPORT_VIEW')) return '/reports'
-  return '/profile'
-}
-
 interface DashboardRouteResolverProps {
   basePath?: string
 }
@@ -339,6 +304,19 @@ const AuthSessionSync: React.FC = () => {
     let isMounted = true
     let refreshIntervalId: number | undefined
 
+    const syncCurrentUser = async (): Promise<boolean> => {
+      try {
+        const currentUser = await authApi.me()
+        if (isMounted && currentUser) {
+          setUser(currentUser)
+          return true
+        }
+      } catch {
+        // 401/403 are handled by the axios interceptor.
+      }
+      return false
+    }
+
     const refreshSession = async () => {
       if (!refreshToken) {
         return false
@@ -351,32 +329,23 @@ const AuthSessionSync: React.FC = () => {
           return true
         }
       } catch {
-        // Ignore token refresh failures; the interceptor handles auth errors.
+        if (isMounted) {
+          useAuthStore.getState().logout()
+        }
       }
 
       return false
     }
 
-    const syncCurrentUser = async () => {
-      try {
-        const currentUser = await authApi.me()
-        if (isMounted && currentUser) {
-          setUser(currentUser)
-        }
-      } catch {
-        // 401/403 are handled by the axios interceptor; ignore transient errors here.
-      }
-    }
-
     const initializeSession = async () => {
-      const refreshed = await refreshSession()
-      if (!refreshed) {
-        await syncCurrentUser()
+      const synced = await syncCurrentUser()
+      if (!synced) {
+        await refreshSession()
       }
     }
 
     const handleFocus = () => {
-      void refreshSession()
+      void syncCurrentUser()
     }
 
     void initializeSession()
@@ -384,7 +353,7 @@ const AuthSessionSync: React.FC = () => {
     window.addEventListener('focus', handleFocus)
     refreshIntervalId = window.setInterval(() => {
       void refreshSession()
-    }, 5 * 60 * 1000)
+    }, 15 * 60 * 1000)
 
     return () => {
       isMounted = false
@@ -425,14 +394,26 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         : false
 
     if (!hasPermissionAccess) {
-      return <Navigate to={getFirstAuthorizedPath(userPermissions, userRoles)} replace />
+      return (
+        <Navigate
+          to="/unauthorized"
+          replace
+          state={{ from: location.pathname, required: effectiveRequiredPermissions }}
+        />
+      )
     }
   }
 
   if (requiredRoles && requiredRoles.length > 0) {
     const hasRoleAccess = requiredRoles.some((role) => userRoles.includes(role))
     if (!hasRoleAccess) {
-      return <Navigate to={getFirstAuthorizedPath(userPermissions, userRoles)} replace />
+      return (
+        <Navigate
+          to="/unauthorized"
+          replace
+          state={{ from: location.pathname, required: requiredRoles }}
+        />
+      )
     }
   }
 
@@ -447,9 +428,13 @@ const AdminAccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const user = useAuthStore((state) => state.user)
   const { can, loading } = useLocalRBAC()
   const legacyPermissions = user?.permissions || []
-  const hasLegacyAdminAccess = ['ADMIN_VIEW', 'USER_VIEW', 'ROLE_VIEW'].some((permission) =>
-    legacyPermissions.includes(permission)
-  )
+  const hasLegacyAdminAccess = [
+    'USER_VIEW',
+    'ROLE_VIEW',
+    'SETTINGS_ADMIN_VIEW',
+    'SETTINGS_VIEW',
+    'ADMIN_VIEW',
+  ].some((permission) => legacyPermissions.includes(permission))
 
   if (loading && !hasLegacyAdminAccess) {
     return null
@@ -488,23 +473,15 @@ const NotFoundPage: React.FC = () => {
   )
 }
 
-const UnauthorizedPage: React.FC = () => {
+const UnauthorizedRoute: React.FC = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  if (!isAuthenticated) {
+    return <AccessDeniedPage />
+  }
   return (
-    <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-600">403</p>
-      <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Unauthorized</h1>
-      <p className="mt-2 text-sm text-slate-600">
-        You do not have permission to view this page.
-      </p>
-      <div className="mt-6">
-        <Link
-          to="/dashboard"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          Go to dashboard
-        </Link>
-      </div>
-    </div>
+    <Layout>
+      <AccessDeniedPage />
+    </Layout>
   )
 }
 
@@ -523,7 +500,7 @@ function App() {
         <Route path="/auth/callback" element={<OAuthCallbackPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedRoute />} />
         <Route
           path="/admin/rbac/users"
           element={<Navigate to="/admin/users" replace />}
@@ -542,6 +519,14 @@ function App() {
           element={
             <ProtectedRoute>
               <UserProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/access"
+          element={
+            <ProtectedRoute>
+              <MyAccessPage />
             </ProtectedRoute>
           }
         />
@@ -1189,6 +1174,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SalesOrderDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/erp/sales-orders-settings"
+          element={
+            <ProtectedRoute>
+              <SalesOrderSettingsPage />
             </ProtectedRoute>
           }
         />
@@ -2160,10 +2153,18 @@ function App() {
           }
         />
         <Route
+          path="/reports/view/:reportId"
+          element={
+            <ProtectedRoute>
+              <ReportDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/reports/:reportId"
           element={
             <ProtectedRoute>
-              <Navigate to="/reports" replace />
+              <ReportDetailPage />
             </ProtectedRoute>
           }
         />

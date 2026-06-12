@@ -8,6 +8,7 @@ import com.everx.auth.entity.RefreshToken;
 import com.everx.auth.entity.User;
 import com.everx.auth.repository.RefreshTokenRepository;
 import com.everx.auth.repository.UserRepository;
+import com.everx.config.DevAdminCredentials;
 import com.everx.shared.exception.EntityNotFoundException;
 import com.everx.shared.exception.ValidationException;
 import com.everx.shared.util.JwtTokenProvider;
@@ -28,9 +29,6 @@ import java.util.stream.Stream;
 @Transactional
 public class AuthService {
 
-    private static final String DEFAULT_ADMIN_EMAIL = "admin@everx.com";
-    private static final String DEFAULT_ADMIN_PASSWORD = "password123";
-
     @Value("${everx.local-auth.enable-default-admin:true}")
     private boolean enableDefaultAdmin;
 
@@ -47,18 +45,19 @@ public class AuthService {
     private PasswordEncoder passwordEncoder;
 
     public LoginResponse login(LoginRequest request) {
-        log.info("Login attempt for email: {}", request.getEmail());
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        log.info("Login attempt for email: {}", email);
+        maybeBootstrapDefaultAdmin(email, request.getPassword());
 
-        maybeBootstrapDefaultAdmin(request);
-
-        User user = userRepository.findByEmailWithRolesAndPermissions(request.getEmail())
+        User user = userRepository.findByEmailWithRolesAndPermissions(email)
                 .orElseThrow(() -> new ValidationException("Invalid email or password"));
 
         if (!user.getIsActive()) {
             throw new ValidationException("User account is not active");
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        boolean passwordMatches = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
+        if (!passwordMatches) {
             throw new ValidationException("Invalid email or password");
         }
 
@@ -218,21 +217,20 @@ public class AuthService {
                 .toList();
     }
 
-    private void maybeBootstrapDefaultAdmin(LoginRequest request) {
+    private void maybeBootstrapDefaultAdmin(String email, String password) {
         if (!enableDefaultAdmin) {
             return;
         }
-        if (request.getEmail() == null || request.getPassword() == null) {
+        if (email == null || email.isBlank() || password == null) {
             return;
         }
 
-        String email = request.getEmail().trim().toLowerCase();
-        if (!DEFAULT_ADMIN_EMAIL.equals(email) || !DEFAULT_ADMIN_PASSWORD.equals(request.getPassword())) {
+        if (!DevAdminCredentials.EMAIL.equals(email) || !DevAdminCredentials.PASSWORD.equals(password)) {
             return;
         }
 
         User user = userRepository.findByEmail(email).orElseGet(() -> User.builder()
-                .email(DEFAULT_ADMIN_EMAIL)
+                .email(DevAdminCredentials.EMAIL)
                 .fullName("Administrator")
                 .firstName("Admin")
                 .lastName("User")
@@ -243,7 +241,7 @@ public class AuthService {
                 .isDeleted(false)
                 .build());
 
-        user.setPasswordHash(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD));
+        user.setPasswordHash(passwordEncoder.encode(DevAdminCredentials.PASSWORD));
         user.setIsActive(true);
         user.setIsDeleted(false);
         if (user.getRole() == null) {

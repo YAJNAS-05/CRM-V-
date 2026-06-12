@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 /**
  * Wrapper around DynamicReportService that provides fallback mock data
@@ -55,18 +57,19 @@ public class ReportExecutionService {
         try {
             ReportDefinitionEntity def = reportDefService.getReport(reportId);
             
-            // Generate mock data based on report name
             List<Map<String, Object>> mockData = generateMockData(def.getReportName());
-            
+            List<ReportColumn> columns = buildColumnsFromRows(mockData);
+            Map<String, Object> aggregates = computeSimpleAggregates(mockData, columns);
+
             return ReportResult.builder()
                 .reportId(reportId)
                 .reportName(def.getReportName())
-                .columns(Collections.emptyList())
+                .columns(columns)
                 .rows(mockData)
                 .totalCount((long) mockData.size())
                 .page(request.getPage() != null ? request.getPage() : 0)
                 .pageSize(request.getPageSize() != null ? request.getPageSize() : 100)
-                .aggregates(new HashMap<>())
+                .aggregates(aggregates)
                 .chartData(Collections.emptyList())
                 .executedAt(LocalDateTime.now())
                 .durationMs(150L)
@@ -94,6 +97,22 @@ public class ReportExecutionService {
                 row.put("value", 50000 + i * 10000);
                 data.add(row);
             }
+        } else if (lowerName.contains("pipeline")) {
+            String[] stages = {
+                "Prospecting", "Qualification", "Proposal", "Negotiation", "Closed Won", "Closed Lost"
+            };
+            for (int i = 0; i < stages.length; i++) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                int deals = 8 + (int) (Math.random() * 20);
+                long value = 120000L + (long) (Math.random() * 450000);
+                row.put("stage", stages[i]);
+                row.put("dealCount", deals);
+                row.put("pipelineValue", value);
+                row.put("weightedValue", Math.round(value * (0.25 + i * 0.12)));
+                row.put("avgAgeDays", 5 + i * 4 + (int) (Math.random() * 10));
+                row.put("owner", "Rep " + ((char) ('A' + (i % 4))));
+                data.add(row);
+            }
         } else if (lowerName.contains("sales") || lowerName.contains("revenue")) {
             String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
             for (int i = 0; i < 12; i++) {
@@ -101,7 +120,7 @@ public class ReportExecutionService {
                 row.put("month", months[i]);
                 row.put("revenue", 100000 + (int) (Math.random() * 200000));
                 row.put("orders", 50 + (int) (Math.random() * 150));
-                row.put("growth", (Math.random() * 50 - 10));
+                row.put("growth", Math.round((Math.random() * 50 - 10) * 10.0) / 10.0);
                 data.add(row);
             }
         } else if (lowerName.contains("warranty") || lowerName.contains("service")) {
@@ -139,5 +158,78 @@ public class ReportExecutionService {
         }
 
         return data;
+    }
+
+    private List<ReportColumn> buildColumnsFromRows(List<Map<String, Object>> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<ReportColumn> columns = new ArrayList<>();
+        int order = 0;
+        for (String key : rows.get(0).keySet()) {
+            Object sample = rows.get(0).get(key);
+            String dataType = inferDataType(sample, key);
+            columns.add(ReportColumn.builder()
+                    .columnId(key)
+                    .field(key)
+                    .label(formatColumnLabel(key))
+                    .dataType(dataType)
+                    .visible(true)
+                    .sortable(true)
+                    .aggregatable("NUMBER".equals(dataType) || "CURRENCY".equals(dataType))
+                    .displayOrder(order++)
+                    .width("CURRENCY".equals(dataType) || "NUMBER".equals(dataType) ? 140 : 180)
+                    .alignment("NUMBER".equals(dataType) || "CURRENCY".equals(dataType) ? "RIGHT" : "LEFT")
+                    .build());
+        }
+        return columns;
+    }
+
+    private String inferDataType(Object value, String key) {
+        String lowerKey = key == null ? "" : key.toLowerCase(Locale.ROOT);
+        if (lowerKey.contains("revenue")
+                || lowerKey.contains("value")
+                || lowerKey.contains("amount")
+                || lowerKey.contains("cost")
+                || lowerKey.contains("price")) {
+            return "CURRENCY";
+        }
+        if (value instanceof Number) {
+            return lowerKey.contains("count") || lowerKey.contains("qty") || lowerKey.contains("orders")
+                    ? "NUMBER"
+                    : "NUMBER";
+        }
+        if (value instanceof Boolean) {
+            return "BOOLEAN";
+        }
+        return "STRING";
+    }
+
+    private String formatColumnLabel(String key) {
+        String spaced = key.replaceAll("([a-z])([A-Z])", "$1 $2").replace('_', ' ');
+        String[] parts = spaced.split("\\s+");
+        return Arrays.stream(parts)
+                .filter(part -> !part.isBlank())
+                .map(part -> part.substring(0, 1).toUpperCase() + part.substring(1).toLowerCase())
+                .collect(Collectors.joining(" "));
+    }
+
+    private Map<String, Object> computeSimpleAggregates(List<Map<String, Object>> rows, List<ReportColumn> columns) {
+        Map<String, Object> aggregates = new LinkedHashMap<>();
+        for (ReportColumn column : columns) {
+            if (!column.isAggregatable()) {
+                continue;
+            }
+            String field = column.getField();
+            double sum = rows.stream()
+                    .map(row -> row.get(field))
+                    .filter(Number.class::isInstance)
+                    .mapToDouble(v -> ((Number) v).doubleValue())
+                    .sum();
+            aggregates.put(field + "_sum", Math.round(sum * 100.0) / 100.0);
+        }
+        aggregates.put("recordCount", rows.size());
+        return aggregates;
     }
 }

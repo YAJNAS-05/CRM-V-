@@ -145,6 +145,35 @@ export const ReportViewer = ({
         onDateToChange={setDateTo}
       />
 
+      {resultData?.aggregates && Object.keys(resultData.aggregates).length > 0 && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Object.entries(resultData.aggregates)
+            .filter(([key]) => !key.endsWith('_sum') || key.includes('Value') || key.includes('revenue'))
+            .slice(0, 4)
+            .map(([key, value]) => (
+              <div
+                key={key}
+                className="rounded-lg border border-border bg-card px-3 py-2"
+              >
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  {key.replace(/_sum$/, '').replace(/([A-Z])/g, ' $1')}
+                </p>
+                <p className="text-lg font-semibold text-foreground">
+                  {typeof value === 'number'
+                    ? key.toLowerCase().includes('count')
+                      ? value.toLocaleString()
+                      : new Intl.NumberFormat('en-AU', {
+                          style: key.toLowerCase().includes('count') ? 'decimal' : 'currency',
+                          currency: 'AUD',
+                          maximumFractionDigits: 0,
+                        }).format(value)
+                    : String(value)}
+                </p>
+              </div>
+            ))}
+        </div>
+      )}
+
       {/* Main content */}
       <ReportTable
         columns={visibleColumns}

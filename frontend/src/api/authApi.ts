@@ -25,9 +25,11 @@ export const authApi = {
   },
 
   refreshToken: async (refreshToken: string): Promise<LoginResponse | null> => {
-    const response = await axiosInstance.post<ApiResponse<LoginResponse>>('/v1/auth/refresh', {
-      refreshToken,
-    })
+    const response = await axiosInstance.post<ApiResponse<LoginResponse>>(
+      '/v1/auth/refresh',
+      { refreshToken },
+      { _silent: true } as object,
+    )
     return response.data?.data || null
   },
 

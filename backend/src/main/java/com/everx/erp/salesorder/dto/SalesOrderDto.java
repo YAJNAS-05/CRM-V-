@@ -27,6 +27,27 @@ public class SalesOrderDto {
     private String destinationCountry;
     private String notes;
     private List<SalesOrderItemDto> items;
+    private AccountSummaryDto customerDetails;  // Customer information for display
     private Instant createdAt;
     private Instant updatedAt;
+
+    /**
+     * Summary of account/customer details for display in SO context
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AccountSummaryDto {
+        private UUID id;
+        private String name;
+        private String email;
+        private String phone;
+        private String billingStreet;
+        private String billingCity;
+        private String billingState;
+        private String billingZip;
+        private String billingCountry;
+        private String industry;
+        private String website;
+    }
 }

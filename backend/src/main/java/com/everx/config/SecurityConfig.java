@@ -96,7 +96,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.PUT, "/api/field-jobs/**", "/api/field-jobs-test/**").hasAnyAuthority("FIELDWORK_EDIT")
                     .requestMatchers(HttpMethod.PATCH, "/api/field-jobs/**", "/api/field-jobs-test/**").hasAnyAuthority("FIELDWORK_EDIT")
                     .requestMatchers(HttpMethod.DELETE, "/api/field-jobs/**", "/api/field-jobs-test/**").hasAnyAuthority("FIELDWORK_EDIT")
-                    .requestMatchers("/api/v1/reports/**").hasAuthority("REPORT_VIEW")
+                    .requestMatchers("/api/v1/reports/**", "/api/v1/custom-reports/**").hasAuthority("REPORT_VIEW")
                     .requestMatchers(HttpMethod.GET, "/api/pm/**").hasAnyAuthority("PM_VIEW", "PM_CREATE", "PM_EDIT", "PM_DELETE")
                     .requestMatchers(HttpMethod.POST, "/api/pm/**").hasAnyAuthority("PM_CREATE", "PM_EDIT")
                     .requestMatchers(HttpMethod.PUT, "/api/pm/**").hasAnyAuthority("PM_EDIT")

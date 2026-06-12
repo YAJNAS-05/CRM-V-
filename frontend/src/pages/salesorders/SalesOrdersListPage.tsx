@@ -98,6 +98,13 @@ export default function SalesOrdersListPage() {
           >
             Export
           </button>
+          <button
+            onClick={() => navigate('/erp/sales-orders-settings')}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+            title="Configure SO numbering patterns and settings"
+          >
+            ⚙️ Settings
+          </button>
           <FeatureGate requiredPermission="ERP_CREATE">
             <button onClick={() => navigate('/erp/sales-orders/new')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create SO</button>
           </FeatureGate>

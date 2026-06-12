@@ -6,6 +6,7 @@ import com.everx.auth.repository.RoleRepository;
 import com.everx.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -31,15 +32,25 @@ public class AdminUserInitializer implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfiles;
+
     @Override
     @Transactional
     public void run(ApplicationArguments args) throws Exception {
         try {
-            String adminEmail = "admin@everx.com";
-            
-            // Check if admin user already exists
-            if (userRepository.findByEmail(adminEmail).isPresent()) {
-                log.info("Admin user already exists: {}", adminEmail);
+            String adminEmail = DevAdminCredentials.EMAIL;
+
+            var existingAdmin = userRepository.findByEmail(adminEmail);
+            if (existingAdmin.isPresent()) {
+                if (usesH2Profile()) {
+                    User admin = existingAdmin.get();
+                    admin.setPasswordHash(passwordEncoder.encode(DevAdminCredentials.PASSWORD));
+                    userRepository.save(admin);
+                    log.info("Admin password synced for H2 local dev: {}", adminEmail);
+                } else {
+                    log.info("Admin user already exists: {}", adminEmail);
+                }
                 return;
             }
 
@@ -54,7 +65,7 @@ public class AdminUserInitializer implements ApplicationRunner {
             adminUser.setFirstName("Admin");
             adminUser.setLastName("User");
             adminUser.setFullName("Admin User");
-            adminUser.setPasswordHash(passwordEncoder.encode("Admin@123!"));
+            adminUser.setPasswordHash(passwordEncoder.encode(DevAdminCredentials.PASSWORD));
             adminUser.setRole(User.UserRole.ADMIN);
             adminUser.setIsActive(true);
             adminUser.setIsDeleted(false);
@@ -76,5 +87,9 @@ public class AdminUserInitializer implements ApplicationRunner {
             log.error("Error initializing admin user", e);
             throw e;
         }
+    }
+
+    private boolean usesH2Profile() {
+        return activeProfiles != null && activeProfiles.contains("h2");
     }
 }

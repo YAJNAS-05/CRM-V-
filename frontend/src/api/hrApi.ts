@@ -474,11 +474,38 @@ export const appraisalGoalApi = {
     axiosInstance.delete<ApiResponse<void>>(`/v1/hr/appraisal/goals/${id}`),
 }
 
+type HrProjectMember = {
+  id: string
+  projectId: string
+  employeeId: string
+  role: string
+  addedAt: string
+}
+
+type HrProjectDetail = {
+  project: Record<string, any>
+  members: HrProjectMember[]
+  tasks: any[]
+  costs: any[]
+  totalLaborHours: number
+  actualCost: number
+  profitability: number
+  profitMargin: number
+}
+
 export const hrProjectApi = {
   getAll: (page = 0, size = 20) =>
     axiosInstance.get<ApiResponse<Page<HrProjectRecord>>>(`/v1/hr/projects?${buildQueryString(page, size)}`),
+  getById: (id: string) =>
+    axiosInstance.get<ApiResponse<HrProjectDetail>>(`/v1/hr/projects/${id}`),
   create: (data: { projectName: string; projectCode?: string; description?: string; status?: string }) =>
     axiosInstance.post<ApiResponse<HrProjectRecord>>('/v1/hr/projects', data),
+  addMember: (projectId: string, data: { employeeId: string; role: string }) =>
+    axiosInstance.post<ApiResponse<HrProjectMember>>(`/v1/hr/projects/${projectId}/members`, data),
+  updateMemberRole: (projectId: string, employeeId: string, role: string) =>
+    axiosInstance.post<ApiResponse<HrProjectMember>>(`/v1/hr/projects/${projectId}/members`, { employeeId, role }),
+  removeMember: (projectId: string, employeeId: string) =>
+    axiosInstance.delete<ApiResponse<void>>(`/v1/hr/projects/${projectId}/members/${employeeId}`),
 }
 
 export const hrTaskApi = {

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { reportApi } from '@/api/reportApi'
 
 interface Template {
   id: string
@@ -73,19 +74,27 @@ export const TemplateReportPage = () => {
 
   const handleUseTemplate = async (templateName: string) => {
     try {
-      // Create report from template via API
-      const templateId = TEMPLATES.find(t => t.name === templateName)?.id
-      if (!templateId) {
+      const template = TEMPLATES.find((t) => t.name === templateName)
+      if (!template) {
         toast.error('Template not found')
         return
       }
-      
-      // Navigate to report builder with template pre-selected
-      navigate(`/reports/builder?template=${templateId}`)
-      toast.success(`Report created from template: ${templateName}`)
+
+      const response = await reportApi.listReports(undefined, 0, 100)
+      const page = response.data?.data as { content?: Array<{ reportId: number; reportKey?: string }> } | undefined
+      const catalog = page?.content || []
+
+      const match = catalog.find((row) => row.reportKey === template.id)
+      if (match?.reportId) {
+        navigate(`/reports/view/${match.reportId}`)
+        toast.success(`Opened template: ${templateName}`)
+        return
+      }
+
+      toast.error('Template report is not seeded yet. Restart the backend to load the catalog.')
     } catch (error) {
-      console.error('Error creating report from template:', error)
-      toast.error('Failed to create report from template')
+      console.error('Error opening template report:', error)
+      toast.error('Failed to open template report')
     }
   }
 
@@ -100,10 +109,10 @@ export const TemplateReportPage = () => {
   return (
     <div className="space-y-4">
       <button
-        onClick={() => navigate('/reports/builder')}
+        onClick={() => navigate('/reports')}
         className="text-sm text-muted-foreground hover:text-foreground"
       >
-        ← Back to Builder
+        ← Back to Reports
       </button>
 
       <div className="space-y-6">

@@ -332,3 +332,12 @@ export const serviceTicketApi = {
   delete: async (id: string) =>
     axiosInstance.delete(`/v1/erp/service-tickets/${id}`),
 }
+
+export const settingsApi = {
+  getNumberingPattern: async (documentType: string) =>
+    axiosInstance.get(`/v1/erp/settings/numbering-pattern/${documentType}`),
+  saveNumberingPattern: async (documentType: string, data: any) =>
+    axiosInstance.post(`/v1/erp/settings/numbering-pattern/${documentType}`, data),
+  previewNumberingPattern: async (documentType: string, data: any) =>
+    axiosInstance.post(`/v1/erp/settings/numbering-pattern/${documentType}/preview`, data),
+}

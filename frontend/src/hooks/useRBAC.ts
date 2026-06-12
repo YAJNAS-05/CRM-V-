@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { adminApi } from "@/api/adminApi";
+import { hasMatrixPermission } from "@/lib/rbacMatrixBridge";
 
 type Permission = { module: string; action: string };
 
@@ -24,13 +25,17 @@ export function usePermissions() {
   const permissions = useMemo(() => parsePermissions(rawPermissions), [rawPermissions]);
 
   const can = useMemo(
-    () => (module: string, action: string) =>
-      permissions.some(
+    () => (module: string, action: string) => {
+      if (hasMatrixPermission(rawPermissions, module, action)) {
+        return true;
+      }
+      return permissions.some(
         (p) =>
           p.module.toLowerCase() === module.toLowerCase() &&
           p.action.toLowerCase() === action.toLowerCase(),
-      ),
-    [permissions],
+      );
+    },
+    [permissions, rawPermissions],
   );
 
   return { permissions, can, loading: false };

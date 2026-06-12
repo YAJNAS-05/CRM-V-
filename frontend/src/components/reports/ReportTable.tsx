@@ -64,15 +64,37 @@ export const ReportTable = ({
     }
   }
 
-  const totalPages = Math.ceil(totalCount / pageSize)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const displayColumns =
+    columns.length > 0
+      ? columns
+      : rows.length > 0
+        ? Object.keys(rows[0]).map((key, index) => ({
+            columnId: key,
+            field: key,
+            label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()),
+            dataType: typeof rows[0][key] === 'number' ? 'NUMBER' : 'STRING',
+            visible: true,
+            sortable: true,
+            aggregatable: typeof rows[0][key] === 'number',
+            displayOrder: index,
+            width: 150,
+            alignment: typeof rows[0][key] === 'number' ? 'RIGHT' : 'LEFT',
+          }))
+        : []
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-auto rounded-lg border border-border">
+      {displayColumns.length === 0 && !isLoading ? (
+        <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+          No data returned for this report.
+        </div>
+      ) : (
+      <div className="overflow-auto rounded-lg border border-border max-h-[28rem]">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 sticky top-0">
+          <thead className="bg-muted/50 sticky top-0 z-10">
             <tr>
-              {columns.map(col => (
+              {displayColumns.map(col => (
                 <th
                   key={col.columnId}
                   style={{ width: col.width || 150, minWidth: 80 }}
@@ -99,7 +121,7 @@ export const ReportTable = ({
             {isLoading
               ? Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    {columns.map(col => (
+                    {displayColumns.map(col => (
                       <td key={col.columnId} className="px-3 py-2">
                         <div className="h-4 bg-muted rounded w-3/4" />
                       </td>
@@ -111,14 +133,14 @@ export const ReportTable = ({
                     key={idx}
                     className="border-b border-border/50 hover:bg-muted/30 transition-colors"
                   >
-                    {columns.map(col => (
+                    {displayColumns.map(col => (
                       <td
                         key={col.columnId}
                         className={`px-3 py-2 text-sm
                           ${col.alignment === 'RIGHT' ? 'text-right' : ''}
                           ${col.alignment === 'CENTER' ? 'text-center' : ''}`}
                       >
-                        {formatValue(row[col.columnId], col)}
+                        {formatValue(row[col.field] ?? row[col.columnId], col)}
                       </td>
                     ))}
                   </tr>
@@ -127,6 +149,7 @@ export const ReportTable = ({
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">

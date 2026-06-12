@@ -13,7 +13,7 @@ type CrmDetailHeroProps = {
   title: string
   subtitle: string
   avatarText?: string
-  badges?: string[]
+  badges?: ReactNode[]
   actions?: ReactNode
   metrics?: CrmDetailMetric[]
 }
@@ -49,8 +49,8 @@ export default function CrmDetailHero({
                 <p className="mt-2 text-sm leading-6 text-slate-600 md:text-[15px]">{subtitle}</p>
                 {badges.length > 0 ? (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {badges.map((badge) => (
-                      <span key={badge} className="pm-badge bg-white/85 text-slate-700 ring-1 ring-slate-200">
+                    {badges.map((badge, index) => (
+                      <span key={typeof badge === 'string' ? badge : `badge-${index}`} className="pm-badge bg-white/85 text-slate-700 ring-1 ring-slate-200">
                         {badge}
                       </span>
                     ))}

@@ -6,10 +6,11 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 public interface GlRevaluationRepository extends JpaRepository<GlRevaluation, Long> {
-    List<GlRevaluation> findByAccountIdOrderByRevaluationDateDesc(Long accountId);
+    List<GlRevaluation> findByAccount_IdOrderByRevaluationDateDesc(UUID accountId);
 
     List<GlRevaluation> findByRevaluationDateBetween(LocalDate startDate, LocalDate endDate);
 

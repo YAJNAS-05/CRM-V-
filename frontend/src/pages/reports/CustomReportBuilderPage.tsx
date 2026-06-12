@@ -272,7 +272,8 @@ const panelLabel: Record<Exclude<PanelMode, 'add'>, string> = {
 
 const CUSTOM_REPORTS_AVAILABLE =
   import.meta.env.VITE_ENABLE_CUSTOM_REPORTS_API === 'true' ||
-  import.meta.env.VITE_ENABLE_CUSTOM_REPORTS_DRAFT_MODE === 'true'
+  import.meta.env.VITE_ENABLE_CUSTOM_REPORTS_DRAFT_MODE === 'true' ||
+  import.meta.env.DEV
 
 export const CustomReportBuilderPage: React.FC = () => {
   const { reportId } = useParams<{ reportId?: string }>()
@@ -1178,13 +1179,30 @@ export const CustomReportBuilderPage: React.FC = () => {
   const showGrid =
     reportConfig.showGrid === 'always' || (reportConfig.showGrid === 'snap' && !previewMode)
 
-  const canvasStyle: React.CSSProperties = showGrid
-    ? {
-        backgroundImage:
-          'linear-gradient(to right, rgba(148,163,184,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.18) 1px, transparent 1px)',
-        backgroundSize: '24px 24px',
-      }
-    : {}
+  const canvasLayout = useMemo(() => {
+    const [ratioWidth, ratioHeight] = (reportConfig.canvasSize || '16:9')
+      .split(':')
+      .map((value) => Number(value) || 1)
+    const landscape = reportConfig.displayMode !== 'portrait'
+    const widthUnits = landscape ? ratioWidth : ratioHeight
+    const heightUnits = landscape ? ratioHeight : ratioWidth
+    return {
+      aspectRatio: `${widthUnits} / ${heightUnits}`,
+      minHeight: landscape ? 520 : 680,
+    }
+  }, [reportConfig.canvasSize, reportConfig.displayMode])
+
+  const canvasStyle: React.CSSProperties = {
+    ...(showGrid
+      ? {
+          backgroundImage:
+            'linear-gradient(to right, rgba(148,163,184,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.18) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }
+      : {}),
+    aspectRatio: canvasLayout.aspectRatio,
+    minHeight: canvasLayout.minHeight,
+  }
 
   if (loading) {
     return (
@@ -1195,9 +1213,9 @@ export const CustomReportBuilderPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="px-6 py-3 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-100 -mx-4 -my-4 md:-mx-6 md:-my-6 lg:-mx-8 lg:-my-8">
+      <div className="bg-white border-b border-slate-200 sticky top-16 z-20 shadow-sm">
+        <div className="px-4 py-3 md:px-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex-1 max-w-2xl">
             <input
               type="text"
@@ -1221,8 +1239,9 @@ export const CustomReportBuilderPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
               onClick={() => navigate('/reports')}
               className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
             >
@@ -1250,6 +1269,7 @@ export const CustomReportBuilderPage: React.FC = () => {
             )}
 
             <button
+              type="button"
               onClick={() => setPanelMode('add')}
               className="inline-flex items-center gap-2 px-4 py-2 text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50"
             >
@@ -1293,7 +1313,7 @@ export const CustomReportBuilderPage: React.FC = () => {
       <div className="px-6 py-4">
         <div className="grid grid-cols-12 gap-4 min-h-[calc(100vh-170px)]">
           <div className="col-span-12 xl:col-span-9">
-            <div className="bg-slate-200/70 border border-slate-300 rounded-xl min-h-[680px] p-6" style={canvasStyle}>
+            <div className="bg-slate-200/70 border border-slate-300 rounded-xl w-full p-4 md:p-6" style={canvasStyle}>
               {report.widgets.length === 0 ? (
                 <div className="h-full min-h-[620px] flex items-center justify-center">
                   <div className="text-center text-slate-500">
@@ -1515,8 +1535,9 @@ export const CustomReportBuilderPage: React.FC = () => {
 
           <div className="col-span-12 xl:col-span-3">
             <div className="flex min-h-[680px] h-full">
-              <div className="w-12 bg-white border border-r-0 rounded-l-xl py-3 flex flex-col items-center gap-2">
+              <div className="w-12 shrink-0 bg-white border border-r-0 rounded-l-xl py-3 flex flex-col items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setPanelMode('configure')}
                   className={`p-2 rounded-lg ${panelMode === 'configure' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100'}`}
                   title="Widget Configuration"

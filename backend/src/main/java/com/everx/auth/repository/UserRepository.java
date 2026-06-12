@@ -16,13 +16,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
-    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar LEFT JOIN FETCH ar.permissions WHERE u.email = :email AND u.isDeleted = false")
+    // Role.permissions is EAGER — fetch only assignedRoles here to avoid Hibernate fetch join conflicts.
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar WHERE u.email = :email AND u.isDeleted = false")
     Optional<User> findByEmailWithRolesAndPermissions(@Param("email") String email);
 
-    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar LEFT JOIN FETCH ar.permissions WHERE u.id = :userId AND u.isDeleted = false")
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar WHERE u.id = :userId AND u.isDeleted = false")
     Optional<User> findByIdWithRolesAndPermissions(@Param("userId") UUID userId);
 
-    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar LEFT JOIN FETCH ar.permissions WHERE u.authId = :authId AND u.isDeleted = false")
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.assignedRoles ar WHERE u.authId = :authId AND u.isDeleted = false")
     Optional<User> findByAuthIdWithRolesAndPermissions(@Param("authId") UUID authId);
 
     @Query("SELECT DISTINCT u FROM User u LEFT JOIN u.assignedRoles ar WHERE u.isDeleted = false ORDER BY u.createdAt DESC")

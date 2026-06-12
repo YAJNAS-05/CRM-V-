@@ -145,8 +145,8 @@ public class GlRevaluationService {
     /**
      * Get revaluation history for an account
      */
-    public List<GlRevaluation> getRevaluationHistory(Long accountId) {
-        return revaluationRepository.findByAccountIdOrderByRevaluationDateDesc(accountId);
+    public List<GlRevaluation> getRevaluationHistory(UUID accountId) {
+        return revaluationRepository.findByAccount_IdOrderByRevaluationDateDesc(accountId);
     }
 
     /**

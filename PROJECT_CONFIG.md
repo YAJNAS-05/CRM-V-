@@ -53,7 +53,7 @@ When the backend runs for the very first time on a fresh PostgreSQL instance, it
 
 - **Login URL**: `http://localhost:5173/login`
 - **Admin Email**: `admin@everx.com`
-- **Admin Password**: `Admin@123!`
+- **Admin Password**: `password123` (local H2 dev; see `DevAdminCredentials`)
 - **Role Permissions Provided**: `SUPER_ADMIN` (Highest priority hierarchy)
 
 ---

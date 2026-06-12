@@ -1,5 +1,7 @@
 package com.everx.erp.salesorder;
 
+import com.everx.crm.account.Account;
+import com.everx.crm.account.AccountRepository;
 import com.everx.erp.equipment.Equipment;
 import com.everx.erp.equipment.CommercialStatus;
 import com.everx.erp.equipment.PhysicalStatus;
@@ -8,6 +10,7 @@ import com.everx.erp.equipment.EquipmentStatus;
 import com.everx.erp.logistics.Shipment;
 import com.everx.erp.logistics.ShipmentRepository;
 import com.everx.erp.numbering.DocumentNumberGenerator;
+import com.everx.erp.settings.NumberingPatternService;
 import com.everx.erp.workflow.SalesOrderWorkflowOrchestrator;
 import com.everx.finance.invoice.Invoice;
 import com.everx.finance.invoice.InvoiceRepository;
@@ -36,8 +39,10 @@ public class SalesOrderService {
     private final EquipmentRepository equipmentRepository;
     private final ShipmentRepository shipmentRepository;
     private final InvoiceRepository invoiceRepository;
+    private final AccountRepository accountRepository;
     private final SagaOrchestrator sagaOrchestrator;
     private final DocumentNumberGenerator documentNumberGenerator;
+    private final NumberingPatternService numberingPatternService;
     private final SalesOrderWorkflowOrchestrator salesOrderWorkflowOrchestrator;
 
     @Transactional
@@ -302,7 +307,13 @@ public class SalesOrderService {
     }
 
     private String generateSalesOrderNumber() {
-        return documentNumberGenerator.generate("SO", candidate -> salesOrderRepository.findBySoNumber(candidate).isPresent());
+        try {
+            // Use configurable numbering pattern if available
+            return numberingPatternService.generateNumber("SALES_ORDER");
+        } catch (Exception e) {
+            // Fallback to DocumentNumberGenerator if pattern not configured yet
+            return documentNumberGenerator.generate("SO", candidate -> salesOrderRepository.findBySoNumber(candidate).isPresent());
+        }
     }
 
     private SalesOrderDto toDto(SalesOrder so) {
@@ -322,6 +333,26 @@ public class SalesOrderService {
         dto.setNotes(so.getNotes());
         dto.setCreatedAt(so.getCreatedAt().toInstant());
         dto.setUpdatedAt(so.getUpdatedAt().toInstant());
+
+        // Fetch and include customer details
+        if (so.getAccountId() != null) {
+            Account account = accountRepository.findById(so.getAccountId()).orElse(null);
+            if (account != null) {
+                SalesOrderDto.AccountSummaryDto customerSummary = new SalesOrderDto.AccountSummaryDto();
+                customerSummary.setId(account.getId());
+                customerSummary.setName(account.getName());
+                customerSummary.setEmail(account.getEmail());
+                customerSummary.setPhone(account.getPhone());
+                customerSummary.setBillingStreet(account.getBillingStreet());
+                customerSummary.setBillingCity(account.getBillingCity());
+                customerSummary.setBillingState(account.getBillingState());
+                customerSummary.setBillingZip(account.getBillingZip());
+                customerSummary.setBillingCountry(account.getBillingCountry());
+                customerSummary.setIndustry(account.getIndustry());
+                customerSummary.setWebsite(account.getWebsite());
+                dto.setCustomerDetails(customerSummary);
+            }
+        }
 
         if (so.getItems() != null) {
             List<SalesOrderItemDto> itemDtos = so.getItems().stream()

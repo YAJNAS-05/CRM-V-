@@ -9,6 +9,10 @@ import { useAuthStore } from '../../store/authStore'
 import CrmDetailHero from '../../components/crm/CrmDetailHero'
 import { FeatureGate } from '../../components/rbac'
 import { toast } from 'sonner'
+import CompletionStatusBadge from '../../components/forms/CompletionStatusBadge'
+import { deriveCompletionStatus } from '../../lib/formCompletion'
+
+const ACCOUNT_REQUIRED_FIELDS = ['name', 'email', 'phone', 'industry', 'accountType'] as const
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Account name is required'),
@@ -66,6 +70,8 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
       }
 
       setAccount(current)
+      const completion = deriveCompletionStatus(current, [...ACCOUNT_REQUIRED_FIELDS])
+      setIsEditing(isNew || completion === 'PENDING')
       reset({
         name: current.name,
         email: current.email,
@@ -115,6 +121,14 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
       } else {
         await accountApi.update(id!, data)
         toast.success('Account updated')
+        const completion = deriveCompletionStatus(data, [...ACCOUNT_REQUIRED_FIELDS])
+        if (completion === 'PENDING') {
+          await fetchAccount()
+          return
+        }
+        setIsEditing(false)
+        await fetchAccount()
+        return
       }
       navigate('/crm/accounts')
     } catch (error: any) {
@@ -146,6 +160,7 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
   if (!isEditing && account) {
     const openDeals = deals.filter((deal) => !['CLOSED_WON', 'CLOSED_LOST'].includes(deal.stage)).length
     const weightedPipeline = deals.reduce((sum, deal) => sum + (deal.expectedRevenueWeighted || 0), 0)
+    const recordCompletion = deriveCompletionStatus(account, [...ACCOUNT_REQUIRED_FIELDS])
 
     return (
       <div className="space-y-6">
@@ -155,12 +170,19 @@ const AccountDetailPage: React.FC<AccountDetailPageProps> = ({ isNew = false }) 
           title={account.name}
           subtitle={[account.industry, account.accountType].filter(Boolean).join(' · ') || 'Customer account profile and commercial context.'}
           avatarText={account.name?.[0]}
-          badges={[account.industry || 'Industry pending', account.accountType || 'Type pending', `${contacts.length} contacts`]}
+          badges={[
+            <CompletionStatusBadge key="completion" status={recordCompletion} />,
+            account.industry || 'Industry pending',
+            account.accountType || 'Type pending',
+            `${contacts.length} contacts`,
+          ]}
           actions={
             <>
+              {recordCompletion === 'COMPLETED' && (
               <FeatureGate requiredPermission="CRM_EDIT">
                 <button onClick={() => setIsEditing(true)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Edit</button>
               </FeatureGate>
+              )}
               <FeatureGate requiredPermission="CRM_DELETE">
                 <button onClick={handleDelete} className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50">Delete</button>
               </FeatureGate>

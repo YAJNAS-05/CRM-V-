@@ -96,7 +96,7 @@ public class UserDto {
             .role(primaryRole)
             .roles(roleNames.stream().toList())
             .permissions(permissions)
-                .officeLocation(user.getOfficeLocation().name())
+                .officeLocation(user.getOfficeLocation() != null ? user.getOfficeLocation().name() : null)
                 .isActive(user.getIsActive())
                 .lastLogin(user.getLastLogin())
                 .avatarUrl(user.getAvatarUrl())

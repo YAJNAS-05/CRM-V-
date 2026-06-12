@@ -19,6 +19,8 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.H2Dialect
+        hbm2ddl:
+          create_namespaces: true
 
   h2:
     console:
@@ -29,6 +31,8 @@ spring:
     enabled: false
 
 everx:
+  reporting:
+    allow-mock-fallback: true
   jwt:
     access-expiry-ms: 28800000
 

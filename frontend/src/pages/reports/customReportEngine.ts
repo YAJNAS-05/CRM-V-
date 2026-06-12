@@ -47,6 +47,7 @@ export const KNOWN_DATA_SOURCES = [
   { value: '/v1/crm/deals', label: 'CRM Deals' },
   { value: '/v1/crm/reports/pipeline', label: 'CRM Pipeline' },
   { value: '/v1/crm/reports/conversion', label: 'CRM Conversion' },
+  { value: '/v1/erp/service-tickets', label: 'Service Tickets' },
   { value: '/field-jobs', label: 'Field Jobs' },
 ]
 

@@ -1,6 +1,8 @@
 spring:
   application:
     name: everx-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:h2}
   main:
     allow-bean-definition-overriding: true
     allow-circular-references: true

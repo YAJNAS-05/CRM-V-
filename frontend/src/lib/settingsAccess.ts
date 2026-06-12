@@ -3,6 +3,10 @@ import type { User } from '../types'
 const ADMIN_SETTINGS_PERMISSIONS = new Set([
   'SETTINGS_ADMIN_VIEW',
   'SETTINGS_ADMIN_EDIT',
+  'SETTINGS_VIEW',
+  'SETTINGS_EDIT',
+  'USER_VIEW',
+  'ROLE_VIEW',
 ])
 
 const ADMIN_ROLES = new Set(['SUPER_ADMIN', 'ADMIN'])

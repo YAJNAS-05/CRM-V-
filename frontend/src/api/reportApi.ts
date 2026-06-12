@@ -3,6 +3,8 @@ import axiosInstance from './axiosInstance'
 
 export interface ReportDefinition {
   reportId: number
+  reportKey?: string
+  reportType?: string
   reportName: string
   module: string
   description: string
@@ -116,7 +118,8 @@ const shouldUseCustomReportFallback = (error: any) => {
   return !status || [400, 401, 403, 404, 500, 501, 503, 504].includes(status)
 }
 
-const ENABLE_CUSTOM_REPORTS_API = import.meta.env.VITE_ENABLE_CUSTOM_REPORTS_API === 'true'
+const ENABLE_CUSTOM_REPORTS_API =
+  import.meta.env.VITE_ENABLE_CUSTOM_REPORTS_API === 'true' || import.meta.env.DEV
 let customReportsApiStatus: 'unknown' | 'available' | 'unavailable' =
   ENABLE_CUSTOM_REPORTS_API ? 'unknown' : 'unavailable'
 

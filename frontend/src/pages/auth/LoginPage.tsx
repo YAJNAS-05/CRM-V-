@@ -176,6 +176,13 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
+          {import.meta.env.DEV && (
+            <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs text-slate-600">
+              Local dev: <span className="font-mono">admin@everx.com</span> /{' '}
+              <span className="font-mono">password123</span>
+            </p>
+          )}
+
           <div className="mt-6 text-center text-sm text-slate-600">
             Don't have an account?{' '}
             <Link to="/signup" className="font-semibold text-blue-600 hover:text-blue-700">

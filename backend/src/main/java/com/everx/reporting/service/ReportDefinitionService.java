@@ -4,6 +4,7 @@ import com.everx.reporting.dto.*;
 import com.everx.reporting.entity.ReportDefinitionEntity;
 import com.everx.reporting.repository.ReportDefinitionRepository;
 import com.everx.shared.exception.ValidationException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -42,6 +43,13 @@ public class ReportDefinitionService {
         if (user == null) {
             throw new SecurityException("User authentication is required to create reports");
         }
+        return create(request, user.getUsername());
+    }
+
+    public ReportDefinitionEntity create(CreateReportRequest request, String ownerPrincipal) {
+        if (ownerPrincipal == null || ownerPrincipal.isBlank()) {
+            throw new SecurityException("User authentication is required to create reports");
+        }
 
         if (request == null || request.getReportName() == null || request.getReportName().isBlank()) {
             throw new ValidationException("reportName", "Report name is required");
@@ -52,11 +60,10 @@ public class ReportDefinitionService {
 
         String normalizedReportName = request.getReportName().trim();
         String normalizedModule = request.getModule().trim();
-        String reportKey = generateDeterministicReportKey(user.getUsername(), normalizedModule, normalizedReportName);
+        String reportKey = generateDeterministicReportKey(ownerPrincipal, normalizedModule, normalizedReportName);
 
-        // De-duplicate save: same user + module + report name updates existing report instead of creating another row.
         var existing = reportDefRepo.findByOwnedByIgnoreCaseAndModuleIgnoreCaseAndReportNameIgnoreCaseAndIsActiveTrue(
-            user.getUsername(),
+            ownerPrincipal,
             normalizedModule,
             normalizedReportName
         );
@@ -64,7 +71,7 @@ public class ReportDefinitionService {
         if (existing.isPresent()) {
             ReportDefinitionEntity entity = existing.get();
             entity.setDescription(request.getDescription());
-            entity.setDefinition(request.getDefinition());
+            entity.setDefinition(normalizeDefinition(request.getDefinition()));
             entity.setReportType("CUSTOM");
             entity.setReportKey(reportKey);
             entity.setUpdatedAt(LocalDateTime.now());
@@ -77,9 +84,9 @@ public class ReportDefinitionService {
             .reportType("CUSTOM")
             .module(normalizedModule)
             .description(request.getDescription())
-            .definition(request.getDefinition())
-            .createdBy(user.getUsername())
-            .ownedBy(user.getUsername())
+            .definition(normalizeDefinition(request.getDefinition()))
+            .createdBy(ownerPrincipal)
+            .ownedBy(ownerPrincipal)
             .isSystem(false)
             .isActive(true)
             .runCount(0)
@@ -88,7 +95,6 @@ public class ReportDefinitionService {
         try {
             return reportDefRepo.save(entity);
         } catch (DataIntegrityViolationException ex) {
-            // Handles concurrent duplicate create requests safely.
             return reportDefRepo.findByReportKey(reportKey)
                 .orElseThrow(() -> new ValidationException("reportName", "A report with this name already exists"));
         }
@@ -98,11 +104,17 @@ public class ReportDefinitionService {
         if (user == null) {
             throw new SecurityException("User authentication is required to update reports");
         }
+        return update(reportId, request, user.getUsername());
+    }
+
+    public ReportDefinitionEntity update(Long reportId, UpdateReportRequest request, String ownerPrincipal) {
+        if (ownerPrincipal == null || ownerPrincipal.isBlank()) {
+            throw new SecurityException("User authentication is required to update reports");
+        }
         
         ReportDefinitionEntity entity = getReport(reportId);
 
-        // Only owner or admin can update
-        if (!entity.getOwnedBy().equals(user.getUsername())) {
+        if (!entity.getOwnedBy().equals(ownerPrincipal)) {
             throw new SecurityException("Not authorized to update this report");
         }
 
@@ -127,7 +139,7 @@ public class ReportDefinitionService {
         entity.setReportName(normalizedReportName);
         entity.setReportKey(reportKey);
         entity.setDescription(request.getDescription());
-        entity.setDefinition(request.getDefinition());
+        entity.setDefinition(normalizeDefinition(request.getDefinition()));
         entity.setUpdatedAt(LocalDateTime.now());
 
         return reportDefRepo.save(entity);
@@ -195,5 +207,22 @@ public class ReportDefinitionService {
             return "";
         }
         return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+    }
+
+    /**
+     * Hibernate JSON columns on H2 expect a serialized JSON payload (String), not a raw Map.
+     */
+    public Object normalizeDefinition(Object definition) {
+        if (definition == null) {
+            return "{}";
+        }
+        if (definition instanceof String str) {
+            return str;
+        }
+        try {
+            return objectMapper.writeValueAsString(definition);
+        } catch (JsonProcessingException e) {
+            throw new ValidationException("definition", "Invalid report definition JSON");
+        }
     }
 }

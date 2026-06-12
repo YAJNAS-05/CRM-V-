@@ -1,5 +1,5 @@
 import api from '../api/axiosInstance';
-import { employeeApi } from '../api/hrApi';
+import { employeeApi, hrProjectApi } from '../api/hrApi';
 import type { Employee } from '../types/hr';
 import type {
   Project,
@@ -545,21 +545,104 @@ export const projectService = {
   },
 
   async getMembers(projectId: string) {
-    const response = await employeeApi.getAll(0, 200);
-    const employees = response.data?.data?.content ?? [];
-    return employees.map(employee => toProjectMember(projectId, employee));
+    const projectResponse = await hrProjectApi.getById(projectId)
+    const members = projectResponse.data?.data?.members || []
+
+    if (members.length === 0) {
+      return []
+    }
+
+    const employeeResults = await Promise.allSettled(
+      members.map((member) => employeeApi.getById(member.employeeId)),
+    )
+
+    const employeeMap = new Map<string, Employee>()
+    employeeResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const employee = result.value.data?.data
+        if (employee) {
+          employeeMap.set(members[index].employeeId, employee)
+        }
+      }
+    })
+
+    return members.map((member) => {
+      const employee = employeeMap.get(member.employeeId)
+      const userId = employee?.userId || employee?.id || member.employeeId
+      const fullName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : 'Unknown user'
+
+      return {
+        id: member.id,
+        project_id: member.projectId,
+        user_id: userId,
+        role: member.role as ProjectMember['role'],
+        joined_at: member.addedAt,
+        user: {
+          id: userId,
+          full_name: fullName || 'Unknown user',
+          email: employee?.email || '',
+          avatar_url: employee?.avatarUrl || null,
+        },
+      }
+    })
   },
 
-  async addMember(_projectId: string, _userId: string, _role: string = 'MEMBER') {
-    return notImplemented('Project members');
+  async addMember(projectId: string, userId: string, role: string = 'MEMBER') {
+    const response = await hrProjectApi.addMember(projectId, { employeeId: userId, role })
+    const member = response.data?.data
+    if (!member) {
+      throw new Error('Failed to add project member')
+    }
+
+    const employeeResponse = await employeeApi.getById(member.employeeId).catch(() => null)
+    const employee = employeeResponse?.data?.data
+    const userIdValue = employee?.userId || employee?.id || member.employeeId
+    const fullName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : 'Member'
+
+    return {
+      id: member.id,
+      project_id: member.projectId,
+      user_id: userIdValue,
+      role: member.role as ProjectMember['role'],
+      joined_at: member.addedAt,
+      user: {
+        id: userIdValue,
+        full_name: fullName,
+        email: employee?.email || '',
+        avatar_url: employee?.avatarUrl || null,
+      },
+    }
   },
 
-  async removeMember(_projectId: string, _userId: string) {
-    return notImplemented('Project members');
+  async removeMember(projectId: string, userId: string) {
+    await hrProjectApi.removeMember(projectId, userId)
   },
 
-  async updateMemberRole(_projectId: string, _userId: string, _role: string) {
-    return notImplemented('Project members');
+  async updateMemberRole(projectId: string, userId: string, role: string) {
+    const response = await hrProjectApi.updateMemberRole(projectId, userId, role)
+    const member = response.data?.data
+    if (!member) {
+      throw new Error('Failed to update project member role')
+    }
+
+    const employeeResponse = await employeeApi.getById(member.employeeId).catch(() => null)
+    const employee = employeeResponse?.data?.data
+    const userIdValue = employee?.userId || employee?.id || member.employeeId
+    const fullName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : 'Member'
+
+    return {
+      id: member.id,
+      project_id: member.projectId,
+      user_id: userIdValue,
+      role: member.role as ProjectMember['role'],
+      joined_at: member.addedAt,
+      user: {
+        id: userIdValue,
+        full_name: fullName,
+        email: employee?.email || '',
+        avatar_url: employee?.avatarUrl || null,
+      },
+    }
   },
 };
 
